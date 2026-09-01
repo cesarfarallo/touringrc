@@ -19,24 +19,35 @@ Login pensado para pilotos: **Google o Apple, sin usuario/clave propios**, guard
 ## Estado actual (lo que YA existe en el repo)
 
 ```
+web/                           ← Fase A del roadmap: SPA Vite+React (nuevo)
+├── .env.example               ← plantilla VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+├── src/
+│   ├── lib/supabase.js        ← cliente de Supabase (anon key)
+│   ├── theme.js                ← tokens de diseño + checklist de tipos de archivo
+│   ├── hooks.js                 ← fetch de eventos / resultados / campeonato
+│   ├── components/               ← piezas de UI portadas del mockup, con datos reales
+│   └── App.jsx                   ← layout + tabs (Calendario / Resultados / Campeonato)
+└── README.md                   ← cómo correrlo y deployarlo
+
 touringrc-sync/
-├── .env.example              ← plantilla de variables de entorno (nuevo)
-├── .gitignore                ← ignora env/.env/__pycache__ (nuevo)
+├── .env.example              ← plantilla de variables de entorno
+├── .gitignore                ← ignora env/.env/__pycache__
 ├── requirements.txt          (pandas, xlrd, supabase, python-dotenv)
 ├── livetime_parsers.py       ← parsers de los .xls/.csv que exporta Live Timing
 ├── piloto_resolver.py        ← resolución de identidad de piloto entre reportes
 ├── sync_evento.py            ← CLI: sincroniza una carpeta de exports -> Supabase
 ├── files/                    ← muestras reales de exports de Live Timing (fixtures)
 ├── mockup/
-│   └── touringrc-app-skeleton.jsx   ← mockup de UI (referencia de diseño, no un app real)
+│   └── touringrc-app-skeleton.jsx   ← mockup de UI original (referencia de diseño)
 └── sql/
     ├── schema.sql             ← modelo de datos completo + RLS
     └── seed.sql                ← seed de ejemplo (1 campeonato + 7 fechas)
 ```
 
-**No existe todavía** ningún proyecto de frontend real (sin `package.json`, sin build), ni auth
-implementado, ni el flujo de inscripción-online-escribe-en-la-base, ni exportación de
-inscriptos, ni panel admin real. Ver "Roadmap" más abajo.
+`web/` lee `eventos`, `resultados_finales` y `campeonato_puntos` en vivo desde Supabase
+(lectura pública, sin auth). **Todavía no existe**: login real (Google/Apple), el flujo de
+inscripción-online-escribe-en-la-base, exportación de inscriptos, ni panel admin real — los
+botones de login/admin en `web/` son placeholders visuales. Ver "Roadmap" más abajo.
 
 ## Arquitectura objetivo
 
@@ -71,6 +82,12 @@ inscriptos, ni panel admin real. Ver "Roadmap" más abajo.
 queda con el comportamiento default de Postgres/Supabase (sin política = sin acceso vía la
 `anon key` una vez que se habilite RLS en esas tablas, o acceso abierto si nunca se habilita —
 a decidir explícitamente en la Fase F del roadmap, hoy es un punto ciego).
+
+**Nota de diseño (`eventos` vs. `clase`)**: `eventos` NO tiene columna `clase` — un evento puede
+tener resultados de varias clases a la vez (así lo modelan `resultados_finales` y
+`campeonato_puntos`, cada uno con su propio `clase_id`). El mockup original simplificaba esto con
+un campo `evento.clase` fijo; `web/` no lo reproduce — el filtro de clase vive en las vistas de
+Resultados/Campeonato, no en la tarjeta de cada evento del calendario.
 
 ## Pipeline de sincronización (`touringrc-sync/`)
 
@@ -149,19 +166,22 @@ cual. Define:
   como plantilla. El script de sync usa la `service_role key` (bypasea RLS), tratarla como
   secreto de máxima sensibilidad.
 
-## ⚠️ Seguridad — acción pendiente del usuario
+## ⚠️ Seguridad
 
-Hasta este commit, `touringrc-sync/env` y `touringrc-sync/sql/env` estuvieron trackeados en git
-con una `SUPABASE_URL` y una `SUPABASE_SERVICE_KEY` reales en texto plano (la `service_role`
-key, que bypasea RLS por completo). Este commit los saca del tracking y agrega `.gitignore` +
-`.env.example`, pero **el valor viejo sigue en el historial de git**. Falta, y lo tiene que
-hacer el usuario porque requiere el dashboard de Supabase:
+`touringrc-sync/env` y `touringrc-sync/sql/env` estuvieron trackeados en git con una
+`SUPABASE_URL` y una `SUPABASE_SERVICE_KEY` reales en texto plano (la `service_role` key, que
+bypasea RLS por completo). Se sacaron del tracking (quedan `.gitignore` + `.env.example` como
+plantilla) y **la clave legacy expuesta ya fue invalidada** desde el dashboard de Supabase
+(Settings → API Keys → "Disable JWT-based API keys", tras migrar a las claves nuevas
+`publishable`/`secret`) — el valor que quedó en el historial de git ya no sirve para nada.
 
-1. **Rotar la `service_role key`**: Supabase Dashboard → Project Settings → API → "Reset"
-   sobre la service_role key. Actualizar el `env` local (no commiteado) con el valor nuevo.
-2. (Recomendado, opcional) Purgar el valor viejo del historial de git con `git filter-repo` o
-   BFG Repo-Cleaner — no se hizo en este paso por ser una reescritura de historia compartida
-   (afecta a cualquiera con un clone existente); coordinarlo antes de ejecutarlo.
+Pendiente (opcional, prolijidad): purgar el valor viejo del historial de git con
+`git filter-repo` o BFG Repo-Cleaner — no es urgente porque la clave ya está muerta, pero
+conviene coordinarlo en algún momento por ser una reescritura de historia compartida (afecta a
+cualquiera con un clone existente).
+
+Al correr `sync_evento.py` de acá en adelante, usar la **secret key** nueva (reemplazo de
+`service_role` en el esquema de claves actual de Supabase) en el `env` local.
 
 ## Hosting — opciones gratuitas evaluadas
 
@@ -176,11 +196,12 @@ hacer el usuario porque requiere el dashboard de Supabase:
   porque Live Timing corre ahí. Si más adelante se quiere automatizar, evaluar GitHub Actions
   (trigger manual) o una Supabase Edge Function — no es necesario para el estado actual.
 
-## Roadmap (fases siguientes, no implementadas todavía)
+## Roadmap
 
-1. **Fase A — Scaffold del frontend**: proyecto Vite+React, `@supabase/supabase-js`, migrar
-   las 3 vistas del mockup a datos reales de lectura pública (`eventos`, `resultados_finales`,
-   `campeonato_puntos`), sin auth todavía. Deploy a Vercel.
+1. ✅ **Fase A — Scaffold del frontend** (`web/`): proyecto Vite+React, `@supabase/supabase-js`,
+   las 3 vistas del mockup migradas a datos reales de lectura pública (`eventos`,
+   `resultados_finales`, `campeonato_puntos`), sin auth todavía. **Falta deployar a Vercel**
+   (conectar el repo, Root Directory = `web/`, cargar las env vars — ver `web/README.md`).
 2. **Fase B — Auth Google/Apple**: configurar providers OAuth en Supabase Auth (arrancar por
    Google), vincular `auth_user_id` en `pilotos` en el primer login, guardar `email`.
 3. **Fase C — Inscripción online**: formulario que inserta en `inscripciones` (la policy RLS ya
