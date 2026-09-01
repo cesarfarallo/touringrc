@@ -9,7 +9,7 @@ sección 5 para la lógica completa.
 """
 from livetime_parsers import parse_nombre_crudo
 
-
+    
 class PilotoResolver:
     def __init__(self, supabase_client):
         self.sb = supabase_client
