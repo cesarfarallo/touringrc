@@ -265,8 +265,9 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    `VITE_SUPABASE_ANON_KEY`, no la `anon key` legacy — las legacy quedaron deshabilitadas
    (ver sección de Seguridad). La UI ahora muestra un banner de error visible si falla la
    conexión a Supabase (antes fallaba en silencio y quedaba todo en blanco).
-2. 🔧 **Fase B — Auth Google + email** (en curso): código listo, falta la config manual en
-   Google Cloud/Supabase (ver checklist más abajo). Qué se hizo:
+2. 🔧 **Fase B — Auth Google + email** (en curso): código listo y **verificado funcionando en
+   staging** (login con Google, trigger vinculó el piloto correctamente). Falta repetir la
+   config en el proyecto de producción (ver checklist más abajo). Qué se hizo:
    - `touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql` — trigger
      `on_auth_user_created` (security definer) sobre `auth.users`: en el primer login busca un
      `piloto` con ese email sin vincular (`auth_user_id is null`) y lo vincula, o si no existe
@@ -295,6 +296,11 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
      Cloud Console, habilitar el provider Google en Supabase Auth (en los dos proyectos,
      staging y prod), confirmar que el provider Email esté habilitado (suele venir activo por
      default) y correr la migración 0001 en los dos proyectos.
+     - ✅ Staging: hecho y confirmado (proyecto de Google Cloud `touringrc`, credenciales OAuth
+       con las dos redirect URIs de Supabase cargadas; login con Google probado end-to-end).
+     - ⏳ Producción: repetir los mismos pasos con el mismo cliente OAuth (ya tiene las dos
+       redirect URIs, no hace falta crear uno nuevo) — falta habilitar el provider y correr la
+       migración 0001 en el proyecto de producción (`lkfbpmhefunzmmkrfqnm`).
    - Apple Sign In: descartado por ahora (cuenta de Apple Developer paga); el magic link a
      email cubre el mismo caso de uso sin costo — se puede sumar Apple más adelante si hace
      falta.
