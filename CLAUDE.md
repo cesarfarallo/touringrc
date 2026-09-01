@@ -213,6 +213,10 @@ en curso mientras se prueba algo:
 | **Staging** | `dev` | Preview Deployment (URL única por push) | Proyecto Supabase separado, con `schema.sql` + `seed.sql` de prueba |
 | **Producción** | `main` | Production Deployment (`*.vercel.app` / dominio final) | Proyecto Supabase de producción (el original, con datos reales del club) |
 
+✅ Ya armado: proyecto de staging creado en Supabase, `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`
+cargadas en Vercel con target Production (prod) y Preview (staging) por separado. Este commit
+es, de hecho, el primer push de prueba del flujo `dev` → Preview Deployment.
+
 Flujo de trabajo:
 1. Se labura y commitea en `dev` (local o acá), push a `dev` cada tanto (no hace falta que sea
    commit por commit, sí antes de dar algo por terminado).
