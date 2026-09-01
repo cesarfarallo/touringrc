@@ -203,6 +203,39 @@ el frontend: usar la **Publishable key** (reemplazo de `anon key`) en `VITE_SUPA
   porque Live Timing corre ahí. Si más adelante se quiere automatizar, evaluar GitHub Actions
   (trigger manual) o una Supabase Edge Function — no es necesario para el estado actual.
 
+## Entornos: staging vs. producción
+
+Dos ramas de git + dos proyectos de Supabase, para no arriesgar datos reales de un campeonato
+en curso mientras se prueba algo:
+
+| | Rama | Deploy (Vercel) | Base de datos |
+|---|---|---|---|
+| **Staging** | `dev` | Preview Deployment (URL única por push) | Proyecto Supabase separado, con `schema.sql` + `seed.sql` de prueba |
+| **Producción** | `main` | Production Deployment (`*.vercel.app` / dominio final) | Proyecto Supabase de producción (el original, con datos reales del club) |
+
+Flujo de trabajo:
+1. Se labura y commitea en `dev` (local o acá), push a `dev` cada tanto (no hace falta que sea
+   commit por commit, sí antes de dar algo por terminado).
+2. Cada push a `dev` dispara automáticamente un **Preview Deployment** en Vercel, apuntando a
+   la base de **staging** (env vars de Vercel escopeadas a "Preview" — ver más abajo). Se prueba
+   ahí sin riesgo.
+3. Cuando algo está confirmado, se lleva `dev` → `main` (fast-forward, como se hizo con Fase A).
+   Vercel redeploya producción automáticamente contra la base real.
+
+**Configuración en Vercel** (Settings → Environment Variables): las variables
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` están duplicadas con distinto *target*:
+- Target **Production** → URL y Publishable key del proyecto de Supabase de **producción**.
+- Target **Preview** (y opcionalmente Development) → URL y Publishable key del proyecto de
+  **staging**.
+
+**Settings → Git → Production Branch** tiene que estar en `main` (así los pushes a `dev` generan
+Preview y no pisan producción).
+
+**Cambios de schema SQL**: como son dos proyectos de Supabase separados (no hay migraciones
+automáticas entre ellos), todo cambio de schema se escribe como un archivo nuevo en
+`touringrc-sync/sql/migrations/` (ver el README ahí para la convención) y se corre a mano,
+primero en staging para validar, después el mismo archivo sin cambios en producción.
+
 ## Roadmap
 
 1. ✅ **Fase A — Scaffold del frontend** (`web/`): proyecto Vite+React, `@supabase/supabase-js`,
