@@ -1,4 +1,0 @@
-pandas
-xlrd
-supabase
-python-dotenv
