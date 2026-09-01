@@ -235,6 +235,12 @@ Flujo de trabajo:
 - Target **Preview** (y opcionalmente Development) → URL y Publishable key del proyecto de
   **staging**.
 
+Además, `VITE_APP_ENV=staging` con target **Preview únicamente** (sin cargar en Production)
+prende una franja roja diagonal "DEV" en la esquina de la web
+(`web/src/components/DevRibbon.jsx`) — para no confundir nunca a simple vista un Preview
+Deployment con producción. Corriendo local con `npm run dev` la franja aparece sola, sin
+necesidad de esta variable.
+
 **Settings → Git → Production Branch** tiene que estar en `main` (así los pushes a `dev` generan
 Preview y no pisan producción).
 

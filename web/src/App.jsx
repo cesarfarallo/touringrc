@@ -11,6 +11,7 @@ import TablaCampeonato from "./components/TablaCampeonato";
 import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
 import PilotosAdmin from "./components/PilotosAdmin";
+import DevRibbon from "./components/DevRibbon";
 
 function nombreParaMostrar(piloto, session) {
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
@@ -63,6 +64,7 @@ export default function TouringRCApp() {
   return (
     <div style={{ background: T.bg, minHeight: "100vh", color: T.text, fontFamily: "Inter, sans-serif" }}>
       <style>{FONTS}</style>
+      <DevRibbon />
 
       {/* Header */}
       <div style={{ borderBottom: `1px solid ${T.line}`, background: T.surface }}>

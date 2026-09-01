@@ -9,4 +9,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// createClient tira una excepción sincrónica si supabaseUrl no es una URL
+// válida (ej. undefined) -- eso rompe el render de toda la app en vez de
+// dejar que el banner de error de App.jsx avise qué pasó. Si faltan las env
+// vars, usamos una URL con formato válido pero inexistente: los pedidos van
+// a fallar igual, pero de forma prolija (los hooks capturan el error) en vez
+// de un crash total.
+export const supabase = createClient(supabaseUrl || "https://env-vars-faltantes.supabase.co", supabaseAnonKey || "missing-anon-key");
