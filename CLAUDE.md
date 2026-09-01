@@ -251,8 +251,24 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    `VITE_SUPABASE_ANON_KEY`, no la `anon key` legacy — las legacy quedaron deshabilitadas
    (ver sección de Seguridad). La UI ahora muestra un banner de error visible si falla la
    conexión a Supabase (antes fallaba en silencio y quedaba todo en blanco).
-2. **Fase B — Auth Google/Apple**: configurar providers OAuth en Supabase Auth (arrancar por
-   Google), vincular `auth_user_id` en `pilotos` en el primer login, guardar `email`.
+2. 🔧 **Fase B — Auth Google** (en curso): código listo, falta la config manual en Google
+   Cloud/Supabase (ver checklist más abajo). Qué se hizo:
+   - `touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql` — trigger
+     `on_auth_user_created` (security definer) sobre `auth.users`: en el primer login busca un
+     `piloto` con ese email sin vincular (`auth_user_id is null`) y lo vincula, o si no existe
+     crea uno nuevo con `auth_user_id`/`email` seteados. Corre server-side para no necesitar
+     policies de insert/update en `pilotos` desde el cliente (evita que alguien pueda "pisar" un
+     piloto ajeno via RLS mal armada).
+   - `web/src/hooks.js` — `useSession()` (sesión de Supabase Auth reactiva) y
+     `usePilotoActual(session)` (trae la fila de `pilotos` vinculada).
+   - `web/src/App.jsx` — botón "Ingresar con Google" real
+     (`supabase.auth.signInWithOAuth({ provider: "google" })`), logout real, nombre mostrado
+     sale del piloto vinculado (o el email si todavía no hay nombre). El toggle "ADMIN" sigue
+     siendo un demo visual local — no hay rol admin en la base todavía, eso es Fase E.
+   - Pendiente, manual (no se puede hacer desde el repo): crear credenciales OAuth en Google
+     Cloud Console, habilitar el provider Google en Supabase Auth (en los dos proyectos,
+     staging y prod), y correr la migración 0001 en los dos. Apple queda para más adelante
+     (requiere cuenta de Apple Developer paga).
 3. **Fase C — Inscripción online**: formulario que inserta en `inscripciones` (la policy RLS ya
    existe). Reemplazar el booleano manual `inscripcion_habilitada` por una ventana calculada
    (ej. columnas `inscripcion_desde`/`inscripcion_hasta`, o `fecha - N días` con N configurable

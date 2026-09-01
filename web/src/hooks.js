@@ -6,6 +6,54 @@ function nombrePiloto(piloto) {
   return [piloto.first_name, piloto.last_name].filter(Boolean).join(" ");
 }
 
+// Sesión de Supabase Auth (null si no hay nadie logueado). Se actualiza sola
+// ante login/logout gracias a onAuthStateChange.
+export function useSession() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  return { session, loading };
+}
+
+// Fila de `pilotos` vinculada a la sesión actual (la crea/vincula el
+// trigger on_auth_user_created en el primer login, ver
+// touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql).
+export function usePilotoActual(session) {
+  const [piloto, setPiloto] = useState(null);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setPiloto(null);
+      return;
+    }
+    let activo = true;
+    supabase
+      .from("pilotos")
+      .select("*")
+      .eq("auth_user_id", session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (activo) setPiloto(data ?? null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [session?.user?.id]);
+
+  return piloto;
+}
+
 // Trae todo el calendario, ordenado por fecha.
 export function useEventos() {
   const [eventos, setEventos] = useState([]);

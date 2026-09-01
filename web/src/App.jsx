@@ -1,16 +1,24 @@
 import { useMemo, useState } from "react";
 import { Calendar, Trophy, Flag, User, Shield, Lock, Plus, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS } from "./theme";
-import { useEventos, useResultadosEvento, useCampeonato } from "./hooks";
+import { useEventos, useResultadosEvento, useCampeonato, useSession, usePilotoActual } from "./hooks";
+import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
 import EventoCard from "./components/EventoCard";
 import TablaResultados from "./components/TablaResultados";
 import TablaCampeonato from "./components/TablaCampeonato";
 
+function nombreParaMostrar(piloto, session) {
+  const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
+  return nombre || session?.user?.email || "Piloto";
+}
+
 export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
-  const [logueado, setLogueado] = useState(false);
+  const { session } = useSession();
+  const piloto = usePilotoActual(session);
+  const logueado = !!session;
   const [esAdmin, setEsAdmin] = useState(false);
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
@@ -40,6 +48,14 @@ export default function TouringRCApp() {
   const dias = proximo ? Math.ceil((new Date(proximo.fecha) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 
   const error = errorEventos || errorCampeonato || errorResultados;
+  const mostrarAdmin = logueado && esAdmin;
+
+  const ingresar = () =>
+    supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+  const salir = () => {
+    setEsAdmin(false);
+    supabase.auth.signOut();
+  };
 
   return (
     <div style={{ background: T.bg, minHeight: "100vh", color: T.text, fontFamily: "Inter, sans-serif" }}>
@@ -72,7 +88,7 @@ export default function TouringRCApp() {
             {logueado && (
               <button
                 onClick={() => setEsAdmin(!esAdmin)}
-                title="Alternar modo admin (demo, todavía sin auth real — ver Fase B/E del roadmap)"
+                title="Alternar modo admin (demo visual — el rol de admin todavía no existe en la base, ver Fase E)"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -91,8 +107,8 @@ export default function TouringRCApp() {
               </button>
             )}
             <button
-              onClick={() => setLogueado(!logueado)}
-              title="Login con Google/Apple todavía no está conectado (Fase B del roadmap)"
+              onClick={logueado ? salir : ingresar}
+              title={logueado ? "Cerrar sesión" : "Ingresar con Google"}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -108,7 +124,7 @@ export default function TouringRCApp() {
               }}
             >
               <User size={14} />
-              {logueado ? "Piloto demo" : "Ingresar"}
+              {logueado ? nombreParaMostrar(piloto, session) : "Ingresar con Google"}
             </button>
           </div>
         </div>
@@ -186,7 +202,7 @@ export default function TouringRCApp() {
               </div>
             )}
 
-            {esAdmin && (
+            {mostrarAdmin && (
               <button
                 title="Todavía no escribe en la base (ver Fase E del roadmap)"
                 style={{
@@ -213,7 +229,7 @@ export default function TouringRCApp() {
                 <EventoCard
                   key={e.id}
                   evento={e}
-                  esAdmin={esAdmin}
+                  esAdmin={mostrarAdmin}
                   onVerResultados={(id) => {
                     setEventoResultadosId(id);
                     setTab("resultados");
