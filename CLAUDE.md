@@ -104,11 +104,17 @@ commiteado — ver `.env.example`) vía `python-dotenv`, o exportadas a mano.
 
 Orden de ejecución dentro de `main()`:
 
-1. **`sync_pilotos`** — lee `GenericImport.csv` de la carpeta (columnas: `FirstName`,
-   `LastName`, `PhoneticName`, `Country`, `PermanentNumber`, `TransponderNumber`,
-   `ChassisManufacturer` — inferidas del código, **no hay un CSV de muestra real committeado
-   en el repo**, conviene conseguir uno para confirmar si trae más columnas, ej. número de auto
-   o clase asignada). Upsert en `pilotos` por match `ilike` de nombre+apellido.
+1. **`sync_pilotos`** — lee `GenericImport.csv` de la carpeta. El formato real (headers en
+   `touringrc-sync/files/GenericImport.csv`, sin filas de datos todavía) tiene ~55 columnas —
+   `FirstName, LastName, NickName, PhoneticName, Ability, ClassName, IsPaid, PillNumber,
+   LocalRegisteredDateTime, RegistrationNumber, Region, ..., PermanentNumber, ...,
+   ChassisManufacturer, ModelName, ModelYear, TransponderNumber, ..., Email, PhoneNumber,
+   Birthday, ...` (lista completa en el propio CSV). **`sync_pilotos` hoy solo lee 7**:
+   `FirstName`, `LastName`, `PhoneticName`, `Country`, `PermanentNumber`, `TransponderNumber`,
+   `ChassisManufacturer`. Quedan sin usar, entre otras, `ClassName` (la clase asignada al
+   piloto — importante para Fase D/E, ver abajo), `RegistrationNumber` (correspondería al
+   `registration_number` de `pilotos`, el id que se inyecta EN Live Timing) y `Email`. Upsert en
+   `pilotos` por match `ilike` de nombre+apellido.
 2. **`sync_final_results`** — lee `FinalResults.xls`, resuelve cada piloto vía
    `PilotoResolver`, upsert en `resultados_finales` (marca `tq=True` si el flag `[TQ]` está en
    el nombre crudo).
@@ -208,9 +214,12 @@ Al correr `sync_evento.py` de acá en adelante, usar la **secret key** nueva (re
    existe). Reemplazar el booleano manual `inscripcion_habilitada` por una ventana calculada
    (ej. columnas `inscripcion_desde`/`inscripcion_hasta`, o `fecha - N días` con N configurable
    por evento o global).
-4. **Fase D — Export de inscriptos**: botón admin que genera `GenericImport.csv` (u otro
-   formato compatible con la importación de Live Timing) desde `inscripciones` + `pilotos` del
-   evento — resuelve la dirección web→Live Timing que hoy falta.
+4. **Fase D — Export de inscriptos**: botón admin que genera `GenericImport.csv` (formato real
+   confirmado en `touringrc-sync/files/GenericImport.csv`, ~55 columnas) desde `inscripciones` +
+   `pilotos` del evento — resuelve la dirección web→Live Timing que hoy falta. Como mínimo hay
+   que completar `FirstName`, `LastName`, `ClassName` (viene de `inscripciones.clase_id` →
+   `clases.nombre`) y, si están cargados, `Email`/`RegistrationNumber`/`PermanentNumber`/
+   `TransponderNumber` — el resto de las columnas puede ir vacío, Live Timing las tolera.
 5. **Fase E — Panel admin**: alta de eventos (insert en `eventos`), toggle/ventana de
    inscripción, upload de los archivos de resultados con el checklist ya modelado en
    `eventos.archivos`, disparo del sync (puede seguir siendo manual vía CLI o evolucionar a
