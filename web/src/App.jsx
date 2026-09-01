@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, Shield, Lock, Plus, Clock } from "lucide-react";
+import { Calendar, Trophy, Flag, User, Shield, Lock, Plus, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS } from "./theme";
 import { useEventos, useResultadosEvento, useCampeonato } from "./hooks";
 import NavTab from "./components/NavTab";
@@ -13,8 +13,8 @@ export default function TouringRCApp() {
   const [logueado, setLogueado] = useState(false);
   const [esAdmin, setEsAdmin] = useState(false);
 
-  const { eventos, loading: cargandoEventos } = useEventos();
-  const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato } = useCampeonato();
+  const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
+  const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato, error: errorCampeonato } = useCampeonato();
 
   const clases = Object.keys(campeonatoPorClase);
   const [clase, setClase] = useState(null);
@@ -30,10 +30,16 @@ export default function TouringRCApp() {
       ? eventoResultadosId
       : eventosCorridos[0]?.id;
 
-  const { porClase: resultadosPorClase, loading: cargandoResultados } = useResultadosEvento(eventoResultadosIdActivo);
+  const {
+    porClase: resultadosPorClase,
+    loading: cargandoResultados,
+    error: errorResultados,
+  } = useResultadosEvento(eventoResultadosIdActivo);
 
   const proximo = eventos.find((e) => !e.corrida);
   const dias = proximo ? Math.ceil((new Date(proximo.fecha) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+
+  const error = errorEventos || errorCampeonato || errorResultados;
 
   return (
     <div style={{ background: T.bg, minHeight: "100vh", color: T.text, fontFamily: "Inter, sans-serif" }}>
@@ -109,6 +115,27 @@ export default function TouringRCApp() {
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
+        {error && (
+          <div
+            style={{
+              marginBottom: 24,
+              padding: "12px 16px",
+              borderRadius: 8,
+              background: `${T.red}15`,
+              border: `1px solid ${T.red}40`,
+              fontSize: 13,
+              color: T.red,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <AlertTriangle size={14} />
+            No se pudo conectar con la base ({error.message ?? "error desconocido"}). Revisá
+            VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.
+          </div>
+        )}
+
         {!logueado && tab === "calendario" && (
           <div
             style={{

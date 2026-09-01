@@ -187,7 +187,8 @@ conviene coordinarlo en algún momento por ser una reescritura de historia compa
 cualquiera con un clone existente).
 
 Al correr `sync_evento.py` de acá en adelante, usar la **secret key** nueva (reemplazo de
-`service_role` en el esquema de claves actual de Supabase) en el `env` local.
+`service_role` en el esquema de claves actual de Supabase) en el `env` local. Misma lógica para
+el frontend: usar la **Publishable key** (reemplazo de `anon key`) en `VITE_SUPABASE_ANON_KEY`.
 
 ## Hosting — opciones gratuitas evaluadas
 
@@ -206,8 +207,12 @@ Al correr `sync_evento.py` de acá en adelante, usar la **secret key** nueva (re
 
 1. ✅ **Fase A — Scaffold del frontend** (`web/`): proyecto Vite+React, `@supabase/supabase-js`,
    las 3 vistas del mockup migradas a datos reales de lectura pública (`eventos`,
-   `resultados_finales`, `campeonato_puntos`), sin auth todavía. **Falta deployar a Vercel**
-   (conectar el repo, Root Directory = `web/`, cargar las env vars — ver `web/README.md`).
+   `resultados_finales`, `campeonato_puntos`), sin auth todavía. **Deployado en Vercel**
+   (Root Directory = `web/`, env vars cargadas — ver `web/README.md`). Usar la clave
+   **`Publishable key`** (esquema nuevo de Supabase, prefijo `sb_publishable_...`) en
+   `VITE_SUPABASE_ANON_KEY`, no la `anon key` legacy — las legacy quedaron deshabilitadas
+   (ver sección de Seguridad). La UI ahora muestra un banner de error visible si falla la
+   conexión a Supabase (antes fallaba en silencio y quedaba todo en blanco).
 2. **Fase B — Auth Google/Apple**: configurar providers OAuth en Supabase Auth (arrancar por
    Google), vincular `auth_user_id` en `pilotos` en el primer login, guardar `email`.
 3. **Fase C — Inscripción online**: formulario que inserta en `inscripciones` (la policy RLS ya
