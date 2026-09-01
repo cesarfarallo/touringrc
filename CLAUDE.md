@@ -242,7 +242,13 @@ Deployment con producción. Corriendo local con `npm run dev` la franja aparece 
 necesidad de esta variable.
 
 **Settings → Git → Production Branch** tiene que estar en `main` (así los pushes a `dev` generan
-Preview y no pisan producción).
+Preview y no pisan producción). Esto ya está bien configurado (Environments → Production trackea
+`main`, Preview trackea "todas las ramas sin asignar", incluye `dev`).
+
+⚠️ **Ojo con el botón "Redeploy"**: reusa la clasificación Production/Preview del deployment
+original, no la recalcula según las reglas de rama actuales — si un deployment quedó mal
+clasificado (ej. por una configuración vieja), redeployarlo no lo arregla. Para forzar una
+reclasificación correcta hace falta un deployment nuevo genuino (push real a la rama).
 
 **Cambios de schema SQL**: como son dos proyectos de Supabase separados (no hay migraciones
 automáticas entre ellos), todo cambio de schema se escribe como un archivo nuevo en
