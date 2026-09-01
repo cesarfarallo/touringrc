@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, Shield, Lock, Plus, Clock, AlertTriangle } from "lucide-react";
+import { Calendar, Trophy, Flag, User, Shield, Plus, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS } from "./theme";
 import { useEventos, useResultadosEvento, useCampeonato, useSession, usePilotoActual } from "./hooks";
 import { supabase } from "./lib/supabase";
@@ -8,6 +8,9 @@ import StartLights from "./components/StartLights";
 import EventoCard from "./components/EventoCard";
 import TablaResultados from "./components/TablaResultados";
 import TablaCampeonato from "./components/TablaCampeonato";
+import LoginCard from "./components/LoginCard";
+import MiPerfil from "./components/MiPerfil";
+import PilotosAdmin from "./components/PilotosAdmin";
 
 function nombreParaMostrar(piloto, session) {
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
@@ -17,7 +20,7 @@ function nombreParaMostrar(piloto, session) {
 export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
   const { session } = useSession();
-  const piloto = usePilotoActual(session);
+  const { piloto, loading: cargandoPiloto } = usePilotoActual(session);
   const logueado = !!session;
   const [esAdmin, setEsAdmin] = useState(false);
 
@@ -152,24 +155,8 @@ export default function TouringRCApp() {
           </div>
         )}
 
-        {!logueado && tab === "calendario" && (
-          <div
-            style={{
-              marginBottom: 24,
-              padding: "12px 16px",
-              borderRadius: 8,
-              background: `${T.teal}15`,
-              border: `1px solid ${T.teal}40`,
-              fontSize: 13,
-              color: T.teal,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <Lock size={14} /> Ingresá con Google o Apple para inscribirte a una fecha.
-          </div>
-        )}
+        {!logueado && tab === "calendario" && <LoginCard />}
+        {logueado && tab === "calendario" && <MiPerfil session={session} piloto={piloto} loading={cargandoPiloto} />}
 
         {tab === "calendario" && (
           <>
@@ -201,6 +188,8 @@ export default function TouringRCApp() {
                 <StartLights diasRestantes={dias} />
               </div>
             )}
+
+            {mostrarAdmin && <PilotosAdmin />}
 
             {mostrarAdmin && (
               <button

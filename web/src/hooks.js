@@ -29,29 +29,66 @@ export function useSession() {
 // Fila de `pilotos` vinculada a la sesión actual (la crea/vincula el
 // trigger on_auth_user_created en el primer login, ver
 // touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql).
+// `loading` distingue "todavía consultando" de "consulté y no hay piloto
+// vinculado" (esto último no debería pasar nunca si el trigger corrió bien).
 export function usePilotoActual(session) {
   const [piloto, setPiloto] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!session?.user?.id) {
       setPiloto(null);
+      setLoading(false);
       return;
     }
     let activo = true;
+    setLoading(true);
     supabase
       .from("pilotos")
       .select("*")
       .eq("auth_user_id", session.user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (activo) setPiloto(data ?? null);
+        if (!activo) return;
+        setPiloto(data ?? null);
+        setLoading(false);
       });
     return () => {
       activo = false;
     };
   }, [session?.user?.id]);
 
-  return piloto;
+  return { piloto, loading };
+}
+
+// Todos los pilotos, con el email y si tienen o no una cuenta vinculada
+// (auth_user_id). Pensado para un panel admin simple que audite que el
+// login se está asociando bien. `pilotos` tiene select público (RLS), así
+// que no hace falta ningún permiso especial para leerlo.
+export function usePilotos() {
+  const [pilotos, setPilotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("pilotos")
+      .select("id, first_name, last_name, email, auth_user_id, created_at")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setPilotos(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  return { pilotos, loading, error };
 }
 
 // Trae todo el calendario, ordenado por fecha.

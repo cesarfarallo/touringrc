@@ -14,7 +14,9 @@ web tiene que resolver tres cosas:
 3. **Resultados y campeonato**: terminada la fecha, el admin sube los archivos que exporta Live
    Timing y la web actualiza tanto el resultado de esa fecha como el acumulado del campeonato.
 
-Login pensado para pilotos: **Google o Apple, sin usuario/clave propios**, guardando el email.
+Login pensado para pilotos: **sin usuario/clave propios**, guardando el email. Implementado con
+Google + magic link a email (Apple Sign In se descartó por requerir cuenta de Apple Developer
+paga — ver Fase B).
 
 ## Estado actual (lo que YA existe en el repo)
 
@@ -251,24 +253,39 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    `VITE_SUPABASE_ANON_KEY`, no la `anon key` legacy — las legacy quedaron deshabilitadas
    (ver sección de Seguridad). La UI ahora muestra un banner de error visible si falla la
    conexión a Supabase (antes fallaba en silencio y quedaba todo en blanco).
-2. 🔧 **Fase B — Auth Google** (en curso): código listo, falta la config manual en Google
-   Cloud/Supabase (ver checklist más abajo). Qué se hizo:
+2. 🔧 **Fase B — Auth Google + email** (en curso): código listo, falta la config manual en
+   Google Cloud/Supabase (ver checklist más abajo). Qué se hizo:
    - `touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql` — trigger
      `on_auth_user_created` (security definer) sobre `auth.users`: en el primer login busca un
      `piloto` con ese email sin vincular (`auth_user_id is null`) y lo vincula, o si no existe
      crea uno nuevo con `auth_user_id`/`email` seteados. Corre server-side para no necesitar
      policies de insert/update en `pilotos` desde el cliente (evita que alguien pueda "pisar" un
-     piloto ajeno via RLS mal armada).
-   - `web/src/hooks.js` — `useSession()` (sesión de Supabase Auth reactiva) y
-     `usePilotoActual(session)` (trae la fila de `pilotos` vinculada).
-   - `web/src/App.jsx` — botón "Ingresar con Google" real
-     (`supabase.auth.signInWithOAuth({ provider: "google" })`), logout real, nombre mostrado
-     sale del piloto vinculado (o el email si todavía no hay nombre). El toggle "ADMIN" sigue
-     siendo un demo visual local — no hay rol admin en la base todavía, eso es Fase E.
+     piloto ajeno via RLS mal armada). Funciona igual sin importar el método de login (Google o
+     email), porque escucha inserts en `auth.users`, no un provider específico.
+   - `web/src/hooks.js` — `useSession()` (sesión de Supabase Auth reactiva),
+     `usePilotoActual(session)` (piloto vinculado + `loading`, para distinguir "todavía
+     consultando" de "no hay piloto vinculado") y `usePilotos()` (listado completo, para
+     auditoría admin).
+   - `web/src/components/LoginCard.jsx` — reemplaza Apple Sign In (requiere cuenta de Apple
+     Developer paga) por un **magic link a email** (`supabase.auth.signInWithOtp`): sin
+     contraseña propia, coherente con la idea original de "sin usuario/clave". Se muestra junto
+     al botón de Google cuando no hay sesión.
+   - `web/src/components/MiPerfil.jsx` — módulo de auto-chequeo: muestra, para el usuario
+     logueado, si el trigger vinculó correctamente un piloto a su cuenta (o un aviso si no,
+     útil para diagnosticar si la migración 0001 no corrió en ese proyecto de Supabase).
+   - `web/src/components/PilotosAdmin.jsx` — en modo admin, tabla de **todos** los pilotos con
+     email y si están vinculados o no (auditoría completa, no solo la propia cuenta). No
+     necesita permisos especiales porque `pilotos` ya es de lectura pública.
+   - `web/src/App.jsx` — logout real, nombre mostrado sale del piloto vinculado (o el email si
+     todavía no hay nombre). El toggle "ADMIN" sigue siendo un demo visual local — no hay rol
+     admin en la base todavía, eso es Fase E — pero ahora depende de estar realmente logueado.
    - Pendiente, manual (no se puede hacer desde el repo): crear credenciales OAuth en Google
      Cloud Console, habilitar el provider Google en Supabase Auth (en los dos proyectos,
-     staging y prod), y correr la migración 0001 en los dos. Apple queda para más adelante
-     (requiere cuenta de Apple Developer paga).
+     staging y prod), confirmar que el provider Email esté habilitado (suele venir activo por
+     default) y correr la migración 0001 en los dos proyectos.
+   - Apple Sign In: descartado por ahora (cuenta de Apple Developer paga); el magic link a
+     email cubre el mismo caso de uso sin costo — se puede sumar Apple más adelante si hace
+     falta.
 3. **Fase C — Inscripción online**: formulario que inserta en `inscripciones` (la policy RLS ya
    existe). Reemplazar el booleano manual `inscripcion_habilitada` por una ventana calculada
    (ej. columnas `inscripcion_desde`/`inscripcion_hasta`, o `fecha - N días` con N configurable
