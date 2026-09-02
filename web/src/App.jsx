@@ -193,6 +193,8 @@ export default function TouringRCApp() {
                 <EventoCard
                   key={e.id}
                   evento={e}
+                  piloto={piloto}
+                  logueado={logueado}
                   onVerResultados={(id) => {
                     setEventoResultadosId(id);
                     setTab("resultados");

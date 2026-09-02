@@ -290,6 +290,66 @@ export function useCampeonato() {
   return { campeonato, porClase, loading, error };
 }
 
+// Catálogo completo de clases (para el selector de la inscripción online).
+export function useClases() {
+  const [clases, setClases] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("clases")
+      .select("id, nombre")
+      .order("nombre")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (!error) setClases(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  return { clases, loading };
+}
+
+// Inscripción del piloto logueado a un evento puntual (si existe). Se
+// consulta por tarjeta de evento en el Calendario para decidir si mostrar
+// el formulario de inscripción o "ya estás inscripto".
+export function useInscripcionPiloto(eventoId, pilotoId) {
+  const [inscripcion, setInscripcion] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!eventoId || !pilotoId) {
+      setInscripcion(null);
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("inscripciones")
+      .select("id, clase_id, clases ( nombre )")
+      .eq("evento_id", eventoId)
+      .eq("piloto_id", pilotoId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!activo) return;
+        setInscripcion(data ?? null);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [eventoId, pilotoId, version]);
+
+  return { inscripcion, loading, recargar };
+}
+
 // ¿El usuario logueado es admin de verdad? Chequea que tenga el rol
 // 'admin' en `piloto_roles` (server-side, ver
 // touringrc-sync/sql/migrations/0003_roles_y_modulos.sql) -- no

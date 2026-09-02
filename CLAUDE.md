@@ -46,10 +46,10 @@ touringrc-sync/
     └── seed.sql                ← seed de ejemplo (1 campeonato + 7 fechas)
 ```
 
-`web/` lee `eventos`, `resultados_finales` y `campeonato_puntos` en vivo desde Supabase
-(lectura pública, sin auth). **Todavía no existe**: login real (Google/Apple), el flujo de
-inscripción-online-escribe-en-la-base, exportación de inscriptos, ni panel admin real — los
-botones de login/admin en `web/` son placeholders visuales. Ver "Roadmap" más abajo.
+`web/` lee `eventos`, `resultados_finales`, `clasificacion` y `campeonato_puntos` en vivo desde
+Supabase (lectura pública, sin auth para esas tablas). Login real (Google + magic link),
+inscripción online, export de inscriptos y panel admin ya están implementados — ver "Roadmap"
+más abajo para el detalle fase por fase.
 
 ## Arquitectura objetivo
 
@@ -74,7 +74,7 @@ botones de login/admin en `web/` son placeholders visuales. Ver "Roadmap" más a
 | `alias_pendientes` | Cola de revisión manual para nombres ambiguos (2+ candidatos posibles). | sin RLS |
 | `clases` | Categorías recurrentes entre eventos (ej. `Touring Eco 1:10 Modified`). | sin RLS |
 | `campeonatos` | Temporada/torneo (nombre, fecha_inicio, fecha_fin). | sin RLS |
-| `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"pilotos": true, "resultadosFinales": true, ...}`). | select público, insert/update solo admin (migración 0004) |
+| `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool, **sin uso desde la migración 0007** — reemplazado por la ventana calculada), `inscripcion_dias_antes` (int, migración 0007: cuántos días antes de `fecha` se habilita la inscripción online para *esa* fecha en particular — nullable, cada evento configura el suyo), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"resultadosFinales": true, ...}`). | select público, insert/update solo admin (migración 0004) |
 | `inscripciones` | Inscripción de un piloto a una fecha/clase, hecha desde la web. `sincronizado_a_livetime` marca si ya se exportó hacia Live Timing. Unique `(evento_id, piloto_id, clase_id)`. | insert/select solo del propio piloto vía `auth.uid()` |
 | `resultados_finales` | Resultado final de un piloto en una clase de un evento (posición, resultado crudo, heat, `tq`, `vuelta_rapida`). Unique `(evento_id, clase_id, piloto_id)`. | sin RLS |
 | `resultados_ronda` | Detalle por ronda/heat (laps, tiempos, promedios). Unique `(evento_id, clase_id, ronda, piloto_id)`. **Ojo**: la columna `tiempo interval` existe pero `sync_evento.py` no la completa hoy (solo llena `vueltas`). | sin RLS |
@@ -344,8 +344,9 @@ función no se corrió nunca contra un proyecto de Supabase real. Probarla subie
 real desde Gestión de eventos en staging antes de asumir que está lista para producción.
 
 **Bug encontrado en la primera prueba real en staging**: las escrituras (`upsert`/`insert`/
-`update`) en `syncPilotos`/`syncFinalResults`/`syncRoundResults`/`syncTopTimes`/
-`syncCampeonato` y en `piloto_resolver.ts` no chequeaban el `error` que devuelve el cliente de
+`update`) en `syncFinalResults`/`syncRoundResults`/`syncTopTimes`/`syncCampeonato` (y
+`syncPilotos`, que existía en ese momento y se sacó después junto con el tipo `"pilotos"`, ver
+más abajo) y en `piloto_resolver.ts` no chequeaban el `error` que devuelve el cliente de
 Supabase — si el insert fallaba (ej. desajuste de tipos, FK inválida), el código seguía de
 largo, contaba la fila como sincronizada igual, y la función devolvía `{ ok: true }` con el
 checklist tildado aunque no se hubiera escrito nada. Corregido: ahora cada escritura chequea
@@ -353,6 +354,33 @@ checklist tildado aunque no se hubiera escrito nada. Corregido: ahora cada escri
 del botón "Subir resultados" muestra el motivo real en vez de un falso éxito silencioso. Hay
 que re-deployar la función (`supabase functions deploy subir-resultado`) para que este fix
 tome efecto en los proyectos ya deployados.
+
+## Inscripción online y export de inscriptos (Fase C/D)
+
+- **Ventana de inscripción por evento** (migración 0007, `eventos.inscripcion_dias_antes`):
+  reemplaza el booleano manual `inscripcion_habilitada`. La web calcula si la inscripción está
+  abierta en el cliente (`inscripcionAbierta()` en `EventoCard.jsx`): abierta desde
+  `fecha - inscripcion_dias_antes` días hasta `fecha` inclusive. El admin lo configura por
+  evento desde Gestión de eventos (`InscripcionDiasEditable` en `GestionEventos.jsx`, editable
+  tanto al dar de alta una fecha nueva como en cualquier fecha ya existente) — nulo significa
+  "sin inscripción online para esa fecha" (el botón queda deshabilitado).
+- **Botón "Inscribirme"** (`EventoCard.jsx`, Calendario público): visible solo logueado y
+  dentro de la ventana. `useInscripcionPiloto(eventoId, pilotoId)` (`hooks.js`) chequea si el
+  piloto ya tiene una inscripción para ese evento — si la tiene, muestra la clase en vez del
+  botón (no se soporta anotarse a más de una clase por evento desde la UI, aunque el modelo de
+  datos lo permitiría). Si no, un formulario inline con un `<select>` de clases
+  (`useClases()`) inserta en `inscripciones` — la policy RLS de insert/select ya existía
+  (`piloto_id in (select id from pilotos where auth_user_id = auth.uid())`, ver
+  `schema.sql`), no hizo falta ninguna migración de permisos nueva.
+- **Export de inscriptos** (`web/src/lib/genericImport.js` + botón "Exportar inscriptos" en
+  `GestionEventos.jsx`): arma el `GenericImport.csv` real (56 columnas, header tomado tal cual
+  de `touringrc-sync/files/GenericImport.csv`) a partir de `inscripciones` del evento, join con
+  `pilotos` y `clases` — completa `FirstName`/`LastName`/`ClassName`/`Email`/
+  `RegistrationNumber`/`PermanentNumber`/`TransponderNumber`, el resto de las columnas queda
+  vacío (Live Timing las tolera). Descarga el archivo directo en el navegador (`Blob` +
+  `<a download>`), sin pasar por ningún backend — es una lectura pública de datos que ya son
+  del propio club, no hizo falta una Edge Function para esto. El admin lo importa a mano en
+  Live Timing (no hay API para automatizar ese lado).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
@@ -508,21 +536,25 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    - Apple Sign In: descartado por ahora (cuenta de Apple Developer paga); el magic link a
      email cubre el mismo caso de uso sin costo — se puede sumar Apple más adelante si hace
      falta.
-3. 🔧 **Fase C — Inscripción online** (en curso): prerrequisitos ya resueltos — admin real +
-   vinculación de login por nombre (migración 0002, ver sección arriba) y `cargar_roster.py`
-   para volcar el roster ya cargado en Live Timing. Falta correr `cargar_roster.py` con el
-   roster completo del club (hoy solo se probó con el `EventVerification-Event30.xls` de
-   ejemplo) y construir el formulario en sí: inserta en `inscripciones` (la policy RLS ya
-   existe), pre-completa nombre/apellido si el piloto vinculado ya los tiene. Reemplazar el
-   booleano manual `inscripcion_habilitada` por una ventana calculada (ej. columnas
-   `inscripcion_desde`/`inscripcion_hasta`, o `fecha - N días` con N configurable por evento o
-   global).
-4. **Fase D — Export de inscriptos**: botón admin que genera `GenericImport.csv` (formato real
-   confirmado en `touringrc-sync/files/GenericImport.csv`, ~55 columnas) desde `inscripciones` +
-   `pilotos` del evento — resuelve la dirección web→Live Timing que hoy falta. Como mínimo hay
-   que completar `FirstName`, `LastName`, `ClassName` (viene de `inscripciones.clase_id` →
-   `clases.nombre`) y, si están cargados, `Email`/`RegistrationNumber`/`PermanentNumber`/
-   `TransponderNumber` — el resto de las columnas puede ir vacío, Live Timing las tolera.
+3. ✅ **Fase C — Inscripción online**: ventana de inscripción configurable **por evento**
+   (migración 0007, `inscripcion_dias_antes`, reemplaza el booleano manual
+   `inscripcion_habilitada`) y botón "Inscribirme" funcional en el Calendario público (ver
+   sección "Inscripción online y export de inscriptos" más arriba) — inserta en
+   `inscripciones` con la policy RLS que ya existía desde el baseline. No pre-completa
+   nombre/apellido en un formulario propio porque no hace falta: el piloto ya está identificado
+   por la sesión, solo elige la clase. Pendiente (no bloqueante): correr `cargar_roster.py` con
+   el roster completo del club si todavía no se hizo (hoy solo confirmado con el
+   `EventVerification-Event30.xls` de ejemplo) — sin eso, un piloto que se loguea por primera
+   vez y no matchea contra el roster igual puede inscribirse (el trigger de la migración 0002
+   le crea un piloto nuevo), pero puede terminar duplicado si después se carga el roster real.
+4. ✅ **Fase D — Export de inscriptos**: botón "Exportar inscriptos" en Gestión de eventos
+   genera el `GenericImport.csv` real (56 columnas, confirmado en
+   `touringrc-sync/files/GenericImport.csv`) desde `inscripciones` + `pilotos` + `clases` del
+   evento y lo descarga directo en el navegador — ver sección de arriba
+   (`web/src/lib/genericImport.js`). Completa `FirstName`, `LastName`, `ClassName`, y si están
+   cargados `Email`/`RegistrationNumber`/`PermanentNumber`/`TransponderNumber`; el resto de las
+   columnas queda vacío, Live Timing las tolera. El admin todavía tiene que importarlo a mano
+   en Live Timing — no hay API para automatizar ese lado.
 5. ✅ **Fase E — Panel admin**: sección Admin separada del Calendario público, con roles
    configurables por módulo (migración 0003), alta de eventos (migración 0004, módulo
    "Gestión de eventos") y subida de resultados desde la web funcionando de punta a punta vía

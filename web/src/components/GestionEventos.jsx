@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Pencil, Download } from "lucide-react";
 import { T } from "../theme";
 import { useEventos } from "../hooks";
 import { supabase } from "../lib/supabase";
+import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import ArchivosChecklist from "./ArchivosChecklist";
 
 // Infiere qué tipo de archivo de Live Timing es según el nombre, para no
@@ -47,6 +48,7 @@ function NuevaFecha({ onCreado }) {
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
+  const [diasAntes, setDiasAntes] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
 
@@ -55,7 +57,11 @@ function NuevaFecha({ onCreado }) {
     if (!nombre.trim() || !fecha) return;
     setGuardando(true);
     setError(null);
-    const { error } = await supabase.from("eventos").insert({ nombre: nombre.trim(), fecha });
+    const { error } = await supabase.from("eventos").insert({
+      nombre: nombre.trim(),
+      fecha,
+      inscripcion_dias_antes: diasAntes === "" ? null : Number(diasAntes),
+    });
     setGuardando(false);
     if (error) {
       setError(error.message);
@@ -63,6 +69,7 @@ function NuevaFecha({ onCreado }) {
     }
     setNombre("");
     setFecha("");
+    setDiasAntes("");
     setAbierto(false);
     onCreado();
   }
@@ -142,6 +149,26 @@ function NuevaFecha({ onCreado }) {
           }}
         />
       </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ fontSize: 11, color: T.muted }}>Inscripción (días antes)</label>
+        <input
+          type="number"
+          min="0"
+          value={diasAntes}
+          onChange={(e) => setDiasAntes(e.target.value)}
+          placeholder="ej. 10"
+          style={{
+            background: T.surfaceRaised,
+            border: `1px solid ${T.line}`,
+            borderRadius: 8,
+            padding: "8px 12px",
+            color: T.text,
+            fontSize: 13,
+            fontFamily: "JetBrains Mono, monospace",
+            width: 90,
+          }}
+        />
+      </div>
       <button
         type="submit"
         disabled={guardando}
@@ -170,10 +197,120 @@ function NuevaFecha({ onCreado }) {
   );
 }
 
+function InscripcionDiasEditable({ evento, onGuardado }) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(evento.inscripcion_dias_antes ?? "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    const { error } = await supabase
+      .from("eventos")
+      .update({ inscripcion_dias_antes: valor === "" ? null : Number(valor) })
+      .eq("id", evento.id);
+    setGuardando(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEditando(false);
+    onGuardado();
+  }
+
+  if (!editando) {
+    return (
+      <button
+        onClick={() => {
+          setValor(evento.inscripcion_dias_antes ?? "");
+          setEditando(true);
+        }}
+        title="Editar días de antelación para inscripción"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          color: T.muted,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 12,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {evento.inscripcion_dias_antes != null ? `Inscripción: ${evento.inscripcion_dias_antes}d antes` : "Sin inscripción online"}{" "}
+        <Pencil size={11} />
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <input
+        type="number"
+        min="0"
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        placeholder="días"
+        autoFocus
+        style={{
+          background: T.surfaceRaised,
+          border: `1px solid ${T.line}`,
+          borderRadius: 6,
+          padding: "4px 8px",
+          color: T.text,
+          fontSize: 12,
+          fontFamily: "JetBrains Mono, monospace",
+          width: 60,
+        }}
+      />
+      <button
+        onClick={guardar}
+        disabled={guardando}
+        style={{ border: "none", background: "transparent", color: T.amber, fontSize: 12, cursor: "pointer" }}
+      >
+        {guardando ? "..." : "Guardar"}
+      </button>
+      <button
+        onClick={() => setEditando(false)}
+        style={{ border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer" }}
+      >
+        Cancelar
+      </button>
+      {error && <span style={{ color: T.red, fontSize: 11 }}>{error}</span>}
+    </div>
+  );
+}
+
 function FilaEvento({ evento, onSubido }) {
   const inputRef = useRef(null);
   const [subiendo, setSubiendo] = useState(false);
   const [mensaje, setMensaje] = useState(null);
+  const [exportando, setExportando] = useState(false);
+
+  async function exportarInscriptos() {
+    setExportando(true);
+    setMensaje(null);
+    try {
+      const { data, error } = await supabase
+        .from("inscripciones")
+        .select("pilotos ( first_name, last_name, email, registration_number, permanent_number, transponder_number ), clases ( nombre )")
+        .eq("evento_id", evento.id);
+      if (error) throw error;
+      if (!data?.length) {
+        setMensaje({ ok: false, texto: "Todavía no hay inscriptos en esta fecha" });
+        return;
+      }
+      const inscriptos = data.map((i) => ({ ...i.pilotos, clase_nombre: i.clases?.nombre }));
+      descargarCsv(`GenericImport-${evento.nombre.replace(/\s+/g, "_")}.csv`, generarGenericImportCsv(inscriptos));
+    } catch (err) {
+      setMensaje({ ok: false, texto: err.message ?? String(err) });
+    } finally {
+      setExportando(false);
+    }
+  }
 
   const fechaStr = new Date(evento.fecha + "T00:00:00").toLocaleDateString("es-AR", {
     day: "2-digit",
@@ -218,8 +355,32 @@ function FilaEvento({ evento, onSubido }) {
         <div>
           <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 18, fontWeight: 600 }}>{evento.nombre}</div>
           <div style={{ color: T.muted, fontSize: 13, marginTop: 2 }}>{fechaStr}</div>
+          <div style={{ marginTop: 6 }}>
+            <InscripcionDiasEditable evento={evento} onGuardado={onSubido} />
+          </div>
         </div>
-        <div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={exportarInscriptos}
+            disabled={exportando}
+            title="Genera el GenericImport.csv para importar en Live Timing"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: `1px solid ${T.line}`,
+              background: "transparent",
+              color: T.text,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: exportando ? "default" : "pointer",
+            }}
+          >
+            <Download size={13} />
+            {exportando ? "Exportando..." : "Exportar inscriptos"}
+          </button>
           <input
             ref={inputRef}
             type="file"
