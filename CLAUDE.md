@@ -74,7 +74,7 @@ botones de login/admin en `web/` son placeholders visuales. Ver "Roadmap" más a
 | `alias_pendientes` | Cola de revisión manual para nombres ambiguos (2+ candidatos posibles). | sin RLS |
 | `clases` | Categorías recurrentes entre eventos (ej. `Touring Eco 1:10 Modified`). | sin RLS |
 | `campeonatos` | Temporada/torneo (nombre, fecha_inicio, fecha_fin). | sin RLS |
-| `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"pilotos": true, "resultadosFinales": true, ...}`). | select público |
+| `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"pilotos": true, "resultadosFinales": true, ...}`). | select público, insert/update solo admin (migración 0004) |
 | `inscripciones` | Inscripción de un piloto a una fecha/clase, hecha desde la web. `sincronizado_a_livetime` marca si ya se exportó hacia Live Timing. Unique `(evento_id, piloto_id, clase_id)`. | insert/select solo del propio piloto vía `auth.uid()` |
 | `resultados_finales` | Resultado final de un piloto en una clase de un evento (posición, resultado crudo, heat, `tq`, `vuelta_rapida`). Unique `(evento_id, clase_id, piloto_id)`. | sin RLS |
 | `resultados_ronda` | Detalle por ronda/heat (laps, tiempos, promedios). Unique `(evento_id, clase_id, ronda, piloto_id)`. **Ojo**: la columna `tiempo interval` existe pero `sync_evento.py` no la completa hoy (solo llena `vueltas`). | sin RLS |
@@ -226,13 +226,44 @@ permisos. Un piloto puede tener más de un rol.
   `campeonato`, `inscripcion`. `tecnica`/`comisario`/`cronometrista` arrancan sin módulos
   asignados — se configuran desde el panel.
 
-**Frontend**: `web/src/components/RolesAdmin.jsx` — dos tablas: matriz rol×módulo (tildar
-qué ve cada rol) y piloto×rol (asignar roles a cada piloto). `useEsAdmin` ahora chequea
-`piloto_roles` (no la tabla `admins`), consistente con la redefinición de `es_admin()`.
+**Frontend**: `web/src/components/RolesAdmin.jsx` — matriz rol×módulo (tildar qué ve cada
+rol); la asignación piloto×rol vive en `PilotosAdmin.jsx` junto con el resto de la gestión de
+pilotos (ver más abajo). `useEsAdmin` chequea `piloto_roles` (no la tabla `admins`),
+consistente con la redefinición de `es_admin()`.
 
 ⚠️ Igual que la 0002, esta migración depende de que ya hayas corrido la 0002 antes (usa la
 tabla `admins` para el seed inicial) — correr en orden: 0001 → 0002 → 0003, primero en
 staging.
+
+## Migración 0004: admin escribe en `eventos`
+
+Agrega policies de `insert`/`update` en `eventos` gateadas por `es_admin()` — hacían falta
+para el módulo "Gestión de eventos" (alta de fechas del calendario desde la web). Sin
+prerrequisitos más allá de tener `es_admin()` definida (viene de la 0002/0003).
+
+## Sección Admin (separada del Calendario público)
+
+El botón "ADMIN" dejó de ser un toggle dentro del tab Calendario — ahora es un tab más en el
+header (`web/src/App.jsx`), visible solo si `useEsAdmin` da `true`, que renderiza
+`web/src/components/AdminPanel.jsx`. Adentro, tres sub-tabs (mismo patrón de antes, un
+componente por tab en un array `TABS`):
+
+- **Gestión de eventos** (`GestionEventos.jsx`): lista de eventos con el checklist de
+  archivos (`ArchivosChecklist`, ya existía) y un formulario para dar de alta una fecha nueva
+  (nombre + fecha, `insert` en `eventos`, funcional). El botón "Subir resultados" por evento
+  todavía es un placeholder deshabilitado — corre server-side vía Supabase Edge Function
+  (parsers portados a TypeScript), pendiente de implementar.
+- **Pilotos** (`PilotosAdmin.jsx`): fusiona lo que antes eran tres cosas separadas — la cola
+  de `VinculosPendientes` (arriba, se muestra siempre pero queda vacía cuando no hay nada
+  pendiente), la tabla de pilotos con email editable, y chips de rol tildables por piloto
+  (reemplaza la tabla piloto×rol que antes vivía en `RolesAdmin.jsx`). Suma un filtro "Solo
+  sin vincular" (`auth_user_id is null`) para poder completarle el email a mano a alguien que
+  todavía no se logueó nunca, así el próximo login lo matchea directo por email.
+- **Roles** (`RolesAdmin.jsx`): solo la matriz rol×módulo, sin la parte de pilotos.
+
+`EventoCard.jsx` (usado en el Calendario público) perdió el prop `esAdmin` — ya no hace falta,
+las decoraciones de admin (checklist, badge de inscripción) ahora viven exclusivamente en
+`GestionEventos.jsx`.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
@@ -403,10 +434,13 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    que completar `FirstName`, `LastName`, `ClassName` (viene de `inscripciones.clase_id` →
    `clases.nombre`) y, si están cargados, `Email`/`RegistrationNumber`/`PermanentNumber`/
    `TransponderNumber` — el resto de las columnas puede ir vacío, Live Timing las tolera.
-5. **Fase E — Panel admin**: alta de eventos (insert en `eventos`), toggle/ventana de
-   inscripción, upload de los archivos de resultados con el checklist ya modelado en
-   `eventos.archivos`, disparo del sync (puede seguir siendo manual vía CLI o evolucionar a
-   subida server-side).
+5. 🔧 **Fase E — Panel admin** (en curso, adelantada): sección Admin separada del Calendario
+   público, con roles configurables por módulo (migración 0003) y alta de eventos ya
+   funcionando (migración 0004, módulo "Gestión de eventos" — ver sección de arriba). Falta:
+   subir los archivos de resultados de un evento desde la web (checklist ya modelado en
+   `eventos.archivos`, UI ya tiene el botón placeholder) — va a correr vía Supabase Edge
+   Function, portando `livetime_parsers.py` a TypeScript, en vez de seguir siendo manual vía
+   CLI.
 6. **Fase F — Hardening**: decidir y completar RLS en las tablas que hoy no la tienen
    (`resultados_finales`, `resultados_ronda`, `campeonato_puntos`, `clases`, `campeonatos`,
    `piloto_alias`, `alias_pendientes`), tests para `livetime_parsers.py`, logging estructurado

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, Shield, Plus, Clock, AlertTriangle } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS } from "./theme";
 import { useEventos, useResultadosEvento, useCampeonato, useSession, usePilotoActual, useEsAdmin } from "./hooks";
 import { supabase } from "./lib/supabase";
@@ -24,7 +24,6 @@ export default function TouringRCApp() {
   const { piloto, loading: cargandoPiloto } = usePilotoActual(session);
   const logueado = !!session;
   const { esAdmin: esAdminReal } = useEsAdmin(session);
-  const [verComoAdmin, setVerComoAdmin] = useState(false);
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
   const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato, error: errorCampeonato } = useCampeonato();
@@ -53,12 +52,11 @@ export default function TouringRCApp() {
   const dias = proximo ? Math.ceil((new Date(proximo.fecha) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 
   const error = errorEventos || errorCampeonato || errorResultados;
-  const mostrarAdmin = logueado && esAdminReal && verComoAdmin;
 
   const ingresar = () =>
     supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   const salir = () => {
-    setVerComoAdmin(false);
+    setTab("calendario");
     supabase.auth.signOut();
   };
 
@@ -89,29 +87,11 @@ export default function TouringRCApp() {
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />
             <NavTab icon={Flag} label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
             <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
+            {logueado && esAdminReal && (
+              <NavTab icon={ShieldCheck} label="Admin" active={tab === "admin"} onClick={() => setTab("admin")} />
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {logueado && esAdminReal && (
-              <button
-                onClick={() => setVerComoAdmin(!verComoAdmin)}
-                title="Alternar vista admin"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  border: `1px solid ${verComoAdmin ? T.amber : T.line}`,
-                  background: verComoAdmin ? `${T.amber}18` : "transparent",
-                  color: verComoAdmin ? T.amber : T.muted,
-                  fontSize: 11,
-                  fontFamily: "JetBrains Mono, monospace",
-                  cursor: "pointer",
-                }}
-              >
-                <Shield size={12} /> ADMIN
-              </button>
-            )}
             <button
               onClick={logueado ? salir : ingresar}
               title={logueado ? "Cerrar sesión" : "Ingresar con Google"}
@@ -192,36 +172,11 @@ export default function TouringRCApp() {
               </div>
             )}
 
-            {mostrarAdmin && <AdminPanel />}
-
-            {mostrarAdmin && (
-              <button
-                title="Todavía no escribe en la base (ver Fase E del roadmap)"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 16,
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: `1px dashed ${T.amber}66`,
-                  background: "transparent",
-                  color: T.amber,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                <Plus size={15} /> Agregar fecha al calendario
-              </button>
-            )}
-
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {eventos.map((e) => (
                 <EventoCard
                   key={e.id}
                   evento={e}
-                  esAdmin={mostrarAdmin}
                   onVerResultados={(id) => {
                     setEventoResultadosId(id);
                     setTab("resultados");
@@ -231,6 +186,8 @@ export default function TouringRCApp() {
             </div>
           </>
         )}
+
+        {tab === "admin" && esAdminReal && <AdminPanel />}
 
         {(tab === "resultados" || tab === "campeonato") && (
           <>

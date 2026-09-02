@@ -99,6 +99,9 @@ export function useEventos() {
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
 
   useEffect(() => {
     let activo = true;
@@ -116,9 +119,9 @@ export function useEventos() {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [version]);
 
-  return { eventos, loading, error };
+  return { eventos, loading, error, recargar };
 }
 
 // Resultados finales de un evento, agrupados por clase:

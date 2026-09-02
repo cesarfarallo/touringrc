@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Link2, Users, ShieldCheck } from "lucide-react";
+import { CalendarCog, Users, ShieldCheck } from "lucide-react";
 import { T } from "../theme";
-import VinculosPendientes from "./VinculosPendientes";
+import GestionEventos from "./GestionEventos";
 import PilotosAdmin from "./PilotosAdmin";
 import RolesAdmin from "./RolesAdmin";
 
 const TABS = [
-  { id: "vinculos", label: "Vínculos pendientes", icon: Link2, Componente: VinculosPendientes },
+  { id: "eventos", label: "Gestión de eventos", icon: CalendarCog, Componente: GestionEventos },
   { id: "pilotos", label: "Pilotos", icon: Users, Componente: PilotosAdmin },
   { id: "roles", label: "Roles", icon: ShieldCheck, Componente: RolesAdmin },
 ];
@@ -36,8 +36,8 @@ function SubTab({ icon: Icon, label, active, onClick }) {
   );
 }
 
-// Agrupa los paneles admin en sub-tabs para no tener que escrolear
-// todos apilados. Cada módulo nuevo (ej. Fase C/D/E) se suma acá.
+// Sección admin, separada del Calendario público. Cada módulo nuevo
+// (ej. subida de resultados vía Edge Function) se suma a esta lista.
 export default function AdminPanel() {
   const [tab, setTab] = useState(TABS[0].id);
   const activa = TABS.find((t) => t.id === tab) ?? TABS[0];
@@ -45,7 +45,7 @@ export default function AdminPanel() {
 
   return (
     <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {TABS.map((t) => (
           <SubTab key={t.id} icon={t.icon} label={t.label} active={tab === t.id} onClick={() => setTab(t.id)} />
         ))}
