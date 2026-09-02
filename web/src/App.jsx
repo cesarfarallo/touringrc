@@ -12,6 +12,7 @@ import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
 import PilotosAdmin from "./components/PilotosAdmin";
 import VinculosPendientes from "./components/VinculosPendientes";
+import RolesAdmin from "./components/RolesAdmin";
 import DevRibbon from "./components/DevRibbon";
 
 function nombreParaMostrar(piloto, session) {
@@ -195,6 +196,7 @@ export default function TouringRCApp() {
 
             {mostrarAdmin && <VinculosPendientes />}
             {mostrarAdmin && <PilotosAdmin />}
+            {mostrarAdmin && <RolesAdmin />}
 
             {mostrarAdmin && (
               <button

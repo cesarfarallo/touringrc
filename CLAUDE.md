@@ -203,6 +203,37 @@ filas de `vinculos_pendientes` sin resolver. Para cada una, el admin puede:
 sección 1 del archivo y poner el email real que va a ser admin (reemplazar
 `'TU_EMAIL_AQUI@gmail.com'`).
 
+## Roles y módulos (migración 0003)
+
+En vez de codificar a mano qué puede hacer cada rol, la app se divide en **módulos**
+(pantallas/funciones: `calendario`, `resultados`, `campeonato`, `inscripcion`,
+`admin_pilotos`, `admin_calendario`, `admin_resultados`, `admin_roles`), y para cada
+**rol** (`admin`, `piloto`, `tecnica`, `comisario`, `cronometrista`) el admin tilda a qué
+módulos tiene acceso desde el propio panel — no hace falta tocar código para cambiar
+permisos. Un piloto puede tener más de un rol.
+
+- `roles`, `modulos`, `rol_modulos` (qué módulo ve cada rol), `piloto_roles` (qué rol tiene
+  cada piloto) — las cuatro con RLS: lectura pública (hace falta para armar el menú del
+  frontend), escritura solo admin.
+- `es_admin()` se **redefine** en términos de este esquema (antes miraba la tabla `admins` de
+  la 0002) — el rol `admin` pasa a ser un rol más, con todos los módulos por default. La
+  migración migra automáticamente los admins existentes de `admins` a `piloto_roles` (por
+  match de email). La tabla `admins` queda sin uso pero no se borra.
+- `tiene_modulo(modulo_id)` / `mis_modulos()` — funciones helper para RLS y para que el
+  frontend arme el menú (`supabase.rpc("mis_modulos")` devuelve todos los módulos del usuario
+  logueado en una sola consulta).
+- Seed inicial: `admin` → todos los módulos. `piloto` → `calendario`, `resultados`,
+  `campeonato`, `inscripcion`. `tecnica`/`comisario`/`cronometrista` arrancan sin módulos
+  asignados — se configuran desde el panel.
+
+**Frontend**: `web/src/components/RolesAdmin.jsx` — dos tablas: matriz rol×módulo (tildar
+qué ve cada rol) y piloto×rol (asignar roles a cada piloto). `useEsAdmin` ahora chequea
+`piloto_roles` (no la tabla `admins`), consistente con la redefinición de `es_admin()`.
+
+⚠️ Igual que la 0002, esta migración depende de que ya hayas corrido la 0002 antes (usa la
+tabla `admins` para el seed inicial) — correr en orden: 0001 → 0002 → 0003, primero en
+staging.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
@@ -348,8 +379,8 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
      completa, no solo la propia cuenta). No
      necesita permisos especiales porque `pilotos` ya es de lectura pública.
    - `web/src/App.jsx` — logout real, nombre mostrado sale del piloto vinculado (o el email si
-     todavía no hay nombre). El toggle "ADMIN" sigue siendo un demo visual local — no hay rol
-     admin en la base todavía, eso es Fase E — pero ahora depende de estar realmente logueado.
+     todavía no hay nombre). El toggle "ADMIN" ahora depende de un rol real en la base (ver
+     sección "Roles y módulos" más abajo, migración 0003).
    - Config manual (Google Cloud Console + Supabase Auth, en los dos proyectos) ya hecha y
      confirmada: credenciales OAuth de Google (proyecto `touringrc`, con las redirect URIs de
      staging y prod cargadas), provider Google habilitado, provider Email confirmado activo, y

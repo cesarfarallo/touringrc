@@ -236,16 +236,17 @@ export function useCampeonato() {
   return { campeonato, porClase, loading, error };
 }
 
-// ¿El usuario logueado es admin de verdad? Chequea la tabla `admins`
-// (server-side, ver touringrc-sync/sql/migrations/0002_admin_y_vinculo_por_nombre.sql)
-// -- no confundir con el toggle visual "ADMIN" del header, que ahora
+// ¿El usuario logueado es admin de verdad? Chequea que tenga el rol
+// 'admin' en `piloto_roles` (server-side, ver
+// touringrc-sync/sql/migrations/0003_roles_y_modulos.sql) -- no
+// confundir con el toggle visual "ADMIN" del header, que ahora
 // depende de esto para siquiera mostrarse.
 export function useEsAdmin(session) {
   const [esAdmin, setEsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       setEsAdmin(false);
       setLoading(false);
       return;
@@ -253,19 +254,20 @@ export function useEsAdmin(session) {
     let activo = true;
     setLoading(true);
     supabase
-      .from("admins")
-      .select("email")
-      .eq("email", session.user.email)
+      .from("pilotos")
+      .select("piloto_roles ( rol_id )")
+      .eq("auth_user_id", session.user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (!activo) return;
-        setEsAdmin(!!data);
+        const roles = (data?.piloto_roles ?? []).map((r) => r.rol_id);
+        setEsAdmin(roles.includes("admin"));
         setLoading(false);
       });
     return () => {
       activo = false;
     };
-  }, [session?.user?.email]);
+  }, [session?.user?.id]);
 
   return { esAdmin, loading };
 }
@@ -336,5 +338,114 @@ export function useVinculosPendientes(habilitado) {
   }, [habilitado, version]);
 
   return { vinculos, pilotosPorId, loading, error, recargar };
+}
+
+// Módulos a los que tiene acceso el usuario logueado (unión de todos
+// sus roles) -- ver touringrc-sync/sql/migrations/0003_roles_y_modulos.sql.
+// Devuelve un Set<string> para chequear fácil con .has("modulo_id").
+export function useMisModulos(session) {
+  const [modulos, setModulos] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setModulos(new Set());
+      setLoading(false);
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .rpc("mis_modulos")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (!error) setModulos(new Set((data ?? []).map((r) => r.modulo_id)));
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [session?.user?.id]);
+
+  return { modulos, loading };
+}
+
+// Catálogo completo de roles, módulos y qué módulo tiene cada rol
+// habilitado -- para el panel admin "Roles y módulos".
+export function useRolesYModulos(habilitado) {
+  const [roles, setRoles] = useState([]);
+  const [modulos, setModulos] = useState([]);
+  const [rolModulos, setRolModulos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!habilitado) return;
+    let activo = true;
+    setLoading(true);
+    Promise.all([
+      supabase.from("roles").select("*").order("id"),
+      supabase.from("modulos").select("*").order("id"),
+      supabase.from("rol_modulos").select("*"),
+    ]).then(([r, m, rm]) => {
+      if (!activo) return;
+      const err = r.error || m.error || rm.error;
+      if (err) {
+        setError(err);
+      } else {
+        setRoles(r.data ?? []);
+        setModulos(m.data ?? []);
+        setRolModulos(rm.data ?? []);
+      }
+      setLoading(false);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [habilitado, version]);
+
+  return { roles, modulos, rolModulos, loading, error, recargar };
+}
+
+// Qué rol(es) tiene asignado cada piloto -- { piloto_id: Set(rol_id) }.
+export function usePilotoRoles(habilitado) {
+  const [porPiloto, setPorPiloto] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!habilitado) return;
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("piloto_roles")
+      .select("piloto_id, rol_id")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) {
+          setError(error);
+          setLoading(false);
+          return;
+        }
+        const mapa = {};
+        for (const row of data ?? []) {
+          if (!mapa[row.piloto_id]) mapa[row.piloto_id] = new Set();
+          mapa[row.piloto_id].add(row.rol_id);
+        }
+        setPorPiloto(mapa);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [habilitado, version]);
+
+  return { porPiloto, loading, error, recargar };
 }
 
