@@ -1,13 +1,18 @@
 """
 Carga masiva del roster de pilotos ya cargado en Live Timing hacia
-`pilotos` en Supabase, a partir de un export EventVerification-*.xls
+`pilotos` en Supabase, a partir de exports EventVerification-*.xls
 (el que muestra quiénes están registrados/verificados en un evento, con
 Name/Email/Car/Tx por clase). No toca resultados ni eventos, solo
 pilotos -- pensado para correr una vez, antes de la Fase C, así el
 trigger de login (touringrc-sync/sql/migrations/0002_admin_y_vinculo_por_nombre.sql)
 tiene contra qué matchear por nombre.
 
-Uso:
+Uso (sin --archivo, procesa TODOS los EventVerification-*.xls que
+encuentre en touringrc-sync/files/ -- así cubrís varios eventos de una,
+cada uno suma pilotos que quizás no estaban en los otros):
+    python cargar_roster.py
+
+O apuntando a un archivo puntual, en cualquier ubicación:
     python cargar_roster.py --archivo EventVerification-Event30.xls
 
 Variables de entorno necesarias (mismas que sync_evento.py):
@@ -15,8 +20,10 @@ Variables de entorno necesarias (mismas que sync_evento.py):
     SUPABASE_SERVICE_KEY
 """
 import argparse
+import glob
 import os
 import sys
+from pathlib import Path
 
 from supabase import create_client
 
@@ -27,6 +34,8 @@ except ImportError:
     pass
 
 from livetime_parsers import parse_event_verification
+
+CARPETA_FILES = Path(__file__).resolve().parent / "files"
 
 
 def get_client():
@@ -47,15 +56,11 @@ def separar_nombre(texto):
     return " ".join(partes[:-1]), partes[-1]
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--archivo", required=True, help="Ruta al EventVerification-*.xls")
-    args = ap.parse_args()
-
-    sb = get_client()
-    filas = parse_event_verification(args.archivo)
+def procesar_archivo(sb, path):
+    filas = parse_event_verification(path)
     if not filas:
-        sys.exit("No se encontraron pilotos en el archivo.")
+        print("  (sin pilotos en este archivo)")
+        return 0, 0, 0
 
     nuevos, actualizados, omitidos = 0, 0, 0
 
@@ -94,7 +99,41 @@ def main():
             nuevos += 1
             print(f"  nuevo: {first} {last} ({f['clase']})")
 
-    print(f"\nListo: {nuevos} pilotos nuevos, {actualizados} actualizados, {omitidos} omitidos ({len(filas)} filas leídas).")
+    return nuevos, actualizados, omitidos
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--archivo",
+        help=(
+            "Ruta a un EventVerification-*.xls puntual. Si no se pasa, procesa todos los "
+            f"que encuentre en {CARPETA_FILES}"
+        ),
+    )
+    args = ap.parse_args()
+
+    sb = get_client()
+
+    if args.archivo:
+        archivos = [args.archivo]
+    else:
+        archivos = sorted(glob.glob(str(CARPETA_FILES / "EventVerification-*.xls")))
+        if not archivos:
+            sys.exit(f"No se encontró ningún EventVerification-*.xls en {CARPETA_FILES}")
+
+    total_nuevos = total_actualizados = total_omitidos = 0
+    for archivo in archivos:
+        print(f"\n=== {os.path.basename(archivo)} ===")
+        n, a, o = procesar_archivo(sb, archivo)
+        total_nuevos += n
+        total_actualizados += a
+        total_omitidos += o
+
+    print(
+        f"\nListo: {total_nuevos} pilotos nuevos, {total_actualizados} actualizados, "
+        f"{total_omitidos} omitidos, en {len(archivos)} archivo(s)."
+    )
 
 
 if __name__ == "__main__":

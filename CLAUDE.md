@@ -180,10 +180,13 @@ evento/resultados de por medio): lee un `EventVerification-*.xls` y hace upsert 
 por nombre+apellido (separando el texto crudo por espacios, el último token es el apellido —
 funciona bien con nombres de 2 palabras, con nombres compuestos de 3+ palabras es una
 heurística que puede fallar y hay que corregir a mano después). Completa
-`permanent_number`/`transponder_number` si el archivo los trae.
+`permanent_number`/`transponder_number` si el archivo los trae. Sin `--archivo`, procesa
+**todos** los `EventVerification-*.xls` que encuentre en `touringrc-sync/files/` (útil para
+sumar varios eventos de una, cada uno puede traer pilotos que los otros no tenían):
 
 ```
-python cargar_roster.py --archivo EventVerification-Event30.xls
+python cargar_roster.py
+python cargar_roster.py --archivo EventVerification-Event30.xls   # o uno puntual
 ```
 
 **Panel admin `VinculosPendientes`** (`web/src/components/VinculosPendientes.jsx`): lista las
