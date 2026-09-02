@@ -451,10 +451,29 @@ ese título de pestaña suma además el sufijo `" (DEV)"` (seteado con `document
 diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
 el título de la pestaña/marcadores/historial. El logo real de la categoría (auto + wordmark
 "touring RC", PNG con transparencia) vive en `web/public/logo.png` y se muestra en el header
-vía `<img src="/logo.png">` a 96px de alto — reemplaza el ícono `Flag` placeholder que hubo
-mientras se conseguía el archivo (el que se compartió por el chat en un mensaje llegó como
-imagen pegada, sin quedar accesible como archivo en este entorno; el admin lo subió
-directo a `dev` por su cuenta).
+vía `<img src="/logo.png">` a 192px de alto, sobresaliendo del header fijo de 96px sin
+recortarse (`overflow: visible`, posicionamiento absoluto) — reemplaza el ícono `Flag`
+placeholder que hubo mientras se conseguía el archivo. El favicon sigue siendo
+`web/public/favicon.svg`, con fondo circular gris oscuro (`#4B5563`), logo cian (`#00D9FF`)
+y contorno negro fino.
+
+## Calendario y cuenta regresiva
+
+El home ordena las tarjetas del calendario por cercanía: primero muestra las fechas futuras en
+orden ascendente y luego las fechas pasadas de la más reciente a la más antigua. La próxima fecha
+se calcula como la fecha futura más cercana, independientemente del valor de `corrida`, para no
+seguir mostrando una fecha pasada si el flag quedó desactualizado.
+
+`StartLights.jsx` muestra una representación visual inspirada en el semáforo de largada de F1:
+cinco columnas verticales con cinco luces rojas cada una. Las columnas se encienden
+progresivamente en bloques aproximados de seis días; la quinta se fuerza durante las últimas 24
+horas y, durante las últimas 12 horas, todas las luces encendidas titilan. Arriba se muestra el
+número exacto de días restantes y una frase alusiva que cambia diariamente durante los últimos
+30 días.
+
+En `EventoCard.jsx`, una fecha pasada habilita `Ver resultados` aunque `corrida` sea falso. Para
+una inscripción abierta, el usuario no autenticado también ve un botón `Inscribirme` que inicia
+el login; el formulario real sigue requiriendo una sesión y el piloto vinculado.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

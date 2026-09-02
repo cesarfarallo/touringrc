@@ -49,6 +49,18 @@ export default function TouringRCApp() {
   const clases = Object.keys(campeonatoPorClase);
   const [clase, setClase] = useState(null);
   const claseActiva = clase && clases.includes(clase) ? clase : clases[0];
+  const eventosOrdenados = useMemo(() => {
+    const ahora = new Date();
+    ahora.setHours(0, 0, 0, 0);
+    return [...eventos].sort((a, b) => {
+      const fechaA = new Date(`${a.fecha}T00:00:00`);
+      const fechaB = new Date(`${b.fecha}T00:00:00`);
+      const futuroA = fechaA >= ahora;
+      const futuroB = fechaB >= ahora;
+      if (futuroA !== futuroB) return futuroA ? -1 : 1;
+      return futuroA ? fechaA - fechaB : fechaB - fechaA;
+    });
+  }, [eventos]);
 
   const eventosCorridos = useMemo(
     () => [...eventos].filter((e) => e.corrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
@@ -98,7 +110,7 @@ export default function TouringRCApp() {
       <DevRibbon />
 
       {/* Header */}
-      <div style={{ borderBottom: `1px solid ${T.line}`, background: T.surface }}>
+      <div style={{ borderBottom: `1px solid ${T.line}`, background: T.surface, overflow: "visible" }}>
         <div
           className="header-inner"
           style={{
@@ -108,10 +120,17 @@ export default function TouringRCApp() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            height: 96,
+            boxSizing: "border-box",
+            overflow: "visible",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center" }} title="Touring 1:10 Arg">
-            <img src="/logo.png" alt="Touring 1:10 Arg" style={{ height: 96, width: "auto" }} />
+          <div style={{ display: "flex", alignItems: "flex-start", height: 192, position: "relative" }} title="Touring 1:10 Arg">
+            <img
+              src="/logo.png"
+              alt="Touring 1:10 Arg"
+              style={{ height: 192, width: "auto", display: "block", position: "absolute", top: 0, left: 0, zIndex: 2 }}
+            />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />
@@ -203,12 +222,13 @@ export default function TouringRCApp() {
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {eventos.map((e) => (
+              {eventosOrdenados.map((e) => (
                 <EventoCard
                   key={e.id}
                   evento={e}
                   piloto={piloto}
                   logueado={logueado}
+                  onLogin={ingresar}
                   onVerResultados={(id) => {
                     setEventoResultadosId(id);
                     setTab("resultados");

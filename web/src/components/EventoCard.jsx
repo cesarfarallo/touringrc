@@ -155,7 +155,7 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
   );
 }
 
-export default function EventoCard({ evento, onVerResultados, piloto, logueado }) {
+export default function EventoCard({ evento, onVerResultados, piloto, logueado, onLogin }) {
   const fecha = new Date(evento.fecha + "T00:00:00");
   const fechaStr = fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
   const hoy = new Date();
@@ -203,10 +203,33 @@ export default function EventoCard({ evento, onVerResultados, piloto, logueado }
               Ver resultados <ChevronRight size={14} />
             </button>
           ) : !logueado ? (
+            abierta ? (
+              <button
+                onClick={onLogin}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: T.amber,
+                  color: "#1A1300",
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Inscribirme
+              </button>
+            ) : (
+              <span style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif" }}>
+                Inscripción cerrada
+              </span>
+            )
+          ) : cargandoInscripcion ? (
             <span style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif" }}>
-              {abierta ? "Ingresá para inscribirte" : "Inscripción cerrada"}
+              Consultando inscripción...
             </span>
-          ) : cargandoInscripcion ? null : inscripcion ? (
+          ) : inscripcion ? (
             <span style={{ color: T.teal, fontSize: 13, fontFamily: "Inter, sans-serif", fontWeight: 500 }}>
               Inscripto — {inscripcion.clases?.nombre}
             </span>
