@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, Clock, AlertTriangle } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -78,7 +78,10 @@ export default function TouringRCApp() {
   const proximo = [...eventos]
     .filter((e) => new Date(`${e.fecha}T00:00:00`) >= hoy)
     .sort((a, b) => new Date(`${a.fecha}T00:00:00`) - new Date(`${b.fecha}T00:00:00`))[0];
-  const dias = proximo ? Math.ceil((new Date(`${proximo.fecha}T00:00:00`) - hoy) / (1000 * 60 * 60 * 24)) : 0;
+  const horasRestantes = proximo
+    ? Math.max(0, (new Date(`${proximo.fecha}T00:00:00`) - new Date()) / (1000 * 60 * 60))
+    : 0;
+  const dias = proximo ? Math.ceil(horasRestantes / 24) : 0;
 
   const error = errorEventos || errorCampeonato || errorResultados || errorClasificacion;
 
@@ -192,13 +195,9 @@ export default function TouringRCApp() {
                     Próxima fecha
                   </div>
                   <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700 }}>{proximo.nombre}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, color: T.muted, fontSize: 14 }}>
-                    <Clock size={14} />
-                    <span style={{ fontFamily: "JetBrains Mono, monospace" }}>{dias} días</span>
-                  </div>
                 </div>
                 <div style={{ flexShrink: 0 }}>
-                  <StartLights diasRestantes={dias} />
+                  <StartLights diasRestantes={dias} horasRestantes={horasRestantes} />
                 </div>
               </div>
             )}
