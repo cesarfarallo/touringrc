@@ -21,6 +21,22 @@ function inferirTipo(nombreArchivo) {
   return null;
 }
 
+// supabase-js resume cualquier error HTTP de una Edge Function como
+// "Edge Function returned a non-2xx status code", sin exponer el body
+// real que devolvimos (`{ error: "..." }`) -- hay que ir a buscarlo a
+// `error.context` (la Response cruda) para mostrar el motivo real.
+async function extraerMensajeError(error) {
+  if (error?.context && typeof error.context.json === "function") {
+    try {
+      const body = await error.context.clone().json();
+      if (body?.error) return body.error;
+    } catch {
+      // el body no era JSON -- nos quedamos con error.message
+    }
+  }
+  return error.message ?? String(error);
+}
+
 function archivoABase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -356,7 +372,7 @@ function FilaEvento({ evento, onSubido }) {
         if (tipo === "campeonato") body.campeonatoId = await campeonatoVigenteId();
 
         const { data, error } = await supabase.functions.invoke("subir-resultado", { body });
-        if (error) throw error;
+        if (error) throw new Error(await extraerMensajeError(error));
         if (data?.error) throw new Error(data.error);
 
         resultados.push({ nombre: file.name, ok: true, texto: data?.resumen ?? "Listo" });

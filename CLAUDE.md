@@ -261,7 +261,12 @@ componente por tab en un array `TABS`):
   entre sí. Muestra el resultado de cada archivo por separado (✓/✗ con el nombre) y al final
   refresca el checklist una sola vez. Si algún archivo es `SeriesResultReport.xls` (tipo
   `campeonato`), primero resuelve el `campeonato_id` vigente (el de `fecha_inicio` más
-  reciente, mismo criterio que `useCampeonato()`) antes de mandarlo.
+  reciente, mismo criterio que `useCampeonato()`) antes de mandarlo. **Ojo con los errores**:
+  `supabase.functions.invoke()` resume cualquier error HTTP de la función como el string
+  genérico `"Edge Function returned a non-2xx status code"`, sin exponer el body real que
+  devolvimos (`{ error: "..." }`) — `extraerMensajeError()` en `GestionEventos.jsx` va a buscar
+  el mensaje real a `error.context` (la `Response` cruda del fetch) para que el ✗ rojo muestre
+  el motivo real en vez del genérico.
 - **Pilotos** (`PilotosAdmin.jsx`): fusiona lo que antes eran tres cosas separadas — la cola
   de `VinculosPendientes` (arriba, se muestra siempre pero queda vacía cuando no hay nada
   pendiente), la tabla de pilotos con email editable, y chips de rol tildables por piloto
