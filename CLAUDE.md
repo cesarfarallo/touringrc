@@ -249,10 +249,14 @@ header (`web/src/App.jsx`), visible solo si `useEsAdmin` da `true`, que renderiz
 componente por tab en un array `TABS`):
 
 - **Gestión de eventos** (`GestionEventos.jsx`): lista de eventos con el checklist de
-  archivos (`ArchivosChecklist`, ya existía) y un formulario para dar de alta una fecha nueva
-  (nombre + fecha, `insert` en `eventos`, funcional). El botón "Subir resultados" por evento
-  todavía es un placeholder deshabilitado — corre server-side vía Supabase Edge Function
-  (parsers portados a TypeScript), pendiente de implementar.
+  archivos (`ArchivosChecklist`, ya existía), un formulario para dar de alta una fecha nueva
+  (nombre + fecha, `insert` en `eventos`, funcional) y un botón "Subir resultados" **funcional**
+  por evento: abre el selector de archivos del navegador, infiere el tipo de archivo por el
+  nombre (`inferirTipo`, mismos patrones que `TIPOS_ARCHIVO` en `theme.js`), lo manda en base64
+  a la Edge Function `subir-resultado` (ver sección siguiente) y refresca el checklist con el
+  resultado. Si el archivo es `SeriesResultReport.xls` (tipo `campeonato`), primero resuelve el
+  `campeonato_id` vigente (el de `fecha_inicio` más reciente, mismo criterio que
+  `useCampeonato()`) antes de mandarlo.
 - **Pilotos** (`PilotosAdmin.jsx`): fusiona lo que antes eran tres cosas separadas — la cola
   de `VinculosPendientes` (arriba, se muestra siempre pero queda vacía cuando no hay nada
   pendiente), la tabla de pilotos con email editable, y chips de rol tildables por piloto
@@ -268,6 +272,59 @@ componente por tab en un array `TABS`):
 `EventoCard.jsx` (usado en el Calendario público) perdió el prop `esAdmin` — ya no hace falta,
 las decoraciones de admin (checklist, badge de inscripción) ahora viven exclusivamente en
 `GestionEventos.jsx`.
+
+## Edge Function `subir-resultado` (`supabase/functions/subir-resultado/`)
+
+Corre server-side en Supabase (Deno) para que el botón "Subir resultados" de Gestión de
+eventos pueda escribir en `resultados_finales`/`resultados_ronda`/`campeonato_puntos`/
+`clases`/`pilotos`/`piloto_alias`/`alias_pendientes` sin exponer policies de escritura amplias
+en esas tablas al navegador — la función usa la `service_role key` internamente (nunca
+expuesta al cliente) recién después de verificar que quien llama es admin.
+
+- **`parsers.ts`**: port a TypeScript de `touringrc-sync/livetime_parsers.py`, usando
+  `npm:xlsx@0.18.5` (SheetJS) en vez de `pandas`/`xlrd`. Verificado **fila por fila, byte a
+  byte** contra la salida real del parser de Python usando los archivos de muestra de
+  `touringrc-sync/files/` (un test harness de Node armado ad-hoc para la comparación, no
+  committeado). Detalle importante encontrado en esa verificación: pandas trata por default
+  ciertos strings literales (`"N/A"`, `"NULL"`, `"null"`, etc. — su lista default de
+  `na_values`) como valor faltante aunque la celda tenga texto real; SheetJS no lo hace solo,
+  así que `limpiar()` en `parsers.ts` replica esa misma lista a mano (`NA_VALUES`) — sin este
+  fix, `SeriesResultReport.xls` perdía de forma silenciosa fechas del campeonato con datos
+  reales. **Si el formato de export de Live Timing cambia alguna vez, hay que actualizar los
+  DOS parsers (Python y este) y volver a verificar que coincidan.**
+- **`piloto_resolver.ts`**: port de `piloto_resolver.py` (`PilotoResolver`), misma lógica de
+  resolución de identidad (alias exacto → candidatos por nombre/apellido → 1 = linkea, 0 =
+  crea piloto nuevo, 2+ = encola en `alias_pendientes`), pero contra el cliente JS de
+  Supabase en vez de la librería Python.
+- **`index.ts`**: el handler (`Deno.serve`). Contrato: `POST` con body JSON
+  `{ eventoId, tipo, contenidoBase64, campeonatoId? }`, donde `tipo` es uno de `"pilotos"`
+  (`GenericImport.csv`), `"resultadosFinales"` (`FinalResults.xls`), `"detalleRondas"`
+  (`RoundResult-*.xls`), `"vueltaRapida"` (`RoundTopTimes-*.xls`) o `"campeonato"`
+  (`SeriesResultReport.xls`, requiere `campeonatoId`). Verifica el JWT del `Authorization:
+  Bearer` header contra Supabase Auth, chequea que el piloto vinculado a esa sesión tenga el
+  rol `admin` en `piloto_roles` (mismo criterio que `es_admin()` del lado de Postgres, pero
+  reimplementado acá porque una Edge Function no corre dentro de una policy de RLS), y recién
+  ahí despacha a `syncPilotos`/`syncFinalResults`/`syncRoundResults`/`syncTopTimes`/
+  `syncCampeonato` — ports directos de las funciones homónimas de `sync_evento.py`, mismo
+  orden y misma lógica de upsert. Al final llama `marcarArchivo()` (equivalente a
+  `marcar_archivo()` en Python) para actualizar el jsonb `archivos` de `eventos`, que es lo
+  que lee `ArchivosChecklist`. Devuelve `{ ok: true, resumen }` o `{ error }`.
+
+**Deploy** (manual, el admin lo corre local — no hay CI/CD para Edge Functions todavía):
+```
+npx supabase login
+npx supabase link --project-ref <ref-del-proyecto>   # staging o producción, uno a la vez
+npx supabase functions deploy subir-resultado
+```
+No hace falta configurar secrets a mano: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y
+`SUPABASE_ANON_KEY` los inyecta Supabase automáticamente en el entorno de la función. Hay que
+deployarla **una vez en cada proyecto** (staging y producción son proyectos de Supabase
+separados, ver sección "Entornos" más abajo) — deployar en uno no afecta al otro.
+
+⚠️ No verificable end-to-end desde este entorno de desarrollo (sandbox sin acceso de red a
+`supabase.co`): los parsers se validaron por comparación con el Python de referencia, pero la
+función no se corrió nunca contra un proyecto de Supabase real. Probarla subiendo un archivo
+real desde Gestión de eventos en staging antes de asumir que está lista para producción.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
@@ -438,13 +495,14 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    que completar `FirstName`, `LastName`, `ClassName` (viene de `inscripciones.clase_id` →
    `clases.nombre`) y, si están cargados, `Email`/`RegistrationNumber`/`PermanentNumber`/
    `TransponderNumber` — el resto de las columnas puede ir vacío, Live Timing las tolera.
-5. 🔧 **Fase E — Panel admin** (en curso, adelantada): sección Admin separada del Calendario
-   público, con roles configurables por módulo (migración 0003) y alta de eventos ya
-   funcionando (migración 0004, módulo "Gestión de eventos" — ver sección de arriba). Falta:
-   subir los archivos de resultados de un evento desde la web (checklist ya modelado en
-   `eventos.archivos`, UI ya tiene el botón placeholder) — va a correr vía Supabase Edge
-   Function, portando `livetime_parsers.py` a TypeScript, en vez de seguir siendo manual vía
-   CLI.
+5. ✅ **Fase E — Panel admin**: sección Admin separada del Calendario público, con roles
+   configurables por módulo (migración 0003), alta de eventos (migración 0004, módulo
+   "Gestión de eventos") y subida de resultados desde la web funcionando de punta a punta vía
+   la Edge Function `subir-resultado` (ver sección de arriba) — código escrito y verificado
+   (parsers comparados fila por fila contra el Python de referencia), **pendiente el primer
+   deploy real** (`supabase functions deploy subir-resultado` en staging y producción) y una
+   prueba end-to-end subiendo un archivo real desde el botón de Gestión de eventos, algo que no
+   se pudo hacer desde este entorno de desarrollo por no tener acceso de red a Supabase.
 6. **Fase F — Hardening**: decidir y completar RLS en las tablas que hoy no la tienen
    (`resultados_finales`, `resultados_ronda`, `campeonato_puntos`, `clases`, `campeonatos`,
    `piloto_alias`, `alias_pendientes`), tests para `livetime_parsers.py`, logging estructurado
