@@ -302,7 +302,13 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   de ronda varía según el formato de clasificación (ej. "mejores 2 de 3"). El resultado se
   guarda en la tabla `clasificacion` (migración 0006) y se muestra en la web como un sub-tab
   separado dentro de "Resultados" (`Resultados finales` / `Clasificación`, ver
-  `useClasificacionEvento` en `hooks.js` y `TablaClasificacion.jsx`).
+  `useClasificacionEvento` en `hooks.js` y `TablaClasificacion.jsx`). **Bug encontrado en la
+  primera prueba real**: `Leaderboard-Event*.xls` trae **un sheet por clase** (ej. `Sheet1` =
+  Modified, `Sheet2` = Stock), a diferencia de los demás reportes (un solo sheet, secciones por
+  clase dentro del mismo sheet) — el parser solo leía `wb.SheetNames[0]`, así que se perdían en
+  silencio todas las clases menos la primera. Corregido con `leerTodasLasHojasXls()` (itera
+  todos los sheets del workbook, no solo el primero) — verificado contra el archivo real de
+  muestra: pasó de leer 13 filas (solo Modified) a 20 (13 Modified + 7 Stock).
 - **`piloto_resolver.ts`**: port de `piloto_resolver.py` (`PilotoResolver`), misma lógica de
   resolución de identidad (alias exacto → candidatos por nombre/apellido → 1 = linkea, 0 =
   crea piloto nuevo, 2+ = encola en `alias_pendientes`), pero contra el cliente JS de

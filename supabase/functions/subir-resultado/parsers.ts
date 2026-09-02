@@ -51,6 +51,18 @@ function leerFilasXls(bytes: Uint8Array): unknown[][] {
   return XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: null }) as unknown[][];
 }
 
+// Algunos reportes (Leaderboard-Event*.xls) traen un sheet por clase en
+// vez de secciones dentro de un mismo sheet como el resto -- ej. "Sheet1"
+// = Modified, "Sheet2" = Stock. Se devuelven las filas de cada sheet por
+// separado (no concatenadas) para poder resetear el estado de parseo
+// (clase actual, columnas) entre uno y otro.
+function leerTodasLasHojasXls(bytes: Uint8Array): unknown[][][] {
+  const wb = XLSX.read(bytes, { type: "array" });
+  return wb.SheetNames.map(
+    (nombre) => XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, raw: true, defval: null }) as unknown[][]
+  );
+}
+
 // ---------------------------------------------------------------
 // Utilidades de parsing de texto
 // ---------------------------------------------------------------
@@ -377,7 +389,10 @@ export interface FilaClasificacion {
 }
 
 export function parseLeaderboard(bytes: Uint8Array): FilaClasificacion[] {
-  const filas = leerFilasXls(bytes);
+  return leerTodasLasHojasXls(bytes).flatMap(parseHojaLeaderboard);
+}
+
+function parseHojaLeaderboard(filas: unknown[][]): FilaClasificacion[] {
   const out: FilaClasificacion[] = [];
   let claseActual: string | null = null;
   let colPos = -1;
