@@ -417,6 +417,20 @@ del layout): sin overflow horizontal de la página en Calendario ni Resultados, 
 tabs scrollea para llegar a las pestañas que no entran. Falta verificar con datos reales en un
 celular de verdad (tablas largas, formularios con teclado on-screen, etc.).
 
+## Branding
+
+El nombre visible del producto es **"Touring Eco 1:10 Argentina"** (título del header en
+`App.jsx` y `<title>` de `web/index.html`) — distinto del nombre del repo/proyecto interno
+("Touring RC", usado en este documento y en el código como identificador). En entornos de
+desarrollo (`npm run dev` local o Preview de Vercel con `VITE_APP_ENV=staging`), el título de
+la pestaña del navegador suma el sufijo `" (DEV)"` (seteado con `document.title` en un
+`useEffect` de `App.jsx`, mismo criterio `ES_DEV` que usa `DevRibbon.jsx`) — la franja roja
+diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
+el título de la pestaña/marcadores/historial. Pendiente: reemplazar el ícono `Flag` de
+lucide-react del header por el logo real de la categoría (el club lo tiene que proveer como
+archivo de imagen — no se pudo bajar el que se compartió en el chat porque llegó como imagen
+pegada en el mensaje, sin quedar accesible como archivo en este entorno de desarrollo).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calendar, Trophy, Flag, User, ShieldCheck, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
@@ -27,8 +27,17 @@ function nombreParaMostrar(piloto, session) {
   return nombre || session?.user?.email || "Piloto";
 }
 
+// Mismo criterio que DevRibbon.jsx: prende solo en local (npm run dev) o
+// en Preview de Vercel (VITE_APP_ENV=staging) -- nunca en producción.
+const ES_DEV = import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "staging";
+
 export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
+
+  useEffect(() => {
+    document.title = ES_DEV ? "Touring Eco 1:10 Argentina (DEV)" : "Touring Eco 1:10 Argentina";
+  }, []);
+
   const { session } = useSession();
   const { piloto, loading: cargandoPiloto } = usePilotoActual(session);
   const logueado = !!session;
@@ -97,7 +106,7 @@ export default function TouringRCApp() {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Flag size={20} color={T.amber} />
             <span style={{ fontFamily: "Oswald, sans-serif", fontSize: 19, fontWeight: 700, letterSpacing: 0.5 }}>
-              TOURING RC
+              TOURING ECO 1:10 ARGENTINA
             </span>
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
