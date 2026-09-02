@@ -256,9 +256,13 @@ componente por tab en un array `TABS`):
 - **Pilotos** (`PilotosAdmin.jsx`): fusiona lo que antes eran tres cosas separadas — la cola
   de `VinculosPendientes` (arriba, se muestra siempre pero queda vacía cuando no hay nada
   pendiente), la tabla de pilotos con email editable, y chips de rol tildables por piloto
-  (reemplaza la tabla piloto×rol que antes vivía en `RolesAdmin.jsx`). Suma un filtro "Solo
-  sin vincular" (`auth_user_id is null`) para poder completarle el email a mano a alguien que
-  todavía no se logueó nunca, así el próximo login lo matchea directo por email.
+  (reemplaza la tabla piloto×rol que antes vivía en `RolesAdmin.jsx`). Suma un buscador
+  (nombre+apellido combinados), un filtro por uno o varios roles (chips, OR entre los
+  tildados), y un filtro "Solo sin vincular" (`auth_user_id is null`) para poder completarle
+  el email a mano a alguien que todavía no se logueó nunca, así el próximo login lo matchea
+  directo por email. También permite **dar de alta un piloto a mano** (nombre, apellido,
+  email opcional, roles) — requiere la policy de insert de la migración 0005 — útil para
+  cargar a alguien nuevo sin esperar a que se loguee o corra `cargar_roster.py`.
 - **Roles** (`RolesAdmin.jsx`): solo la matriz rol×módulo, sin la parte de pilotos.
 
 `EventoCard.jsx` (usado en el Calendario público) perdió el prop `esAdmin` — ya no hace falta,

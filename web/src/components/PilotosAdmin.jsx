@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, X, Pencil, Search } from "lucide-react";
+import { Check, X, Pencil, Search, UserPlus } from "lucide-react";
 import { T } from "../theme";
 import { usePilotos, useRolesYModulos, usePilotoRoles } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -125,6 +125,191 @@ function RolChip({ nombre, marcado, onToggle, disabled }) {
   );
 }
 
+function NuevoPiloto({ roles, onCreado }) {
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
+  const [email, setEmail] = useState("");
+  const [rolesElegidos, setRolesElegidos] = useState(new Set(["piloto"]));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  function toggleRolElegido(rolId) {
+    setRolesElegidos((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(rolId)) nuevo.delete(rolId);
+      else nuevo.add(rolId);
+      return nuevo;
+    });
+  }
+
+  async function crear(e) {
+    e.preventDefault();
+    if (!nombre.trim() || !apellido.trim()) return;
+    setGuardando(true);
+    setError(null);
+
+    const { data, error } = await supabase
+      .from("pilotos")
+      .insert({ first_name: nombre.trim(), last_name: apellido.trim(), email: email.trim() || null })
+      .select("id")
+      .single();
+
+    if (error) {
+      setGuardando(false);
+      setError(error.message);
+      return;
+    }
+
+    if (rolesElegidos.size > 0) {
+      const filas = [...rolesElegidos].map((rol_id) => ({ piloto_id: data.id, rol_id }));
+      const { error: errorRoles } = await supabase.from("piloto_roles").insert(filas);
+      if (errorRoles) {
+        setGuardando(false);
+        setError(`Piloto creado, pero falló al asignar roles: ${errorRoles.message}`);
+        onCreado();
+        return;
+      }
+    }
+
+    setGuardando(false);
+    setNombre("");
+    setApellido("");
+    setEmail("");
+    setRolesElegidos(new Set(["piloto"]));
+    setAbierto(false);
+    onCreado();
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        onClick={() => setAbierto(true)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 16,
+          padding: "9px 14px",
+          borderRadius: 8,
+          border: `1px dashed ${T.amber}66`,
+          background: "transparent",
+          color: T.amber,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        <UserPlus size={15} /> Agregar piloto a mano
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={crear}
+      style={{
+        marginBottom: 16,
+        padding: 16,
+        borderRadius: 10,
+        border: `1px solid ${T.line}`,
+        background: T.surface,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: T.muted }}>Nombre</label>
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            required
+            style={{
+              background: T.surfaceRaised,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              padding: "8px 12px",
+              color: T.text,
+              fontSize: 13,
+              minWidth: 150,
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: T.muted }}>Apellido</label>
+          <input
+            value={apellido}
+            onChange={(e) => setApellido(e.target.value)}
+            required
+            style={{
+              background: T.surfaceRaised,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              padding: "8px 12px",
+              color: T.text,
+              fontSize: 13,
+              minWidth: 150,
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: T.muted }}>Email (opcional, hasta que se vincule)</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{
+              background: T.surfaceRaised,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              padding: "8px 12px",
+              color: T.text,
+              fontSize: 13,
+              minWidth: 200,
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: T.muted }}>Roles:</span>
+        {roles.map((r) => (
+          <RolChip key={r.id} nombre={r.nombre} marcado={rolesElegidos.has(r.id)} onToggle={() => toggleRolElegido(r.id)} />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <button
+          type="submit"
+          disabled={guardando}
+          style={{
+            padding: "9px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: T.amber,
+            color: "#1A1300",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: guardando ? "default" : "pointer",
+          }}
+        >
+          {guardando ? "Creando..." : "Crear piloto"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          style={{ border: "none", background: "transparent", color: T.muted, fontSize: 13, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {error && <div style={{ color: T.red, fontSize: 12 }}>{error}</div>}
+    </form>
+  );
+}
+
 // Auditoría + gestión de pilotos: email editable a mano, roles
 // asignables por chip, y un filtro para enfocarse en los que todavía
 // no tienen ninguna cuenta vinculada (para completarles el email de
@@ -183,6 +368,14 @@ export default function PilotosAdmin() {
       <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>
         Pilotos
       </div>
+
+      <NuevoPiloto
+        roles={roles}
+        onCreado={() => {
+          recargar();
+          recargarRoles();
+        }}
+      />
 
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ position: "relative" }}>
