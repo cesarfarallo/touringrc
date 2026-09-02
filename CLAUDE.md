@@ -380,21 +380,28 @@ tome efecto en los proyectos ya deployados.
   fecha" (el botón queda deshabilitado).
 - **Botón "Inscribirme"** (`EventoCard.jsx`, Calendario público): visible solo logueado y
   dentro de la ventana. `useInscripcionPiloto(eventoId, pilotoId)` (`hooks.js`) chequea si el
-  piloto ya tiene una inscripción para ese evento — si la tiene, muestra la clase en vez del
-  botón (no se soporta anotarse a más de una clase por evento desde la UI, aunque el modelo de
-  datos lo permitiría). Si no, un formulario inline con un `<select>` de clases
-  (`useClases()`) inserta en `inscripciones` — la policy RLS de insert/select ya existía
-  (`piloto_id in (select id from pilotos where auth_user_id = auth.uid())`, ver
-  `schema.sql`), no hizo falta ninguna migración de permisos nueva.
+  piloto ya tiene una inscripción para ese evento — si la tiene, muestra la categoría en vez
+  del botón (no se soporta anotarse a más de una categoría por evento desde la UI, aunque el
+  modelo de datos lo permitiría — la columna sigue llamándose `clase`/`clase_id` en la base y
+  en el código, "Categoría" es solo el texto que ve el piloto). Si no, un formulario inline con
+  un `<select>` (`useClases()`) inserta en `inscripciones` — la policy RLS de insert/select ya
+  existía (`piloto_id in (select id from pilotos where auth_user_id = auth.uid())`, ver
+  `schema.sql`), no hizo falta ninguna migración de permisos nueva. El `<select>` se
+  precarga con la categoría de la última inscripción del piloto (`useCategoriaPreferida()` en
+  `hooks.js`, consulta `inscripciones` ordenado por `fecha_inscripcion`) — la mayoría corre
+  siempre en la misma; sigue siendo editable a mano, y una vez que el piloto lo toca no se
+  vuelve a pisar solo.
 - **Transponder al inscribirse** (migración 0008, `actualizar_mi_transponder()`): si el piloto
   ya tiene `transponder_number` cargado en `pilotos`, el formulario lo muestra como dato
-  informativo (no editable ahí). Si no lo tiene, muestra un input opcional — no es obligatorio
-  completarlo, se puede cargar después en la pista con Live Timing sin problema. `pilotos` no
-  tenía ninguna policy de UPDATE para el propio piloto (solo para admin, migración 0002); en
-  vez de abrir una policy de update genérica (que dejaría editar cualquier columna, incluido
-  nombre/apellido), se usa una función `security definer` bien acotada que solo toca
-  `transponder_number` y solo en la fila del propio piloto (`auth_user_id = auth.uid()`),
-  mismo patrón que `fusionar_pilotos()`.
+  informativo, con un lápiz al lado para poder cambiarlo por otro con el que quiera correr esa
+  fecha en particular (por si el habitual no es con el que va a correr). Si no tiene ninguno
+  cargado, muestra directo el input — no es obligatorio completarlo, se puede
+  agregar/cambiar después en la pista con Live Timing sin problema. `pilotos` no tenía ninguna
+  policy de UPDATE para el propio piloto (solo para admin, migración 0002); en vez de abrir una
+  policy de update genérica (que dejaría editar cualquier columna, incluido nombre/apellido),
+  se usa una función `security definer` bien acotada que solo toca `transponder_number` y solo
+  en la fila del propio piloto (`auth_user_id = auth.uid()`), mismo patrón que
+  `fusionar_pilotos()`.
 - **Export de inscriptos** (`web/src/lib/genericImport.js` + botón "Exportar inscriptos" en
   `GestionEventos.jsx`): arma el `GenericImport.csv` real (56 columnas, header tomado tal cual
   de `touringrc-sync/files/GenericImport.csv`) a partir de `inscripciones` del evento, join con
@@ -468,6 +475,10 @@ cual. Define:
 - Nombres de tablas/columnas de dominio en **español** (`pilotos`, `resultados_finales`,
   `inscripcion_habilitada`, etc.) — mantener esa convención en todo código nuevo que toque la
   base.
+- **"Categoría" en la UI, "clase" en la base y el código**: la tabla `clases`/columna
+  `clase_id` no se renombra (sería una migración innecesaria), pero todo texto visible para el
+  piloto/admin dice "Categoría" — decisión explícita para que el sitio hable en los términos
+  que usa el club. Si se agrega una pantalla nueva que muestre esto, seguir el mismo criterio.
 - **Nunca commitear** `env`/`.env` con credenciales reales — usar `touringrc-sync/.env.example`
   como plantilla. El script de sync usa la `service_role key` (bypasea RLS), tratarla como
   secreto de máxima sensibilidad.

@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { T } from "../theme";
-import { useClases, useInscripcionPiloto } from "../hooks";
+import { useClases, useCategoriaPreferida, useInscripcionPiloto } from "../hooks";
 import { supabase } from "../lib/supabase";
 
 // Ventana de PRE-inscripción: habilitada desde `inscripcion_dias_antes`
@@ -21,10 +21,24 @@ function inscripcionAbierta(evento) {
 
 function FormularioInscripcion({ evento, piloto, onInscripto }) {
   const { clases, loading: cargandoClases } = useClases();
+  const { claseId: categoriaPreferida } = useCategoriaPreferida(piloto.id);
   const [claseId, setClaseId] = useState("");
-  const [transponder, setTransponder] = useState("");
+  const [claseTocada, setClaseTocada] = useState(false);
+  const [editandoTx, setEditandoTx] = useState(false);
+  const [transponder, setTransponder] = useState(piloto.transponder_number ?? "");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
+
+  // Precarga la categoría de la última inscripción del piloto (si tiene
+  // alguna) -- la mayoría corre siempre en la misma. Solo si todavía no
+  // tocó el selector a mano.
+  useEffect(() => {
+    if (!claseTocada && categoriaPreferida && clases.some((c) => c.id === categoriaPreferida)) {
+      setClaseId(categoriaPreferida);
+    }
+  }, [categoriaPreferida, clases, claseTocada]);
+
+  const mostrarTransponderActual = piloto.transponder_number && !editandoTx;
 
   async function confirmar() {
     if (!claseId) return;
@@ -40,7 +54,7 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
       return;
     }
 
-    if (transponder.trim()) {
+    if (transponder.trim() !== (piloto.transponder_number ?? "")) {
       const { error: errorTx } = await supabase.rpc("actualizar_mi_transponder", {
         p_transponder: transponder.trim(),
       });
@@ -61,7 +75,10 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <select
           value={claseId}
-          onChange={(e) => setClaseId(e.target.value)}
+          onChange={(e) => {
+            setClaseId(e.target.value);
+            setClaseTocada(true);
+          }}
           disabled={cargandoClases}
           style={{
             background: T.surfaceRaised,
@@ -72,7 +89,7 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
             fontSize: 13,
           }}
         >
-          <option value="">{cargandoClases ? "Cargando clases..." : "Elegí tu clase"}</option>
+          <option value="">{cargandoClases ? "Cargando categorías..." : "Elegí tu categoría"}</option>
           {clases.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}
@@ -80,9 +97,16 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
           ))}
         </select>
 
-        {piloto.transponder_number ? (
-          <span style={{ color: T.muted, fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}>
+        {mostrarTransponderActual ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, color: T.muted, fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}>
             Transponder: {piloto.transponder_number}
+            <button
+              onClick={() => setEditandoTx(true)}
+              title="Correr con otro transponder"
+              style={{ display: "flex", alignItems: "center", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
+            >
+              <Pencil size={11} />
+            </button>
           </span>
         ) : (
           <input
@@ -120,10 +144,10 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
           {guardando ? "Confirmando..." : "Confirmar inscripción"}
         </button>
       </div>
-      {!piloto.transponder_number && (
+      {!mostrarTransponderActual && (
         <div style={{ color: T.muted, fontSize: 11 }}>
-          No hace falta que lo cargues ahora — también se puede agregar después en la pista con
-          el sistema de cronometraje.
+          No hace falta que lo cargues ahora — también se puede agregar/cambiar después en la
+          pista con el sistema de cronometraje.
         </div>
       )}
       {error && <div style={{ color: T.red, fontSize: 12 }}>{error}</div>}

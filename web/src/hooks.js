@@ -314,6 +314,40 @@ export function useClases() {
   return { clases, loading };
 }
 
+// Categoría de la última inscripción del piloto (si tiene alguna), para
+// preseleccionarla en el formulario de inscripción de la próxima fecha --
+// la mayoría de los pilotos corren siempre en la misma.
+export function useCategoriaPreferida(pilotoId) {
+  const [claseId, setClaseId] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!pilotoId) {
+      setClaseId(null);
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("inscripciones")
+      .select("clase_id")
+      .eq("piloto_id", pilotoId)
+      .order("fecha_inscripcion", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!activo) return;
+        setClaseId(data?.clase_id ?? null);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [pilotoId]);
+
+  return { claseId, loading };
+}
+
 // Inscripción del piloto logueado a un evento puntual (si existe). Se
 // consulta por tarjeta de evento en el Calendario para decidir si mostrar
 // el formulario de inscripción o "ya estás inscripto".
