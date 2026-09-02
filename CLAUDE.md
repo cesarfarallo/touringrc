@@ -251,13 +251,17 @@ componente por tab en un array `TABS`):
 
 - **Gestión de eventos** (`GestionEventos.jsx`): lista de eventos con el checklist de
   archivos (`ArchivosChecklist`, ya existía), un formulario para dar de alta una fecha nueva
-  (nombre + fecha, `insert` en `eventos`, funcional) y un botón "Subir resultados" **funcional**
-  por evento: abre el selector de archivos del navegador, infiere el tipo de archivo por el
-  nombre (`inferirTipo`, mismos patrones que `TIPOS_ARCHIVO` en `theme.js`), lo manda en base64
-  a la Edge Function `subir-resultado` (ver sección siguiente) y refresca el checklist con el
-  resultado. Si el archivo es `SeriesResultReport.xls` (tipo `campeonato`), primero resuelve el
-  `campeonato_id` vigente (el de `fecha_inicio` más reciente, mismo criterio que
-  `useCampeonato()`) antes de mandarlo.
+  (nombre + fecha + días de antelación de inscripción, `insert` en `eventos`, funcional) y un
+  botón "Subir resultados" **funcional** por evento: abre el selector de archivos del
+  navegador (acepta selección múltiple), infiere el tipo de cada archivo por el nombre
+  (`inferirTipo`, mismos patrones que `TIPOS_ARCHIVO` en `theme.js`) y los manda **de a uno, en
+  secuencia** (no en paralelo) a la Edge Function `subir-resultado` — secuencial a propósito,
+  porque `marcarArchivo()` del lado de la función hace un read-modify-write sobre
+  `eventos.archivos` y dos uploads simultáneos para el mismo evento se pisarían el checklist
+  entre sí. Muestra el resultado de cada archivo por separado (✓/✗ con el nombre) y al final
+  refresca el checklist una sola vez. Si algún archivo es `SeriesResultReport.xls` (tipo
+  `campeonato`), primero resuelve el `campeonato_id` vigente (el de `fecha_inicio` más
+  reciente, mismo criterio que `useCampeonato()`) antes de mandarlo.
 - **Pilotos** (`PilotosAdmin.jsx`): fusiona lo que antes eran tres cosas separadas — la cola
   de `VinculosPendientes` (arriba, se muestra siempre pero queda vacía cuando no hay nada
   pendiente), la tabla de pilotos con email editable, y chips de rol tildables por piloto

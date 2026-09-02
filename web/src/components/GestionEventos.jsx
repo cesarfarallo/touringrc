@@ -313,13 +313,13 @@ function FilaEvento({ evento, onSubido }) {
         .eq("evento_id", evento.id);
       if (error) throw error;
       if (!data?.length) {
-        setMensaje({ ok: false, texto: "Todavía no hay inscriptos en esta fecha" });
+        setMensaje([{ ok: false, texto: "Todavía no hay inscriptos en esta fecha" }]);
         return;
       }
       const inscriptos = data.map((i) => ({ ...i.pilotos, clase_nombre: i.clases?.nombre }));
       descargarCsv(`GenericImport-${evento.nombre.replace(/\s+/g, "_")}.csv`, generarGenericImportCsv(inscriptos));
     } catch (err) {
-      setMensaje({ ok: false, texto: err.message ?? String(err) });
+      setMensaje([{ ok: false, texto: err.message ?? String(err) }]);
     } finally {
       setExportando(false);
     }
@@ -331,35 +331,42 @@ function FilaEvento({ evento, onSubido }) {
     year: "numeric",
   });
 
-  async function onArchivoElegido(e) {
-    const file = e.target.files?.[0];
+  // Se suben de a uno, en secuencia (no en paralelo): marcarArchivo() en
+  // la Edge Function hace un read-modify-write sobre eventos.archivos, y
+  // dos uploads en simultáneo para el mismo evento se pisarían el
+  // checklist entre sí.
+  async function onArchivosElegidos(e) {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
-
-    const tipo = inferirTipo(file.name);
-    if (!tipo) {
-      setMensaje({ ok: false, texto: `No reconozco "${file.name}" como un export de Live Timing` });
-      return;
-    }
+    if (!files.length) return;
 
     setSubiendo(true);
-    setMensaje(null);
-    try {
-      const contenidoBase64 = await archivoABase64(file);
-      const body = { eventoId: evento.id, tipo, contenidoBase64 };
-      if (tipo === "campeonato") body.campeonatoId = await campeonatoVigenteId();
+    setMensaje([]);
+    const resultados = [];
+    for (const file of files) {
+      const tipo = inferirTipo(file.name);
+      if (!tipo) {
+        resultados.push({ nombre: file.name, ok: false, texto: "No lo reconozco como un export de Live Timing" });
+        setMensaje([...resultados]);
+        continue;
+      }
+      try {
+        const contenidoBase64 = await archivoABase64(file);
+        const body = { eventoId: evento.id, tipo, contenidoBase64 };
+        if (tipo === "campeonato") body.campeonatoId = await campeonatoVigenteId();
 
-      const { data, error } = await supabase.functions.invoke("subir-resultado", { body });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+        const { data, error } = await supabase.functions.invoke("subir-resultado", { body });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
 
-      setMensaje({ ok: true, texto: data?.resumen ?? "Listo" });
-      onSubido();
-    } catch (err) {
-      setMensaje({ ok: false, texto: err.message ?? String(err) });
-    } finally {
-      setSubiendo(false);
+        resultados.push({ nombre: file.name, ok: true, texto: data?.resumen ?? "Listo" });
+      } catch (err) {
+        resultados.push({ nombre: file.name, ok: false, texto: err.message ?? String(err) });
+      }
+      setMensaje([...resultados]);
     }
+    setSubiendo(false);
+    onSubido();
   }
 
   return (
@@ -402,13 +409,14 @@ function FilaEvento({ evento, onSubido }) {
             ref={inputRef}
             type="file"
             accept=".xls"
-            onChange={onArchivoElegido}
+            multiple
+            onChange={onArchivosElegidos}
             style={{ display: "none" }}
           />
           <button
             onClick={() => inputRef.current?.click()}
             disabled={subiendo}
-            title="Subí un FinalResults.xls, RoundResult-*.xls, RoundTopTimes-*.xls, Leaderboard-Event*.xls o SeriesResultReport.xls"
+            title="Subí uno o varios: FinalResults.xls, RoundResult-*.xls, RoundTopTimes-*.xls, Leaderboard-Event*.xls, SeriesResultReport.xls"
             style={{
               display: "flex",
               alignItems: "center",
@@ -428,10 +436,15 @@ function FilaEvento({ evento, onSubido }) {
           </button>
         </div>
       </div>
-      {mensaje && (
-        <div style={{ marginTop: 10, fontSize: 12, color: mensaje.ok ? T.teal : T.red }}>
-          {mensaje.ok ? "✓ " : "✗ "}
-          {mensaje.texto}
+      {mensaje && mensaje.length > 0 && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+          {mensaje.map((m, i) => (
+            <div key={i} style={{ fontSize: 12, color: m.ok ? T.teal : T.red }}>
+              {m.ok ? "✓ " : "✗ "}
+              {m.nombre ? `${m.nombre}: ` : ""}
+              {m.texto}
+            </div>
+          ))}
         </div>
       )}
       <ArchivosChecklist archivos={evento.archivos} />
