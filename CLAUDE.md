@@ -430,7 +430,7 @@ ese título de pestaña suma además el sufijo `" (DEV)"` (seteado con `document
 diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
 el título de la pestaña/marcadores/historial. El logo real de la categoría (auto + wordmark
 "touring RC", PNG con transparencia) vive en `web/public/logo.png` y se muestra en el header
-vía `<img src="/logo.png">` a 64px de alto — reemplaza el ícono `Flag` placeholder que hubo
+vía `<img src="/logo.png">` a 96px de alto — reemplaza el ícono `Flag` placeholder que hubo
 mientras se conseguía el archivo (el que se compartió por el chat en un mensaje llegó como
 imagen pegada, sin quedar accesible como archivo en este entorno; el admin lo subió
 directo a `dev` por su cuenta).
