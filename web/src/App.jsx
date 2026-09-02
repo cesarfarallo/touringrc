@@ -10,9 +10,7 @@ import TablaResultados from "./components/TablaResultados";
 import TablaCampeonato from "./components/TablaCampeonato";
 import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
-import PilotosAdmin from "./components/PilotosAdmin";
-import VinculosPendientes from "./components/VinculosPendientes";
-import RolesAdmin from "./components/RolesAdmin";
+import AdminPanel from "./components/AdminPanel";
 import DevRibbon from "./components/DevRibbon";
 
 function nombreParaMostrar(piloto, session) {
@@ -194,9 +192,7 @@ export default function TouringRCApp() {
               </div>
             )}
 
-            {mostrarAdmin && <VinculosPendientes />}
-            {mostrarAdmin && <PilotosAdmin />}
-            {mostrarAdmin && <RolesAdmin />}
+            {mostrarAdmin && <AdminPanel />}
 
             {mostrarAdmin && (
               <button
