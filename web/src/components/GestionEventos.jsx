@@ -30,6 +30,16 @@ function archivoABase64(file) {
   });
 }
 
+// El export de inscriptos deja de tener sentido el día de la fecha (ya
+// se corrió, o está por correrse) -- mismo criterio de corte que la
+// ventana de pre-inscripción en EventoCard.jsx.
+function exportacionHabilitada(evento) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const fecha = new Date(evento.fecha + "T00:00:00");
+  return hoy < fecha;
+}
+
 // El acumulado de campeonato no tiene evento propio -- se sube contra el
 // campeonato vigente (el de fecha_inicio más reciente), igual criterio que
 // useCampeonato() en ../hooks.js.
@@ -290,7 +300,10 @@ function FilaEvento({ evento, onSubido }) {
   const [mensaje, setMensaje] = useState(null);
   const [exportando, setExportando] = useState(false);
 
+  const exportHabilitado = exportacionHabilitada(evento);
+
   async function exportarInscriptos() {
+    if (!exportHabilitado) return;
     setExportando(true);
     setMensaje(null);
     try {
@@ -362,8 +375,12 @@ function FilaEvento({ evento, onSubido }) {
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={exportarInscriptos}
-            disabled={exportando}
-            title="Genera el GenericImport.csv para importar en Live Timing"
+            disabled={exportando || !exportHabilitado}
+            title={
+              exportHabilitado
+                ? "Genera el GenericImport.csv para importar en Live Timing"
+                : "Se deshabilita el día de la fecha"
+            }
             style={{
               display: "flex",
               alignItems: "center",
@@ -372,10 +389,10 @@ function FilaEvento({ evento, onSubido }) {
               borderRadius: 8,
               border: `1px solid ${T.line}`,
               background: "transparent",
-              color: T.text,
+              color: exportHabilitado ? T.text : T.muted,
               fontSize: 12,
               fontWeight: 600,
-              cursor: exportando ? "default" : "pointer",
+              cursor: exportando || !exportHabilitado ? "default" : "pointer",
             }}
           >
             <Download size={13} />

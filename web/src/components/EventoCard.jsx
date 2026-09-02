@@ -4,10 +4,11 @@ import { T } from "../theme";
 import { useClases, useInscripcionPiloto } from "../hooks";
 import { supabase } from "../lib/supabase";
 
-// Ventana de inscripción: habilitada desde `inscripcion_dias_antes` días
-// antes de la fecha del evento, hasta el día del evento inclusive.
-// Reemplaza el viejo booleano manual `inscripcion_habilitada` (migración
-// 0007) -- cada evento configura su propia antelación.
+// Ventana de PRE-inscripción: habilitada desde `inscripcion_dias_antes`
+// días antes de la fecha del evento, hasta el día ANTERIOR al evento --
+// el día de la fecha ya se cierra (es pre-inscripción, no inscripción en
+// el momento). Reemplaza el viejo booleano manual `inscripcion_habilitada`
+// (migración 0007) -- cada evento configura su propia antelación.
 function inscripcionAbierta(evento) {
   if (evento.inscripcion_dias_antes == null) return false;
   const hoy = new Date();
@@ -15,7 +16,7 @@ function inscripcionAbierta(evento) {
   const fecha = new Date(evento.fecha + "T00:00:00");
   const desde = new Date(fecha);
   desde.setDate(desde.getDate() - evento.inscripcion_dias_antes);
-  return hoy >= desde && hoy <= fecha;
+  return hoy >= desde && hoy < fecha;
 }
 
 function FormularioInscripcion({ evento, piloto, onInscripto }) {

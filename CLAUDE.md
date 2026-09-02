@@ -363,13 +363,17 @@ tome efecto en los proyectos ya deployados.
 
 ## Inscripción online y export de inscriptos (Fase C/D)
 
-- **Ventana de inscripción por evento** (migración 0007, `eventos.inscripcion_dias_antes`):
+- **Ventana de PRE-inscripción por evento** (migración 0007, `eventos.inscripcion_dias_antes`):
   reemplaza el booleano manual `inscripcion_habilitada`. La web calcula si la inscripción está
   abierta en el cliente (`inscripcionAbierta()` en `EventoCard.jsx`): abierta desde
-  `fecha - inscripcion_dias_antes` días hasta `fecha` inclusive. El admin lo configura por
-  evento desde Gestión de eventos (`InscripcionDiasEditable` en `GestionEventos.jsx`, editable
-  tanto al dar de alta una fecha nueva como en cualquier fecha ya existente) — nulo significa
-  "sin inscripción online para esa fecha" (el botón queda deshabilitado).
+  `fecha - inscripcion_dias_antes` días hasta el día **anterior** a `fecha` — el día de la
+  fecha ya se cierra (es pre-inscripción, no algo que se pueda hacer el mismo día de la
+  carrera). Mismo corte para el botón "Exportar inscriptos" de Gestión de eventos
+  (`exportacionHabilitada()` en `GestionEventos.jsx`): deja de tener sentido exportar una vez
+  que llegó el día del evento. El admin configura los días de antelación por evento desde
+  Gestión de eventos (`InscripcionDiasEditable`, editable tanto al dar de alta una fecha nueva
+  como en cualquier fecha ya existente) — nulo significa "sin inscripción online para esa
+  fecha" (el botón queda deshabilitado).
 - **Botón "Inscribirme"** (`EventoCard.jsx`, Calendario público): visible solo logueado y
   dentro de la ventana. `useInscripcionPiloto(eventoId, pilotoId)` (`hooks.js`) chequea si el
   piloto ya tiene una inscripción para ese evento — si la tiene, muestra la clase en vez del
