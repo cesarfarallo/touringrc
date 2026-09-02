@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, X, Pencil } from "lucide-react";
+import { Check, X, Pencil, Search } from "lucide-react";
 import { T } from "../theme";
 import { usePilotos, useRolesYModulos, usePilotoRoles } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -136,6 +136,17 @@ export default function PilotosAdmin() {
   const { porPiloto, recargar: recargarRoles } = usePilotoRoles(true);
   const [trabajandoRol, setTrabajandoRol] = useState(null);
   const [soloSinVincular, setSoloSinVincular] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [rolesFiltro, setRolesFiltro] = useState(new Set());
+
+  function toggleFiltroRol(rolId) {
+    setRolesFiltro((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(rolId)) nuevo.delete(rolId);
+      else nuevo.add(rolId);
+      return nuevo;
+    });
+  }
 
   async function toggleRol(pilotoId, rolId) {
     const clave = `${pilotoId}:${rolId}`;
@@ -150,18 +161,64 @@ export default function PilotosAdmin() {
     recargarRoles();
   }
 
-  const visibles = soloSinVincular ? pilotos.filter((p) => !p.auth_user_id) : pilotos;
+  const textoBusqueda = busqueda.trim().toLowerCase();
+  const visibles = pilotos.filter((p) => {
+    if (soloSinVincular && p.auth_user_id) return false;
+    if (textoBusqueda) {
+      const nombreCompleto = [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase();
+      if (!nombreCompleto.includes(textoBusqueda)) return false;
+    }
+    if (rolesFiltro.size > 0) {
+      const rolesDelPiloto = porPiloto[p.id];
+      const tieneAlguno = rolesDelPiloto && [...rolesFiltro].some((r) => rolesDelPiloto.has(r));
+      if (!tieneAlguno) return false;
+    }
+    return true;
+  });
 
   return (
     <div>
       <VinculosPendientes />
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>Pilotos</div>
+      <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>
+        Pilotos
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
+        <div style={{ position: "relative" }}>
+          <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o apellido..."
+            style={{
+              background: T.surfaceRaised,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              padding: "7px 12px 7px 30px",
+              color: T.text,
+              fontSize: 13,
+              width: 220,
+            }}
+          />
+        </div>
+
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, cursor: "pointer" }}>
           <input type="checkbox" checked={soloSinVincular} onChange={(e) => setSoloSinVincular(e.target.checked)} />
           Solo sin vincular
         </label>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: T.muted }}>Filtrar por rol:</span>
+          {roles.map((r) => (
+            <RolChip
+              key={r.id}
+              nombre={r.nombre}
+              marcado={rolesFiltro.has(r.id)}
+              onToggle={() => toggleFiltroRol(r.id)}
+            />
+          ))}
+        </div>
       </div>
 
       {loading && <div style={{ color: T.muted, fontSize: 13 }}>Cargando pilotos...</div>}
@@ -221,7 +278,9 @@ export default function PilotosAdmin() {
               {visibles.length === 0 && (
                 <tr>
                   <td colSpan={4} style={{ padding: "16px", color: T.muted, fontSize: 13 }}>
-                    {soloSinVincular ? "Todos los pilotos ya están vinculados." : "Todavía no hay pilotos cargados."}
+                    {pilotos.length === 0
+                      ? "Todavía no hay pilotos cargados."
+                      : "Ningún piloto coincide con la búsqueda/filtros."}
                   </td>
                 </tr>
               )}
