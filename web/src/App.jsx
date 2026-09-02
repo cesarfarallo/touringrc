@@ -35,7 +35,7 @@ export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
 
   useEffect(() => {
-    document.title = ES_DEV ? "Touring Eco 1:10 Argentina (DEV)" : "Touring Eco 1:10 Argentina";
+    document.title = ES_DEV ? "Touring 1:10 Arg (DEV)" : "Touring 1:10 Arg";
   }, []);
 
   const { session } = useSession();
@@ -103,8 +103,8 @@ export default function TouringRCApp() {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center" }} title="Touring Eco 1:10 Argentina">
-            <img src="/logo.png" alt="Touring Eco 1:10 Argentina" style={{ height: 44, width: "auto" }} />
+          <div style={{ display: "flex", alignItems: "center" }} title="Touring 1:10 Arg">
+            <img src="/logo.png" alt="Touring 1:10 Arg" style={{ height: 64, width: "auto" }} />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />

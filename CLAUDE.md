@@ -419,7 +419,7 @@ celular de verdad (tablas largas, formularios con teclado on-screen, etc.).
 
 ## Branding
 
-El nombre visible del producto es **"Touring Eco 1:10 Argentina"** — distinto del nombre del
+El nombre visible del producto es **"Touring 1:10 Arg"** — distinto del nombre del
 repo/proyecto interno ("Touring RC", usado en este documento y en el código como
 identificador). Vive **solo** en el `<title>` de `web/index.html` (la pestaña del navegador,
 marcadores, historial) — el header de la web (`App.jsx`) no repite el nombre como texto, va
@@ -430,7 +430,7 @@ ese título de pestaña suma además el sufijo `" (DEV)"` (seteado con `document
 diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
 el título de la pestaña/marcadores/historial. El logo real de la categoría (auto + wordmark
 "touring RC", PNG con transparencia) vive en `web/public/logo.png` y se muestra en el header
-vía `<img src="/logo.png">` a 44px de alto — reemplaza el ícono `Flag` placeholder que hubo
+vía `<img src="/logo.png">` a 64px de alto — reemplaza el ícono `Flag` placeholder que hubo
 mientras se conseguía el archivo (el que se compartió por el chat en un mensaje llegó como
 imagen pegada, sin quedar accesible como archivo en este entorno; el admin lo subió
 directo a `dev` por su cuenta).
