@@ -69,6 +69,9 @@ export function usePilotos() {
   const [pilotos, setPilotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
 
   useEffect(() => {
     let activo = true;
@@ -86,9 +89,9 @@ export function usePilotos() {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [version]);
 
-  return { pilotos, loading, error };
+  return { pilotos, loading, error, recargar };
 }
 
 // Trae todo el calendario, ordenado por fecha.

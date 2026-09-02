@@ -344,7 +344,8 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
      logueado, si el trigger vinculó correctamente un piloto a su cuenta (o un aviso si no,
      útil para diagnosticar si la migración 0001 no corrió en ese proyecto de Supabase).
    - `web/src/components/PilotosAdmin.jsx` — en modo admin, tabla de **todos** los pilotos con
-     email y si están vinculados o no (auditoría completa, no solo la propia cuenta). No
+     email (editable a mano, click para corregirlo) y si están vinculados o no (auditoría
+     completa, no solo la propia cuenta). No
      necesita permisos especiales porque `pilotos` ya es de lectura pública.
    - `web/src/App.jsx` — logout real, nombre mostrado sale del piloto vinculado (o el email si
      todavía no hay nombre). El toggle "ADMIN" sigue siendo un demo visual local — no hay rol
