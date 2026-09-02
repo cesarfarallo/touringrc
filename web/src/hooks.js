@@ -174,6 +174,57 @@ export function useResultadosEvento(eventoId) {
   return { porClase, loading, error };
 }
 
+// Clasificación de un evento (posición de largada, calculada por Live
+// Timing a partir de las rondas clasificatorias -- distinta de
+// resultados_finales, que es el resultado de la final en sí), agrupada
+// por clase: { [claseNombre]: [{ pos, piloto, resultado, rondas, tieBreaker }] }
+export function useClasificacionEvento(eventoId) {
+  const [porClase, setPorClase] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!eventoId) {
+      setPorClase({});
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("clasificacion")
+      .select("posicion, resultado, rondas, tie_breaker, clases ( nombre ), pilotos ( first_name, last_name )")
+      .eq("evento_id", eventoId)
+      .order("posicion", { ascending: true })
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) {
+          setError(error);
+          setLoading(false);
+          return;
+        }
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          const clase = fila.clases?.nombre ?? "Sin clase";
+          if (!agrupado[clase]) agrupado[clase] = [];
+          agrupado[clase].push({
+            pos: fila.posicion,
+            piloto: nombrePiloto(fila.pilotos),
+            resultado: fila.resultado,
+            rondas: fila.rondas ?? [],
+            tieBreaker: fila.tie_breaker,
+          });
+        }
+        setPorClase(agrupado);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [eventoId]);
+
+  return { porClase, loading, error };
+}
+
 // Campeonato vigente (el de fecha_inicio más reciente) + standings por clase.
 export function useCampeonato() {
   const [campeonato, setCampeonato] = useState(null);

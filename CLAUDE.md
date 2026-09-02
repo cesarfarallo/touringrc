@@ -78,6 +78,7 @@ botones de login/admin en `web/` son placeholders visuales. Ver "Roadmap" más a
 | `inscripciones` | Inscripción de un piloto a una fecha/clase, hecha desde la web. `sincronizado_a_livetime` marca si ya se exportó hacia Live Timing. Unique `(evento_id, piloto_id, clase_id)`. | insert/select solo del propio piloto vía `auth.uid()` |
 | `resultados_finales` | Resultado final de un piloto en una clase de un evento (posición, resultado crudo, heat, `tq`, `vuelta_rapida`). Unique `(evento_id, clase_id, piloto_id)`. | sin RLS |
 | `resultados_ronda` | Detalle por ronda/heat (laps, tiempos, promedios). Unique `(evento_id, clase_id, ronda, piloto_id)`. **Ojo**: la columna `tiempo interval` existe pero `sync_evento.py` no la completa hoy (solo llena `vueltas`). | sin RLS |
+| `clasificacion` | Posición de largada (migración 0006): resumen de las rondas clasificatorias que exporta Live Timing en `Leaderboard-Event*.xls` (mejor resultado combinado, ej. "mejores 2 de 3", `rondas` jsonb con el detalle crudo de cada ronda, `tie_breaker` con el criterio de desempate). Distinta de `resultados_finales`, que es el resultado de la final en sí. Unique `(evento_id, clase_id, piloto_id)`. | sin RLS |
 | `campeonato_puntos` | Acumulado de campeonato por clase/piloto (puntos, TQs, victorias, `detalle_por_fecha` jsonb). Unique `(campeonato_id, clase_id, piloto_id)`. | sin RLS |
 | `admins` | Lista de emails autorizados como admin (migración 0002). Reemplaza el viejo toggle "ADMIN" puramente visual del frontend por una verificación real del lado del servidor. | select propio (un admin se ve a sí mismo) |
 | `vinculos_pendientes` | Cola de revisión (migración 0002): logins que no matchearon 1 a 1 contra el roster de `pilotos` ya cargado — o crearon un piloto nuevo (0 candidatos) o quedaron ambiguos (2+ candidatos con mismo nombre). El admin confirma o fusiona vía `fusionar_pilotos()`. | select/update solo admin |
@@ -291,21 +292,37 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   así que `limpiar()` en `parsers.ts` replica esa misma lista a mano (`NA_VALUES`) — sin este
   fix, `SeriesResultReport.xls` perdía de forma silenciosa fechas del campeonato con datos
   reales. **Si el formato de export de Live Timing cambia alguna vez, hay que actualizar los
-  DOS parsers (Python y este) y volver a verificar que coincidan.**
+  DOS parsers (Python y este) y volver a verificar que coincidan.** Excepción: `parseLeaderboard`
+  (`Leaderboard-Event*.xls`, resumen de clasificación/posición de largada) es nuevo acá y
+  todavía no tiene equivalente en `livetime_parsers.py` — se agregó directo en TypeScript
+  porque el flujo real es 100% vía la web, no hay caso de uso hoy para el CLI de Python con
+  este archivo. A diferencia de los otros parsers, lee por índice de columna crudo (sin
+  compactar/filtrar nulos) en vez de por posición dentro de la fila ya compactada, porque
+  `Car #`/`Mfr` suelen venir vacíos en los exports reales del club y la cantidad de columnas
+  de ronda varía según el formato de clasificación (ej. "mejores 2 de 3"). El resultado se
+  guarda en la tabla `clasificacion` (migración 0006) y se muestra en la web como un sub-tab
+  separado dentro de "Resultados" (`Resultados finales` / `Clasificación`, ver
+  `useClasificacionEvento` en `hooks.js` y `TablaClasificacion.jsx`).
 - **`piloto_resolver.ts`**: port de `piloto_resolver.py` (`PilotoResolver`), misma lógica de
   resolución de identidad (alias exacto → candidatos por nombre/apellido → 1 = linkea, 0 =
   crea piloto nuevo, 2+ = encola en `alias_pendientes`), pero contra el cliente JS de
   Supabase en vez de la librería Python.
 - **`index.ts`**: el handler (`Deno.serve`). Contrato: `POST` con body JSON
-  `{ eventoId, tipo, contenidoBase64, campeonatoId? }`, donde `tipo` es uno de `"pilotos"`
-  (`GenericImport.csv`), `"resultadosFinales"` (`FinalResults.xls`), `"detalleRondas"`
-  (`RoundResult-*.xls`), `"vueltaRapida"` (`RoundTopTimes-*.xls`) o `"campeonato"`
-  (`SeriesResultReport.xls`, requiere `campeonatoId`). Verifica el JWT del `Authorization:
-  Bearer` header contra Supabase Auth, chequea que el piloto vinculado a esa sesión tenga el
-  rol `admin` en `piloto_roles` (mismo criterio que `es_admin()` del lado de Postgres, pero
-  reimplementado acá porque una Edge Function no corre dentro de una policy de RLS), y recién
-  ahí despacha a `syncPilotos`/`syncFinalResults`/`syncRoundResults`/`syncTopTimes`/
-  `syncCampeonato` — ports directos de las funciones homónimas de `sync_evento.py`, mismo
+  `{ eventoId, tipo, contenidoBase64, campeonatoId? }`, donde `tipo` es uno de
+  `"resultadosFinales"` (`FinalResults.xls`), `"detalleRondas"` (`RoundResult-*.xls`),
+  `"vueltaRapida"` (`RoundTopTimes-*.xls`), `"clasificacion"` (`Leaderboard-Event*.xls`,
+  posición de largada — ver tabla `clasificacion`, migración 0006) o `"campeonato"`
+  (`SeriesResultReport.xls`, requiere `campeonatoId`). **No** incluye `GenericImport.csv`: ese
+  archivo es al revés, algo que la web tiene que *generar* (Fase D, botón "Exportar
+  inscriptos"), nunca algo que el admin sube — sacado del checklist y del Edge Function
+  después de confundirlo con un archivo de subida en una prueba real. Verifica el JWT del
+  `Authorization: Bearer` header contra Supabase Auth, chequea que el piloto vinculado a esa
+  sesión tenga el rol `admin` en `piloto_roles` (mismo criterio que `es_admin()` del lado de
+  Postgres, pero reimplementado acá porque una Edge Function no corre dentro de una policy de
+  RLS), y recién ahí despacha a `syncFinalResults`/`syncRoundResults`/`syncTopTimes`/
+  `syncClasificacion`/`syncCampeonato` — los primeros cuatro son ports directos de las
+  funciones homónimas de `sync_evento.py` (`syncClasificacion` es nuevo, no existe en el CLI
+  de Python todavía — pendiente si se necesita paridad ahí), mismo
   orden y misma lógica de upsert. Al final llama `marcarArchivo()` (equivalente a
   `marcar_archivo()` en Python) para actualizar el jsonb `archivos` de `eventos`, que es lo
   que lee `ArchivosChecklist`. Devuelve `{ ok: true, resumen }` o `{ error }`.

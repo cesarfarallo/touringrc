@@ -8,11 +8,14 @@ import ArchivosChecklist from "./ArchivosChecklist";
 // Infiere qué tipo de archivo de Live Timing es según el nombre, para no
 // tener que pedirle al admin que lo indique a mano (ver TIPOS_ARCHIVO en
 // ../theme.js -- estos patrones tienen que ir en sincro con esa lista).
+// GenericImport.csv NO va acá: es al revés, un archivo que la web *genera*
+// para importar los inscriptos a Live Timing (botón "Exportar inscriptos"),
+// nunca algo que el admin sube.
 function inferirTipo(nombreArchivo) {
-  if (/^GenericImport.*\.csv$/i.test(nombreArchivo)) return "pilotos";
   if (/^FinalResults.*\.xls$/i.test(nombreArchivo)) return "resultadosFinales";
   if (/^RoundTopTimes-.*\.xls$/i.test(nombreArchivo)) return "vueltaRapida";
   if (/^RoundResult-.*\.xls$/i.test(nombreArchivo)) return "detalleRondas";
+  if (/^Leaderboard-.*\.xls$/i.test(nombreArchivo)) return "clasificacion";
   if (/^SeriesResultReport.*\.xls$/i.test(nombreArchivo)) return "campeonato";
   return null;
 }
@@ -220,14 +223,14 @@ function FilaEvento({ evento, onSubido }) {
           <input
             ref={inputRef}
             type="file"
-            accept=".csv,.xls"
+            accept=".xls"
             onChange={onArchivoElegido}
             style={{ display: "none" }}
           />
           <button
             onClick={() => inputRef.current?.click()}
             disabled={subiendo}
-            title="Subí un GenericImport.csv, FinalResults.xls, RoundResult-*.xls, RoundTopTimes-*.xls o SeriesResultReport.xls"
+            title="Subí un FinalResults.xls, RoundResult-*.xls, RoundTopTimes-*.xls, Leaderboard-Event*.xls o SeriesResultReport.xls"
             style={{
               display: "flex",
               alignItems: "center",

@@ -20,9 +20,9 @@ export const FONTS = `
 // en que se exportan de Live Timing. 'clave' matchea las keys del jsonb
 // `eventos.archivos`.
 export const TIPOS_ARCHIVO = [
-  { clave: "pilotos", label: "Pilotos", archivo: "GenericImport.csv" },
   { clave: "resultadosFinales", label: "Resultados finales", archivo: "FinalResults.xls" },
   { clave: "detalleRondas", label: "Detalle de rondas", archivo: "RoundResult-*.xls" },
   { clave: "vueltaRapida", label: "Vuelta rápida", archivo: "RoundTopTimes-*.xls" },
+  { clave: "clasificacion", label: "Clasificación", archivo: "Leaderboard-Event*.xls" },
   { clave: "campeonato", label: "Campeonato", archivo: "SeriesResultReport.xls" },
 ];

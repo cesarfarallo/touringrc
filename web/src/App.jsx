@@ -1,12 +1,21 @@
 import { useMemo, useState } from "react";
 import { Calendar, Trophy, Flag, User, ShieldCheck, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS } from "./theme";
-import { useEventos, useResultadosEvento, useCampeonato, useSession, usePilotoActual, useEsAdmin } from "./hooks";
+import {
+  useEventos,
+  useResultadosEvento,
+  useClasificacionEvento,
+  useCampeonato,
+  useSession,
+  usePilotoActual,
+  useEsAdmin,
+} from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
 import EventoCard from "./components/EventoCard";
 import TablaResultados from "./components/TablaResultados";
+import TablaClasificacion from "./components/TablaClasificacion";
 import TablaCampeonato from "./components/TablaCampeonato";
 import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
@@ -48,10 +57,17 @@ export default function TouringRCApp() {
     error: errorResultados,
   } = useResultadosEvento(eventoResultadosIdActivo);
 
+  const [subTabResultados, setSubTabResultados] = useState("finales");
+  const {
+    porClase: clasificacionPorClase,
+    loading: cargandoClasificacion,
+    error: errorClasificacion,
+  } = useClasificacionEvento(eventoResultadosIdActivo);
+
   const proximo = eventos.find((e) => !e.corrida);
   const dias = proximo ? Math.ceil((new Date(proximo.fecha) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 
-  const error = errorEventos || errorCampeonato || errorResultados;
+  const error = errorEventos || errorCampeonato || errorResultados || errorClasificacion;
 
   const ingresar = () =>
     supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
@@ -214,45 +230,89 @@ export default function TouringRCApp() {
 
             {tab === "resultados" ? (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                  <span style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif" }}>Fecha:</span>
-                  <select
-                    value={eventoResultadosIdActivo ?? ""}
-                    onChange={(e) => setEventoResultadosId(e.target.value)}
-                    style={{
-                      background: T.surfaceRaised,
-                      border: `1px solid ${T.line}`,
-                      borderRadius: 8,
-                      padding: "8px 12px",
-                      color: T.text,
-                      fontFamily: "JetBrains Mono, monospace",
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {eventosCorridos.map((e) => {
-                      const f = new Date(e.fecha + "T00:00:00").toLocaleDateString("es-AR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      });
-                      return (
-                        <option key={e.id} value={e.id}>
-                          {e.nombre} — {f}
-                        </option>
-                      );
-                    })}
-                  </select>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif" }}>Fecha:</span>
+                    <select
+                      value={eventoResultadosIdActivo ?? ""}
+                      onChange={(e) => setEventoResultadosId(e.target.value)}
+                      style={{
+                        background: T.surfaceRaised,
+                        border: `1px solid ${T.line}`,
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        color: T.text,
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {eventosCorridos.map((e) => {
+                        const f = new Date(e.fecha + "T00:00:00").toLocaleDateString("es-AR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        });
+                        return (
+                          <option key={e.id} value={e.id}>
+                            {e.nombre} — {f}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {[
+                      { id: "finales", label: "Resultados finales" },
+                      { id: "clasificacion", label: "Clasificación" },
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setSubTabResultados(s.id)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          border: `1px solid ${subTabResultados === s.id ? T.amber : T.line}`,
+                          background: subTabResultados === s.id ? `${T.amber}18` : "transparent",
+                          color: subTabResultados === s.id ? T.amber : T.muted,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {cargandoResultados && <div style={{ color: T.muted, fontSize: 13 }}>Cargando resultados...</div>}
-                {!cargandoResultados && claseActiva && resultadosPorClase[claseActiva] ? (
-                  <TablaResultados data={resultadosPorClase[claseActiva]} />
+
+                {subTabResultados === "finales" ? (
+                  <>
+                    {cargandoResultados && <div style={{ color: T.muted, fontSize: 13 }}>Cargando resultados...</div>}
+                    {!cargandoResultados && claseActiva && resultadosPorClase[claseActiva] ? (
+                      <TablaResultados data={resultadosPorClase[claseActiva]} />
+                    ) : (
+                      !cargandoResultados && (
+                        <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>
+                          No hay resultados de {claseActiva?.replace("Touring Eco 1:10 ", "") ?? "esta clase"} en esta fecha.
+                        </div>
+                      )
+                    )}
+                  </>
                 ) : (
-                  !cargandoResultados && (
-                    <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>
-                      No hay resultados de {claseActiva?.replace("Touring Eco 1:10 ", "") ?? "esta clase"} en esta fecha.
-                    </div>
-                  )
+                  <>
+                    {cargandoClasificacion && <div style={{ color: T.muted, fontSize: 13 }}>Cargando clasificación...</div>}
+                    {!cargandoClasificacion && claseActiva && clasificacionPorClase[claseActiva] ? (
+                      <TablaClasificacion data={clasificacionPorClase[claseActiva]} />
+                    ) : (
+                      !cargandoClasificacion && (
+                        <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>
+                          No hay clasificación de {claseActiva?.replace("Touring Eco 1:10 ", "") ?? "esta clase"} en esta
+                          fecha.
+                        </div>
+                      )
+                    )}
+                  </>
                 )}
               </>
             ) : (

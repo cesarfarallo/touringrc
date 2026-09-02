@@ -354,16 +354,77 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
 }
 
 // ---------------------------------------------------------------
-// GenericImport.csv (ya viene limpio, solo lo leemos)
+// Leaderboard-Event*.xls (resumen de clasificación: mejor resultado
+// combinado de las rondas clasificatorias, ej. "mejores 2 de 3", con
+// detalle por ronda y criterio de desempate -- es la posición de
+// largada, distinta de FinalResults que es el resultado de la final).
+//
+// A diferencia de los otros parsers, éste lee por índice de columna
+// crudo (sin compactar/filtrar nulos) para las filas de datos: "Car #"
+// y "Mfr" suelen venir vacíos en los exports reales del club, y si se
+// compactara la fila se perdería la alineación con las columnas de
+// ronda (que además varían en cantidad: "mejores 2 de 3" vs otro
+// formato). El mapeo de columnas se arma leyendo los índices reales de
+// la fila de headers, igual que fechasCols en parseSeriesResult.
 // ---------------------------------------------------------------
-export function parseGenericImport(bytes: Uint8Array): Record<string, string | null>[] {
-  const texto = new TextDecoder("utf-8").decode(bytes).replace(/^﻿/, "");
-  const wb = XLSX.read(texto, { type: "string" });
-  const hoja = wb.Sheets[wb.SheetNames[0]];
-  const filas = XLSX.utils.sheet_to_json(hoja, { defval: null }) as Record<string, unknown>[];
-  return filas.map((fila) => {
-    const limpia: Record<string, string | null> = {};
-    for (const [k, v] of Object.entries(fila)) limpia[k] = limpiar(v);
-    return limpia;
-  });
+export interface FilaClasificacion {
+  clase: string;
+  posicion: number;
+  pilotoCrudo: string;
+  resultadoCrudo: string | null;
+  tieBreaker: string | null;
+  rondas: (string | null)[];
+}
+
+export function parseLeaderboard(bytes: Uint8Array): FilaClasificacion[] {
+  const filas = leerFilasXls(bytes);
+  const out: FilaClasificacion[] = [];
+  let claseActual: string | null = null;
+  let colPos = -1;
+  let colDriver = -1;
+  let colResult = -1;
+  let colTieBreaker = -1;
+  let colsRondas: number[] = [];
+
+  for (const fila of filas) {
+    const raw = fila.map(limpiar);
+    const valsNoNone = raw.filter((v): v is string => v !== null);
+    if (valsNoNone.length === 0) continue;
+
+    if (valsNoNone.length === 1 && !valsNoNone[0].includes("\n") && !valsNoNone[0].includes("www.")) {
+      claseActual = valsNoNone[0];
+      colPos = colDriver = colResult = colTieBreaker = -1;
+      colsRondas = [];
+      continue;
+    }
+
+    if (raw.includes("Driver Name")) {
+      colPos = raw.indexOf("Pos");
+      colDriver = raw.indexOf("Driver Name");
+      colResult = raw.indexOf("Result");
+      colTieBreaker = raw.indexOf("Tie Breaker");
+      colsRondas = [];
+      raw.forEach((v, idx) => {
+        if (v && /^Round \d+$/.test(v)) colsRondas.push(idx);
+      });
+      continue;
+    }
+
+    if (
+      claseActual &&
+      colPos >= 0 &&
+      raw[colPos] &&
+      /^\d+(\.0)?$/.test(raw[colPos]!)
+    ) {
+      out.push({
+        clase: claseActual,
+        posicion: parseInt(raw[colPos]!, 10),
+        pilotoCrudo: raw[colDriver] ?? "",
+        resultadoCrudo: colResult >= 0 ? raw[colResult] : null,
+        tieBreaker: colTieBreaker >= 0 ? raw[colTieBreaker] : null,
+        rondas: colsRondas.map((idx) => raw[idx]),
+      });
+    }
+  }
+  return out;
 }

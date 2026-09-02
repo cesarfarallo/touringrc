@@ -13,7 +13,7 @@ import {
   parseRoundResult,
   parseTopTimes,
   parseSeriesResult,
-  parseGenericImport,
+  parseLeaderboard,
   parseResultadoCrudo,
   parseNombreCrudo,
 } from "./parsers.ts";
@@ -26,7 +26,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const TIPOS_VALIDOS = ["pilotos", "resultadosFinales", "detalleRondas", "vueltaRapida", "campeonato"];
+const TIPOS_VALIDOS = ["resultadosFinales", "detalleRondas", "vueltaRapida", "clasificacion", "campeonato"];
 
 Deno.serve(async (req: Request) => {
   const cors = {
@@ -76,9 +76,6 @@ Deno.serve(async (req: Request) => {
     let resumen: string;
 
     switch (tipo) {
-      case "pilotos":
-        resumen = await syncPilotos(sb, bytes);
-        break;
       case "resultadosFinales":
         resumen = await syncFinalResults(sb, bytes, eventoId, resolver);
         break;
@@ -87,6 +84,9 @@ Deno.serve(async (req: Request) => {
         break;
       case "vueltaRapida":
         resumen = await syncTopTimes(sb, bytes, eventoId, resolver);
+        break;
+      case "clasificacion":
+        resumen = await syncClasificacion(sb, bytes, eventoId, resolver);
         break;
       case "campeonato":
         if (!campeonatoId) return json({ error: "Falta campeonatoId" }, 400, cors);
@@ -144,43 +144,6 @@ async function marcarArchivo(sb: SupabaseClient, eventoId: string, tipo: string)
   const archivos = { ...(ev?.archivos ?? {}), [tipo]: true };
   const { error } = await sb.from("eventos").update({ archivos }).eq("id", eventoId);
   if (error) throw new Error(`eventos.update archivos: ${error.message}`);
-}
-
-async function syncPilotos(sb: SupabaseClient, bytes: Uint8Array): Promise<string> {
-  const pilotos = parseGenericImport(bytes);
-  let count = 0;
-  for (const p of pilotos) {
-    const first = p["FirstName"];
-    const last = p["LastName"];
-    if (!first || !last) continue;
-
-    const { data: existente } = await sb
-      .from("pilotos")
-      .select("id")
-      .ilike("first_name", first)
-      .ilike("last_name", last)
-      .maybeSingle();
-
-    const campos = {
-      first_name: first,
-      last_name: last,
-      phonetic_name: p["PhoneticName"] ?? null,
-      country: p["Country"] ?? null,
-      permanent_number: p["PermanentNumber"] ? String(p["PermanentNumber"]) : null,
-      transponder_number: p["TransponderNumber"] ? String(p["TransponderNumber"]) : null,
-      chassis_manufacturer: p["ChassisManufacturer"] ?? null,
-    };
-
-    if (existente) {
-      const { error } = await sb.from("pilotos").update(campos).eq("id", existente.id);
-      if (error) throw new Error(`pilotos.update (${first} ${last}): ${error.message}`);
-    } else {
-      const { error } = await sb.from("pilotos").insert(campos);
-      if (error) throw new Error(`pilotos.insert (${first} ${last}): ${error.message}`);
-    }
-    count++;
-  }
-  return `${count} pilotos sincronizados`;
 }
 
 async function syncFinalResults(
@@ -277,6 +240,37 @@ async function syncTopTimes(
     count++;
   }
   return `Vuelta rápida marcada (${count})`;
+}
+
+async function syncClasificacion(
+  sb: SupabaseClient,
+  bytes: Uint8Array,
+  eventoId: string,
+  resolver: PilotoResolver
+): Promise<string> {
+  const filas = parseLeaderboard(bytes);
+  let count = 0;
+  for (const f of filas) {
+    const pilotoId = await resolver.resolverOAvisar(f.pilotoCrudo);
+    if (!pilotoId) continue;
+    const claseId = await getOrCreateClase(sb, f.clase);
+
+    const { error } = await sb.from("clasificacion").upsert(
+      {
+        evento_id: eventoId,
+        clase_id: claseId,
+        piloto_id: pilotoId,
+        posicion: f.posicion,
+        resultado: f.resultadoCrudo,
+        rondas: f.rondas,
+        tie_breaker: f.tieBreaker,
+      },
+      { onConflict: "evento_id,clase_id,piloto_id" }
+    );
+    if (error) throw new Error(`clasificacion.upsert (${f.pilotoCrudo}): ${error.message}`);
+    count++;
+  }
+  return `${count} filas de clasificación sincronizadas`;
 }
 
 async function syncCampeonato(
