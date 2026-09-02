@@ -104,9 +104,7 @@ export default function TouringRCApp() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center" }} title="Touring Eco 1:10 Argentina">
-            {/* TODO: reemplazar por el logo real de la categoría (pendiente que lo pasen
-                como archivo de imagen) -- por ahora, ícono placeholder. */}
-            <Flag size={28} color={T.amber} />
+            <img src="/logo.png" alt="Touring Eco 1:10 Argentina" style={{ height: 44, width: "auto" }} />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />

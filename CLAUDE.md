@@ -428,10 +428,12 @@ entornos de desarrollo (`npm run dev` local o Preview de Vercel con `VITE_APP_EN
 ese título de pestaña suma además el sufijo `" (DEV)"` (seteado con `document.title` en un
 `useEffect` de `App.jsx`, mismo criterio `ES_DEV` que usa `DevRibbon.jsx`) — la franja roja
 diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
-el título de la pestaña/marcadores/historial. Pendiente: reemplazar el ícono `Flag` de
-lucide-react del header por el logo real de la categoría (el club lo tiene que proveer como
-archivo de imagen — no se pudo bajar el que se compartió en el chat porque llegó como imagen
-pegada en el mensaje, sin quedar accesible como archivo en este entorno de desarrollo).
+el título de la pestaña/marcadores/historial. El logo real de la categoría (auto + wordmark
+"touring RC", PNG con transparencia) vive en `web/public/logo.png` y se muestra en el header
+vía `<img src="/logo.png">` a 44px de alto — reemplaza el ícono `Flag` placeholder que hubo
+mientras se conseguía el archivo (el que se compartió por el chat en un mensaje llegó como
+imagen pegada, sin quedar accesible como archivo en este entorno; el admin lo subió
+directo a `dev` por su cuenta).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
