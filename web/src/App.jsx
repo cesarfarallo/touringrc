@@ -103,11 +103,10 @@ export default function TouringRCApp() {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Flag size={20} color={T.amber} />
-            <span style={{ fontFamily: "Oswald, sans-serif", fontSize: 19, fontWeight: 700, letterSpacing: 0.5 }}>
-              TOURING ECO 1:10 ARGENTINA
-            </span>
+          <div style={{ display: "flex", alignItems: "center" }} title="Touring Eco 1:10 Argentina">
+            {/* TODO: reemplazar por el logo real de la categoría (pendiente que lo pasen
+                como archivo de imagen) -- por ahora, ícono placeholder. */}
+            <Flag size={28} color={T.amber} />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />

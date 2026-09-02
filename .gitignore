@@ -2,4 +2,6 @@ env
 .env
 __pycache__/
 *.pyc
-supabase/.temp/
+# Cache local del CLI de Supabase (`supabase link`/`supabase init`) -- no
+# trackear sin importar desde qué carpeta se haya corrido el comando.
+**/supabase/.temp/

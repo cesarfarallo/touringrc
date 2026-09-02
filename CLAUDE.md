@@ -419,11 +419,13 @@ celular de verdad (tablas largas, formularios con teclado on-screen, etc.).
 
 ## Branding
 
-El nombre visible del producto es **"Touring Eco 1:10 Argentina"** (título del header en
-`App.jsx` y `<title>` de `web/index.html`) — distinto del nombre del repo/proyecto interno
-("Touring RC", usado en este documento y en el código como identificador). En entornos de
-desarrollo (`npm run dev` local o Preview de Vercel con `VITE_APP_ENV=staging`), el título de
-la pestaña del navegador suma el sufijo `" (DEV)"` (seteado con `document.title` en un
+El nombre visible del producto es **"Touring Eco 1:10 Argentina"** — distinto del nombre del
+repo/proyecto interno ("Touring RC", usado en este documento y en el código como
+identificador). Vive **solo** en el `<title>` de `web/index.html` (la pestaña del navegador,
+marcadores, historial) — el header de la web (`App.jsx`) no repite el nombre como texto, va
+directo al logo, sin wordmark al lado (decisión explícita: "en el home solo el logo"). En
+entornos de desarrollo (`npm run dev` local o Preview de Vercel con `VITE_APP_ENV=staging`),
+ese título de pestaña suma además el sufijo `" (DEV)"` (seteado con `document.title` en un
 `useEffect` de `App.jsx`, mismo criterio `ES_DEV` que usa `DevRibbon.jsx`) — la franja roja
 diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
 el título de la pestaña/marcadores/historial. Pendiente: reemplazar el ícono `Flag` de
