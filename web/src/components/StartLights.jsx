@@ -39,11 +39,14 @@ function fraseParaDias(diasRestantes) {
 }
 
 export default function StartLights({ diasRestantes, horasRestantes }) {
-  const progreso = horasRestantes <= 24
-    ? 5
-    : Math.max(0, 5 - Math.min(5, Math.ceil(diasRestantes / 6)));
-  const todasTitilan = progreso === 5 && horasRestantes <= 12;
+  const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasRestantes / 24)));
+  const todasTitilan = progreso === 7 && horasRestantes <= 12;
   const colorDeColumna = (columna) => {
+    if (columna === 6) {
+      return progreso === 7
+        ? { activo: "#22E55E", borde: "#72FF91", glow: "#22E55ECC" }
+        : { activo: "#123A1D", borde: "#2D7A3D", glow: "transparent" };
+    }
     if (columna < progreso) return { activo: "#F22B2B", borde: "#FF5A5A", glow: "#FF2525CC" };
     return { activo: "#3A1111", borde: "#7A2525", glow: "transparent" };
   };
@@ -51,7 +54,7 @@ export default function StartLights({ diasRestantes, horasRestantes }) {
   return (
     <div
       title="Semáforo de largada: las luces se encienden a medida que se acerca la fecha"
-      aria-label={`Faltan ${diasRestantes} días. ${progreso} de 5 columnas de luces rojas encendidas.`}
+      aria-label={`Faltan ${diasRestantes} días. ${progreso} de 7 columnas encendidas.`}
       style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}
     >
       <style>{`
@@ -83,9 +86,9 @@ export default function StartLights({ diasRestantes, horasRestantes }) {
           boxShadow: "inset 0 1px 2px #000, 0 2px 5px #0006",
         }}
       >
-        {[0, 1, 2, 3, 4].map((columna) => (
+        {[0, 1, 2, 3, 4, 5, 6].map((columna) => (
           <div key={columna} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "4px 5px" }}>
-            {[0, 1, 2, 3, 4].map((luz) => {
+            {[0, 1].map((luz) => {
               const color = colorDeColumna(columna);
               const esUltimaEncendida = progreso > 0 && columna === progreso - 1;
               return (

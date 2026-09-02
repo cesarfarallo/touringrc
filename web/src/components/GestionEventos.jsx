@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Plus, Upload, Pencil, Download } from "lucide-react";
 import { T } from "../theme";
 import { useEventos } from "../hooks";
@@ -310,6 +310,89 @@ function InscripcionDiasEditable({ evento, onGuardado }) {
   );
 }
 
+function DatosEventoEditable({ evento, onGuardado }) {
+  const [editando, setEditando] = useState(false);
+  const [nombre, setNombre] = useState(evento.nombre);
+  const [fecha, setFecha] = useState(evento.fecha);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function guardar() {
+    if (!nombre.trim() || !fecha) return;
+    setGuardando(true);
+    setError(null);
+    const { error: errorGuardado } = await supabase
+      .from("eventos")
+      .update({ nombre: nombre.trim(), fecha })
+      .eq("id", evento.id);
+    setGuardando(false);
+    if (errorGuardado) {
+      setError(errorGuardado.message);
+      return;
+    }
+    setEditando(false);
+    onGuardado();
+  }
+
+  if (!editando) {
+    return (
+      <button
+        onClick={() => {
+          setNombre(evento.nombre);
+          setFecha(evento.fecha);
+          setEditando(true);
+        }}
+        title="Editar nombre y fecha"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 2,
+          padding: 0,
+          border: "none",
+          background: "transparent",
+          color: T.text,
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "Oswald, sans-serif", fontSize: 18, fontWeight: 600 }}>
+          {evento.nombre} <Pencil size={11} color={T.muted} />
+        </span>
+        <span style={{ color: T.muted, fontSize: 13 }}>{new Date(evento.fecha + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" })}</span>
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <input
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
+        aria-label="Nombre del evento"
+        autoFocus
+        style={{ background: T.surfaceRaised, border: `1px solid ${T.line}`, borderRadius: 6, padding: "6px 8px", color: T.text, fontSize: 14 }}
+      />
+      <input
+        type="date"
+        value={fecha}
+        onChange={(e) => setFecha(e.target.value)}
+        aria-label="Fecha del evento"
+        style={{ background: T.surfaceRaised, border: `1px solid ${T.line}`, borderRadius: 6, padding: "6px 8px", color: T.text, fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={guardar} disabled={guardando} style={{ border: "none", background: "transparent", color: T.amber, fontSize: 12, cursor: "pointer" }}>
+          {guardando ? "..." : "Guardar"}
+        </button>
+        <button onClick={() => setEditando(false)} style={{ border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer" }}>
+          Cancelar
+        </button>
+      </div>
+      {error && <span style={{ color: T.red, fontSize: 11 }}>{error}</span>}
+    </div>
+  );
+}
+
 function FilaEvento({ evento, onSubido }) {
   const inputRef = useRef(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -340,12 +423,6 @@ function FilaEvento({ evento, onSubido }) {
       setExportando(false);
     }
   }
-
-  const fechaStr = new Date(evento.fecha + "T00:00:00").toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
 
   // Se suben de a uno, en secuencia (no en paralelo): marcarArchivo() en
   // la Edge Function hace un read-modify-write sobre eventos.archivos, y
@@ -389,8 +466,7 @@ function FilaEvento({ evento, onSubido }) {
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: 20, marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 18, fontWeight: 600 }}>{evento.nombre}</div>
-          <div style={{ color: T.muted, fontSize: 13, marginTop: 2 }}>{fechaStr}</div>
+          <DatosEventoEditable evento={evento} onGuardado={onSubido} />
           <div style={{ marginTop: 6 }}>
             <InscripcionDiasEditable evento={evento} onGuardado={onSubido} />
           </div>
@@ -474,6 +550,11 @@ function FilaEvento({ evento, onSubido }) {
 // migración 0004.
 export default function GestionEventos() {
   const { eventos, loading, error, recargar } = useEventos();
+  const eventosOrdenados = useMemo(() => {
+    return [...eventos].sort(
+      (a, b) => new Date(`${b.fecha}T00:00:00`) - new Date(`${a.fecha}T00:00:00`)
+    );
+  }, [eventos]);
 
   return (
     <div>
@@ -482,7 +563,7 @@ export default function GestionEventos() {
       {loading && <div style={{ color: T.muted, fontSize: 13 }}>Cargando calendario...</div>}
       {error && <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>}
 
-      {!loading && !error && eventos.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} />)}
+      {!loading && !error && eventosOrdenados.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} />)}
     </div>
   );
 }

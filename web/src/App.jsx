@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -9,11 +9,12 @@ import {
   useSession,
   usePilotoActual,
   useEsAdmin,
+  useInscripcionPiloto,
 } from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
-import EventoCard from "./components/EventoCard";
+import EventoCard, { FormularioInscripcion, inscripcionAbierta } from "./components/EventoCard";
 import TablaResultados from "./components/TablaResultados";
 import TablaClasificacion from "./components/TablaClasificacion";
 import TablaCampeonato from "./components/TablaCampeonato";
@@ -33,6 +34,8 @@ const ES_DEV = import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "staging"
 
 export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
+  const [inscripcionVersion, setInscripcionVersion] = useState(0);
+  const [formularioDestacadoAbierto, setFormularioDestacadoAbierto] = useState(false);
 
   useEffect(() => {
     document.title = ES_DEV ? "Touring 1:10 Arg (DEV)" : "Touring 1:10 Arg";
@@ -50,16 +53,9 @@ export default function TouringRCApp() {
   const [clase, setClase] = useState(null);
   const claseActiva = clase && clases.includes(clase) ? clase : clases[0];
   const eventosOrdenados = useMemo(() => {
-    const ahora = new Date();
-    ahora.setHours(0, 0, 0, 0);
-    return [...eventos].sort((a, b) => {
-      const fechaA = new Date(`${a.fecha}T00:00:00`);
-      const fechaB = new Date(`${b.fecha}T00:00:00`);
-      const futuroA = fechaA >= ahora;
-      const futuroB = fechaB >= ahora;
-      if (futuroA !== futuroB) return futuroA ? -1 : 1;
-      return futuroA ? fechaA - fechaB : fechaB - fechaA;
-    });
+    return [...eventos].sort(
+      (a, b) => new Date(`${b.fecha}T00:00:00`) - new Date(`${a.fecha}T00:00:00`)
+    );
   }, [eventos]);
 
   const eventosCorridos = useMemo(
@@ -94,6 +90,9 @@ export default function TouringRCApp() {
     ? Math.max(0, (new Date(`${proximo.fecha}T00:00:00`) - new Date()) / (1000 * 60 * 60))
     : 0;
   const dias = proximo ? Math.ceil(horasRestantes / 24) : 0;
+  const { inscripcion: inscripcionDestacada, recargar: recargarInscripcionDestacada } =
+    useInscripcionPiloto(proximo?.id, piloto?.id);
+  const inscripcionDestacadaAbierta = proximo ? inscripcionAbierta(proximo) : false;
 
   const error = errorEventos || errorCampeonato || errorResultados || errorClasificacion;
 
@@ -120,16 +119,16 @@ export default function TouringRCApp() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            height: 96,
+            height: 172,
             boxSizing: "border-box",
             overflow: "visible",
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-start", height: 192, position: "relative" }} title="Touring 1:10 Arg">
+          <div style={{ display: "flex", alignItems: "center" }} title="Touring 1:10 Arg">
             <img
               src="/logo.png"
               alt="Touring 1:10 Arg"
-              style={{ height: 192, width: "auto", display: "block", position: "absolute", top: 0, left: 0, zIndex: 2 }}
+              style={{ height: 152, maxWidth: "min(340px, 30vw)", width: "auto", display: "block" }}
             />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
@@ -214,6 +213,50 @@ export default function TouringRCApp() {
                     Próxima fecha
                   </div>
                   <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700 }}>{proximo.nombre}</div>
+                  <button
+                  onClick={() => {
+                    if (!logueado) {
+                      ingresar();
+                      return;
+                    }
+                    setFormularioDestacadoAbierto((abierto) => !abierto);
+                  }}
+                  disabled={!!inscripcionDestacada}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 14,
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: inscripcionDestacada ? T.surfaceRaised : T.amber,
+                    color: inscripcionDestacada ? T.muted : "#1A1300",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: inscripcionDestacada ? "default" : "pointer",
+                  }}
+                  >
+                  <UserPlus size={14} />
+                  {inscripcionDestacada
+                    ? "Ya estás inscripto"
+                    : formularioDestacadoAbierto
+                      ? "Cerrar inscripción"
+                      : "Inscribirme"}
+                  </button>
+                  {formularioDestacadoAbierto && logueado && piloto && !inscripcionDestacada && inscripcionDestacadaAbierta && (
+                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.line}` }}>
+                      <FormularioInscripcion
+                        evento={proximo}
+                        piloto={piloto}
+                        onInscripto={() => {
+                          setFormularioDestacadoAbierto(false);
+                          setInscripcionVersion((version) => version + 1);
+                          recargarInscripcionDestacada();
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div style={{ flexShrink: 0 }}>
                   <StartLights diasRestantes={dias} horasRestantes={horasRestantes} />
@@ -225,6 +268,10 @@ export default function TouringRCApp() {
               {eventosOrdenados.map((e) => (
                 <EventoCard
                   key={e.id}
+                  refreshInscripcion={inscripcionVersion}
+                  onInscripto={() => {
+                    setInscripcionVersion((version) => version + 1);
+                  }}
                   evento={e}
                   piloto={piloto}
                   logueado={logueado}

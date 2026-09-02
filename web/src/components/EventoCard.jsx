@@ -9,7 +9,7 @@ import { supabase } from "../lib/supabase";
 // el día de la fecha ya se cierra (es pre-inscripción, no inscripción en
 // el momento). Reemplaza el viejo booleano manual `inscripcion_habilitada`
 // (migración 0007) -- cada evento configura su propia antelación.
-function inscripcionAbierta(evento) {
+export function inscripcionAbierta(evento) {
   if (evento.inscripcion_dias_antes == null) return false;
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -19,7 +19,7 @@ function inscripcionAbierta(evento) {
   return hoy >= desde && hoy < fecha;
 }
 
-function FormularioInscripcion({ evento, piloto, onInscripto }) {
+export function FormularioInscripcion({ evento, piloto, onInscripto }) {
   const { clases, loading: cargandoClases } = useClases();
   const { claseId: categoriaPreferida } = useCategoriaPreferida(piloto.id);
   const [claseId, setClaseId] = useState("");
@@ -155,7 +155,15 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
   );
 }
 
-export default function EventoCard({ evento, onVerResultados, piloto, logueado, onLogin }) {
+export default function EventoCard({
+  evento,
+  onVerResultados,
+  piloto,
+  logueado,
+  onLogin,
+  refreshInscripcion,
+  onInscripto,
+}) {
   const fecha = new Date(evento.fecha + "T00:00:00");
   const fechaStr = fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
   const hoy = new Date();
@@ -165,8 +173,13 @@ export default function EventoCard({ evento, onVerResultados, piloto, logueado, 
   const { inscripcion, loading: cargandoInscripcion, recargar } = useInscripcionPiloto(evento.id, piloto?.id);
   const abierta = inscripcionAbierta(evento);
 
+  useEffect(() => {
+    if (refreshInscripcion > 0) recargar();
+  }, [refreshInscripcion]);
+
   return (
     <div
+      id={`evento-${evento.id}`}
       style={{
         background: T.surface,
         border: `1px solid ${T.line}`,
@@ -263,6 +276,7 @@ export default function EventoCard({ evento, onVerResultados, piloto, logueado, 
             onInscripto={() => {
               setFormularioAbierto(false);
               recargar();
+              onInscripto?.();
             }}
           />
         </div>

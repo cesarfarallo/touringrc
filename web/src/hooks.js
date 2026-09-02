@@ -109,7 +109,7 @@ export function useEventos() {
     supabase
       .from("eventos")
       .select("*")
-      .order("fecha", { ascending: true })
+      .order("fecha", { ascending: false })
       .then(({ data, error }) => {
         if (!activo) return;
         if (error) setError(error);
@@ -596,4 +596,3 @@ export function usePilotoRoles(habilitado) {
 
   return { porPiloto, loading, error, recargar };
 }
-

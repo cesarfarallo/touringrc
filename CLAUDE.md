@@ -450,30 +450,44 @@ ese título de pestaña suma además el sufijo `" (DEV)"` (seteado con `document
 `useEffect` de `App.jsx`, mismo criterio `ES_DEV` que usa `DevRibbon.jsx`) — la franja roja
 diagonal ya cubre el aviso visual dentro de la página, esto es un aviso adicional visible en
 el título de la pestaña/marcadores/historial. El logo real de la categoría (auto + wordmark
-"touring RC", PNG con transparencia) vive en `web/public/logo.png` y se muestra en el header
-vía `<img src="/logo.png">` a 192px de alto, sobresaliendo del header fijo de 96px sin
-recortarse (`overflow: visible`, posicionamiento absoluto) — reemplaza el ícono `Flag`
-placeholder que hubo mientras se conseguía el archivo. El favicon sigue siendo
+"touring RC", PNG con transparencia) vive en `web/public/logo.png` y se muestra dentro del
+banner superior vía `<img src="/logo.png">` a 152px de alto, centrado y sin posicionamiento
+absoluto. El banner tiene 172px de alto para contener el logo sin recortarlo ni cruzarlo con
+la navegación. El favicon sigue siendo
 `web/public/favicon.svg`, con fondo circular gris oscuro (`#4B5563`), logo cian (`#00D9FF`)
 y contorno negro fino.
 
 ## Calendario y cuenta regresiva
 
-El home ordena las tarjetas del calendario por cercanía: primero muestra las fechas futuras en
-orden ascendente y luego las fechas pasadas de la más reciente a la más antigua. La próxima fecha
+El home consulta todas las fechas de `eventos` y ordena las tarjetas del calendario por fecha
+descendente: primero muestra la fecha más reciente (sea futura o pasada) y luego continúa hacia
+las más antiguas. No se limita el listado ni se filtran fechas. La próxima fecha
 se calcula como la fecha futura más cercana, independientemente del valor de `corrida`, para no
 seguir mostrando una fecha pasada si el flag quedó desactualizado.
 
 `StartLights.jsx` muestra una representación visual inspirada en el semáforo de largada de F1:
-cinco columnas verticales con cinco luces rojas cada una. Las columnas se encienden
-progresivamente en bloques aproximados de seis días; la quinta se fuerza durante las últimas 24
-horas y, durante las últimas 12 horas, todas las luces encendidas titilan. Arriba se muestra el
+siete columnas verticales con dos luces cada una, organizadas en dos filas. Las seis primeras
+columnas usan luces rojas y la séptima, correspondiente al día de la carrera, usa luces verdes.
+Las columnas se encienden progresivamente durante la última semana: una columna por día, desde
+siete días antes hasta la fecha de la carrera. Durante las últimas 12 horas, todas las luces
+encendidas titilan. Arriba se muestra el
 número exacto de días restantes y una frase alusiva que cambia diariamente durante los últimos
 30 días.
 
 En `EventoCard.jsx`, una fecha pasada habilita `Ver resultados` aunque `corrida` sea falso. Para
 una inscripción abierta, el usuario no autenticado también ve un botón `Inscribirme` que inicia
 el login; el formulario real sigue requiriendo una sesión y el piloto vinculado.
+
+La tarjeta destacada de la próxima fecha también incluye un botón `Inscribirme` con ícono.
+Si el usuario no está autenticado inicia el login; si ya inició sesión, abre y cierra un
+formulario propio dentro de la tarjeta destacada. La tarjeta del evento tiene otro formulario
+independiente que se abre y cierra desde su propio botón. Ambos estados se sincronizan después
+de una inscripción: una vez inscripto, los dos botones quedan deshabilitados.
+
+El módulo administrativo `GestionEventos.jsx` usa el mismo orden del calendario: fecha más
+reciente primero, sea futura o pasada, y luego las fechas más antiguas.
+Cada evento permite editar inline su nombre y fecha mediante el ícono de lápiz; el guardado
+actualiza la fila de `eventos` y refresca el listado.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
@@ -664,3 +678,8 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    (`resultados_finales`, `resultados_ronda`, `campeonato_puntos`, `clases`, `campeonatos`,
    `piloto_alias`, `alias_pendientes`), tests para `livetime_parsers.py`, logging estructurado
    en `sync_evento.py`, y purga opcional del historial de git del secreto expuesto.
+siete columnas verticales con dos luces cada una, organizadas en dos filas. Las seis primeras
+columnas usan luces rojas y la séptima, correspondiente al día de la carrera, usa luces verdes.
+Las columnas se encienden progresivamente durante la última semana: una columna por día, desde
+siete días antes hasta la fecha de la carrera. Durante las últimas 12 horas, todas las luces
+encendidas titilan. Arriba se muestra el
