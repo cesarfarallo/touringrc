@@ -18,6 +18,8 @@ export default function NavTab({ icon: Icon, label, active, onClick }) {
         fontSize: 14,
         cursor: "pointer",
         transition: "all 0.2s",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
       }}
     >
       <Icon size={16} />

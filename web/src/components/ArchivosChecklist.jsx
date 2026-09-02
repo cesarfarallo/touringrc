@@ -6,7 +6,7 @@ export default function ArchivosChecklist({ archivos }) {
   const faltantes = TIPOS_ARCHIVO.filter((t) => !archivos[t.clave]);
   const completo = faltantes.length === 0;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
       {TIPOS_ARCHIVO.map((t) => {
         const ok = !!archivos[t.clave];
         return (

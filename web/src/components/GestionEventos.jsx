@@ -379,7 +379,7 @@ function FilaEvento({ evento, onSubido }) {
             <InscripcionDiasEditable evento={evento} onGuardado={onSubido} />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             onClick={exportarInscriptos}
             disabled={exportando || !exportHabilitado}

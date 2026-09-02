@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Calendar, Trophy, Flag, User, ShieldCheck, Clock, AlertTriangle } from "lucide-react";
-import { T, FONTS } from "./theme";
+import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
   useResultadosEvento,
@@ -78,12 +78,13 @@ export default function TouringRCApp() {
 
   return (
     <div style={{ background: T.bg, minHeight: "100vh", color: T.text, fontFamily: "Inter, sans-serif" }}>
-      <style>{FONTS}</style>
+      <style>{FONTS + RESPONSIVE_CSS}</style>
       <DevRibbon />
 
       {/* Header */}
       <div style={{ borderBottom: `1px solid ${T.line}`, background: T.surface }}>
         <div
+          className="header-inner"
           style={{
             maxWidth: 900,
             margin: "0 auto",
@@ -99,7 +100,7 @@ export default function TouringRCApp() {
               TOURING RC
             </span>
           </div>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />
             <NavTab icon={Flag} label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
             <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
@@ -132,7 +133,7 @@ export default function TouringRCApp() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
+      <div className="page-content" style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
         {error && (
           <div
             style={{
@@ -172,6 +173,8 @@ export default function TouringRCApp() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 16,
                 }}
               >
                 <div>
@@ -184,7 +187,9 @@ export default function TouringRCApp() {
                     <span style={{ fontFamily: "JetBrains Mono, monospace" }}>{dias} días</span>
                   </div>
                 </div>
-                <StartLights diasRestantes={dias} />
+                <div style={{ flexShrink: 0 }}>
+                  <StartLights diasRestantes={dias} />
+                </div>
               </div>
             )}
 
@@ -263,7 +268,7 @@ export default function TouringRCApp() {
                       })}
                     </select>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {[
                       { id: "finales", label: "Resultados finales" },
                       { id: "clasificacion", label: "Clasificación" },

@@ -392,6 +392,7 @@ export default function PilotosAdmin() {
               color: T.text,
               fontSize: 13,
               width: 220,
+              maxWidth: "100%",
             }}
           />
         </div>
@@ -419,7 +420,8 @@ export default function PilotosAdmin() {
 
       {!loading && !error && (
         <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${T.line}` }}>
                 {["Nombre", "Email", "Roles", "Vinculado"].map((h) => (
@@ -479,6 +481,7 @@ export default function PilotosAdmin() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

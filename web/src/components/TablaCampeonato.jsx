@@ -3,7 +3,8 @@ import { T } from "../theme";
 export default function TablaCampeonato({ data }) {
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ borderBottom: `1px solid ${T.line}` }}>
             {["Pos", "Piloto", "Puntos", "TQs", "Victorias", "Fechas"].map((h) => (
@@ -49,6 +50,7 @@ export default function TablaCampeonato({ data }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

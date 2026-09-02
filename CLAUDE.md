@@ -396,6 +396,27 @@ tome efecto en los proyectos ya deployados.
   del propio club, no hizo falta una Edge Function para esto. El admin lo importa a mano en
   Live Timing (no hay API para automatizar ese lado).
 
+## Responsive / mobile (`web/`)
+
+Toda la UI usa estilos inline (no hay Tailwind ni CSS modules), así que la mayoría de lo
+responsive se resuelve directo en los `style={{...}}` de cada componente — `flexWrap: "wrap"`
+en las filas que pueden no entrar en una pantalla angosta, y `overflowX: "auto"` envolviendo
+cada `<table>` (con un `minWidth` en el propio `<table>` para forzar el scroll horizontal en
+vez de apretar las columnas) en `TablaResultados.jsx`, `TablaClasificacion.jsx`,
+`TablaCampeonato.jsx`, la tabla de `PilotosAdmin.jsx` y la matriz de `RolesAdmin.jsx`.
+
+Lo único que necesitó una media query real (no se puede con estilos inline) es el **header**
+de `App.jsx`: en pantallas ≤640px el nav de tabs (Calendario/Resultados/Campeonato/Admin) pasa
+a su propia fila con scroll horizontal en vez de apretarse junto al logo y el botón de login,
+que también pasan a apilarse. Eso vive en `RESPONSIVE_CSS` (`theme.js`), inyectado igual que
+`FONTS` vía `<style>` en `App.jsx`, con las clases `.header-inner`/`.nav-tabs`/`.page-content`.
+
+Verificado con Playwright en un viewport de 320px (iPhone SE) desde este entorno de
+desarrollo (sin datos reales, por la falta de acceso de red a Supabase, pero sí la estructura
+del layout): sin overflow horizontal de la página en Calendario ni Resultados, y el nav de
+tabs scrollea para llegar a las pestañas que no entran. Falta verificar con datos reales en un
+celular de verdad (tablas largas, formularios con teclado on-screen, etc.).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
