@@ -158,6 +158,9 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
 export default function EventoCard({ evento, onVerResultados, piloto, logueado }) {
   const fecha = new Date(evento.fecha + "T00:00:00");
   const fechaStr = fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const resultadosDisponibles = evento.corrida || fecha < hoy;
   const [formularioAbierto, setFormularioAbierto] = useState(false);
   const { inscripcion, loading: cargandoInscripcion, recargar } = useInscripcionPiloto(evento.id, piloto?.id);
   const abierta = inscripcionAbierta(evento);
@@ -179,7 +182,7 @@ export default function EventoCard({ evento, onVerResultados, piloto, logueado }
           <div style={{ color: T.muted, fontSize: 13, marginTop: 4, fontFamily: "Inter, sans-serif" }}>{fechaStr}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {evento.corrida ? (
+          {resultadosDisponibles ? (
             <button
               onClick={() => onVerResultados(evento.id)}
               style={{

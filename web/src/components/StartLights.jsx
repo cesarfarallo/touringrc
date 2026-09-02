@@ -3,7 +3,7 @@ import { T } from "../theme";
 export default function StartLights({ diasRestantes }) {
   const encendidas = Math.max(0, 5 - Math.min(5, Math.ceil(diasRestantes / 6)));
   return (
-    <div style={{ display: "flex", gap: 10 }}>
+    <div title="Indicador de cuenta regresiva hasta la próxima fecha" style={{ display: "flex", gap: 10 }}>
       {[0, 1, 2, 3, 4].map((i) => (
         <div
           key={i}

@@ -73,8 +73,12 @@ export default function TouringRCApp() {
     error: errorClasificacion,
   } = useClasificacionEvento(eventoResultadosIdActivo);
 
-  const proximo = eventos.find((e) => !e.corrida);
-  const dias = proximo ? Math.ceil((new Date(proximo.fecha) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const proximo = [...eventos]
+    .filter((e) => new Date(`${e.fecha}T00:00:00`) >= hoy)
+    .sort((a, b) => new Date(`${a.fecha}T00:00:00`) - new Date(`${b.fecha}T00:00:00`))[0];
+  const dias = proximo ? Math.ceil((new Date(`${proximo.fecha}T00:00:00`) - hoy) / (1000 * 60 * 60 * 24)) : 0;
 
   const error = errorEventos || errorCampeonato || errorResultados || errorClasificacion;
 
