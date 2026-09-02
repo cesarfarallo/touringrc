@@ -19,22 +19,24 @@ export class PilotoResolver {
     const textoCrudo = textoCrudoOriginal.trim();
     if (this.cache.has(textoCrudo)) return this.cache.get(textoCrudo)!;
 
-    const { data: alias } = await this.sb
+    const { data: alias, error: errAlias } = await this.sb
       .from("piloto_alias")
       .select("piloto_id")
       .eq("texto_crudo", textoCrudo)
       .maybeSingle();
+    if (errAlias) throw new Error(`piloto_alias.select (${textoCrudo}): ${errAlias.message}`);
     if (alias) {
       this.cache.set(textoCrudo, alias.piloto_id);
       return alias.piloto_id;
     }
 
     const { firstName, lastName, country } = parseNombreCrudo(textoCrudo);
-    const { data: candidatos } = await this.sb
+    const { data: candidatos, error: errCandidatos } = await this.sb
       .from("pilotos")
       .select("id")
       .ilike("first_name", firstName)
       .ilike("last_name", lastName);
+    if (errCandidatos) throw new Error(`pilotos.select candidatos (${textoCrudo}): ${errCandidatos.message}`);
 
     // deno-lint-ignore no-explicit-any
     const ids: string[] = (candidatos ?? []).map((c: any) => c.id);
@@ -58,20 +60,21 @@ export class PilotoResolver {
     }
 
     // 2+ candidatos: ambiguo, no lo resolvemos solos.
-    await this.sb.from("alias_pendientes").upsert(
-      { texto_crudo: textoCrudo, candidatos: ids },
-      { onConflict: "texto_crudo" }
-    );
+    const { error: errAmbiguo } = await this.sb
+      .from("alias_pendientes")
+      .upsert({ texto_crudo: textoCrudo, candidatos: ids }, { onConflict: "texto_crudo" });
+    if (errAmbiguo) throw new Error(`alias_pendientes.upsert (${textoCrudo}): ${errAmbiguo.message}`);
     this.cache.set(textoCrudo, null);
     return null;
   }
 
   private async crearAlias(textoCrudo: string, pilotoId: string) {
-    await this.sb.from("piloto_alias").insert({
+    const { error } = await this.sb.from("piloto_alias").insert({
       texto_crudo: textoCrudo,
       piloto_id: pilotoId,
       resuelto_manualmente: false,
     });
+    if (error) throw new Error(`piloto_alias.insert (${textoCrudo}): ${error.message}`);
   }
 
   async resolverOAvisar(textoCrudo: string): Promise<string | null> {

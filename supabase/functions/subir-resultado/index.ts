@@ -142,7 +142,8 @@ async function getOrCreateClase(sb: SupabaseClient, nombre: string): Promise<str
 async function marcarArchivo(sb: SupabaseClient, eventoId: string, tipo: string) {
   const { data: ev } = await sb.from("eventos").select("archivos").eq("id", eventoId).maybeSingle();
   const archivos = { ...(ev?.archivos ?? {}), [tipo]: true };
-  await sb.from("eventos").update({ archivos }).eq("id", eventoId);
+  const { error } = await sb.from("eventos").update({ archivos }).eq("id", eventoId);
+  if (error) throw new Error(`eventos.update archivos: ${error.message}`);
 }
 
 async function syncPilotos(sb: SupabaseClient, bytes: Uint8Array): Promise<string> {
@@ -171,9 +172,11 @@ async function syncPilotos(sb: SupabaseClient, bytes: Uint8Array): Promise<strin
     };
 
     if (existente) {
-      await sb.from("pilotos").update(campos).eq("id", existente.id);
+      const { error } = await sb.from("pilotos").update(campos).eq("id", existente.id);
+      if (error) throw new Error(`pilotos.update (${first} ${last}): ${error.message}`);
     } else {
-      await sb.from("pilotos").insert(campos);
+      const { error } = await sb.from("pilotos").insert(campos);
+      if (error) throw new Error(`pilotos.insert (${first} ${last}): ${error.message}`);
     }
     count++;
   }
@@ -194,7 +197,7 @@ async function syncFinalResults(
     const claseId = await getOrCreateClase(sb, f.clase);
     const { flags } = parseNombreCrudo(f.pilotoCrudo);
 
-    await sb.from("resultados_finales").upsert(
+    const { error } = await sb.from("resultados_finales").upsert(
       {
         evento_id: eventoId,
         clase_id: claseId,
@@ -206,6 +209,7 @@ async function syncFinalResults(
       },
       { onConflict: "evento_id,clase_id,piloto_id" }
     );
+    if (error) throw new Error(`resultados_finales.upsert (${f.pilotoCrudo}): ${error.message}`);
     count++;
   }
   return `${count} resultados finales sincronizados`;
@@ -225,7 +229,7 @@ async function syncRoundResults(
     const claseId = await getOrCreateClase(sb, f.clase);
     const r = parseResultadoCrudo(f.lapsTimeCrudo);
 
-    await sb.from("resultados_ronda").upsert(
+    const { error } = await sb.from("resultados_ronda").upsert(
       {
         evento_id: eventoId,
         clase_id: claseId,
@@ -243,6 +247,7 @@ async function syncRoundResults(
       },
       { onConflict: "evento_id,clase_id,ronda,piloto_id" }
     );
+    if (error) throw new Error(`resultados_ronda.upsert (${f.pilotoCrudo}, ${f.ronda}): ${error.message}`);
     count++;
   }
   return `${count} filas de detalle de ronda sincronizadas`;
@@ -262,12 +267,13 @@ async function syncTopTimes(
     if (!pilotoId) continue;
     const claseId = await getOrCreateClase(sb, f.clase);
 
-    await sb
+    const { error } = await sb
       .from("resultados_finales")
       .update({ vuelta_rapida: true })
       .eq("evento_id", eventoId)
       .eq("clase_id", claseId)
       .eq("piloto_id", pilotoId);
+    if (error) throw new Error(`resultados_finales.update vuelta_rapida (${f.pilotoCrudo}): ${error.message}`);
     count++;
   }
   return `Vuelta rápida marcada (${count})`;
@@ -286,7 +292,7 @@ async function syncCampeonato(
     if (!pilotoId) continue;
     const claseId = await getOrCreateClase(sb, f.clase);
 
-    await sb.from("campeonato_puntos").upsert(
+    const { error } = await sb.from("campeonato_puntos").upsert(
       {
         campeonato_id: campeonatoId,
         clase_id: claseId,
@@ -304,6 +310,7 @@ async function syncCampeonato(
       },
       { onConflict: "campeonato_id,clase_id,piloto_id" }
     );
+    if (error) throw new Error(`campeonato_puntos.upsert (${f.pilotoCrudo}): ${error.message}`);
     count++;
   }
   return `${count} filas de campeonato sincronizadas`;

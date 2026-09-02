@@ -326,6 +326,17 @@ separados, ver sección "Entornos" más abajo) — deployar en uno no afecta al 
 función no se corrió nunca contra un proyecto de Supabase real. Probarla subiendo un archivo
 real desde Gestión de eventos en staging antes de asumir que está lista para producción.
 
+**Bug encontrado en la primera prueba real en staging**: las escrituras (`upsert`/`insert`/
+`update`) en `syncPilotos`/`syncFinalResults`/`syncRoundResults`/`syncTopTimes`/
+`syncCampeonato` y en `piloto_resolver.ts` no chequeaban el `error` que devuelve el cliente de
+Supabase — si el insert fallaba (ej. desajuste de tipos, FK inválida), el código seguía de
+largo, contaba la fila como sincronizada igual, y la función devolvía `{ ok: true }` con el
+checklist tildado aunque no se hubiera escrito nada. Corregido: ahora cada escritura chequea
+`error` y tira una excepción con el nombre de la tabla y la fila que falló, así el mensaje rojo
+del botón "Subir resultados" muestra el motivo real en vez de un falso éxito silencioso. Hay
+que re-deployar la función (`supabase functions deploy subir-resultado`) para que este fix
+tome efecto en los proyectos ya deployados.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
