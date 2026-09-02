@@ -22,6 +22,7 @@ function inscripcionAbierta(evento) {
 function FormularioInscripcion({ evento, piloto, onInscripto }) {
   const { clases, loading: cargandoClases } = useClases();
   const [claseId, setClaseId] = useState("");
+  const [transponder, setTransponder] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
 
@@ -29,56 +30,103 @@ function FormularioInscripcion({ evento, piloto, onInscripto }) {
     if (!claseId) return;
     setGuardando(true);
     setError(null);
+
     const { error } = await supabase
       .from("inscripciones")
       .insert({ evento_id: evento.id, piloto_id: piloto.id, clase_id: claseId });
-    setGuardando(false);
     if (error) {
+      setGuardando(false);
       setError(error.message);
       return;
     }
+
+    if (transponder.trim()) {
+      const { error: errorTx } = await supabase.rpc("actualizar_mi_transponder", {
+        p_transponder: transponder.trim(),
+      });
+      if (errorTx) {
+        setGuardando(false);
+        setError(`Te inscribiste bien, pero no se pudo guardar el transponder: ${errorTx.message}`);
+        onInscripto();
+        return;
+      }
+    }
+
+    setGuardando(false);
     onInscripto();
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <select
-        value={claseId}
-        onChange={(e) => setClaseId(e.target.value)}
-        disabled={cargandoClases}
-        style={{
-          background: T.surfaceRaised,
-          border: `1px solid ${T.line}`,
-          borderRadius: 8,
-          padding: "8px 10px",
-          color: T.text,
-          fontSize: 13,
-        }}
-      >
-        <option value="">{cargandoClases ? "Cargando clases..." : "Elegí tu clase"}</option>
-        {clases.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.nombre}
-          </option>
-        ))}
-      </select>
-      <button
-        onClick={confirmar}
-        disabled={!claseId || guardando}
-        style={{
-          padding: "8px 16px",
-          borderRadius: 8,
-          border: "none",
-          background: claseId ? T.amber : T.surfaceRaised,
-          color: claseId ? "#1A1300" : T.muted,
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: claseId && !guardando ? "pointer" : "default",
-        }}
-      >
-        {guardando ? "Confirmando..." : "Confirmar inscripción"}
-      </button>
-      {error && <div style={{ width: "100%", color: T.red, fontSize: 12 }}>{error}</div>}
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <select
+          value={claseId}
+          onChange={(e) => setClaseId(e.target.value)}
+          disabled={cargandoClases}
+          style={{
+            background: T.surfaceRaised,
+            border: `1px solid ${T.line}`,
+            borderRadius: 8,
+            padding: "8px 10px",
+            color: T.text,
+            fontSize: 13,
+          }}
+        >
+          <option value="">{cargandoClases ? "Cargando clases..." : "Elegí tu clase"}</option>
+          {clases.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
+
+        {piloto.transponder_number ? (
+          <span style={{ color: T.muted, fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}>
+            Transponder: {piloto.transponder_number}
+          </span>
+        ) : (
+          <input
+            type="text"
+            value={transponder}
+            onChange={(e) => setTransponder(e.target.value)}
+            placeholder="Nº de transponder (opcional)"
+            style={{
+              background: T.surfaceRaised,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              padding: "8px 10px",
+              color: T.text,
+              fontSize: 13,
+              fontFamily: "JetBrains Mono, monospace",
+              width: 180,
+            }}
+          />
+        )}
+
+        <button
+          onClick={confirmar}
+          disabled={!claseId || guardando}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: claseId ? T.amber : T.surfaceRaised,
+            color: claseId ? "#1A1300" : T.muted,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: claseId && !guardando ? "pointer" : "default",
+          }}
+        >
+          {guardando ? "Confirmando..." : "Confirmar inscripción"}
+        </button>
+      </div>
+      {!piloto.transponder_number && (
+        <div style={{ color: T.muted, fontSize: 11 }}>
+          No hace falta que lo cargues ahora — también se puede agregar después en la pista con
+          el sistema de cronometraje.
+        </div>
+      )}
+      {error && <div style={{ color: T.red, fontSize: 12 }}>{error}</div>}
     </div>
   );
 }

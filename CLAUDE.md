@@ -386,6 +386,15 @@ tome efecto en los proyectos ya deployados.
   (`useClases()`) inserta en `inscripciones` — la policy RLS de insert/select ya existía
   (`piloto_id in (select id from pilotos where auth_user_id = auth.uid())`, ver
   `schema.sql`), no hizo falta ninguna migración de permisos nueva.
+- **Transponder al inscribirse** (migración 0008, `actualizar_mi_transponder()`): si el piloto
+  ya tiene `transponder_number` cargado en `pilotos`, el formulario lo muestra como dato
+  informativo (no editable ahí). Si no lo tiene, muestra un input opcional — no es obligatorio
+  completarlo, se puede cargar después en la pista con Live Timing sin problema. `pilotos` no
+  tenía ninguna policy de UPDATE para el propio piloto (solo para admin, migración 0002); en
+  vez de abrir una policy de update genérica (que dejaría editar cualquier columna, incluido
+  nombre/apellido), se usa una función `security definer` bien acotada que solo toca
+  `transponder_number` y solo en la fila del propio piloto (`auth_user_id = auth.uid()`),
+  mismo patrón que `fusionar_pilotos()`.
 - **Export de inscriptos** (`web/src/lib/genericImport.js` + botón "Exportar inscriptos" en
   `GestionEventos.jsx`): arma el `GenericImport.csv` real (56 columnas, header tomado tal cual
   de `touringrc-sync/files/GenericImport.csv`) a partir de `inscripciones` del evento, join con
