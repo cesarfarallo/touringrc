@@ -336,6 +336,55 @@ def parse_series_result(path):
 
 
 # ---------------------------------------------------------------
+# EventVerification-*.xls (roster de pilotos verificados/registrados
+# en un evento, por clase -- Name, Email, Car, Tx, Verified). A
+# diferencia de GenericImport.csv, este SÍ lo exporta la herramienta
+# local (no es para importar). Se usa para volcar el roster ya
+# cargado en Live Timing a `pilotos`, ver cargar_roster.py.
+# ---------------------------------------------------------------
+
+def parse_event_verification(path):
+    """
+    Devuelve lista de dicts: {clase, posicion, piloto_crudo, email,
+    permanent_number, transponder_number, verificado}.
+
+    Columnas fijas del export (0-indexed): 2=posición, 3=Name,
+    6=Email, 7=Car, 8=Tx, 9=Verified (un caracter tipo checkmark si
+    está verificado, vacío si no).
+    """
+    df = pd.read_excel(path, sheet_name=0, header=None, engine="xlrd")
+    out = []
+    clase_actual = None
+
+    for _, row in df.iterrows():
+        col2, col3 = row[2] if len(row) > 2 else None, row[3] if len(row) > 3 else None
+
+        if _clean(col3) == "Name":
+            continue
+
+        # Header de sección: sin posición, con nombre de clase en col3
+        if pd.isna(col2) and _clean(col3):
+            clase_actual = _clean(col3)
+            continue
+
+        # Fila de datos: posición numérica + nombre
+        if pd.notna(col2) and _clean(col3):
+            car = row[7] if len(row) > 7 else None
+            tx = row[8] if len(row) > 8 else None
+            verificado = row[9] if len(row) > 9 else None
+            out.append({
+                "clase": clase_actual,
+                "posicion": int(col2),
+                "piloto_crudo": _clean(col3),
+                "email": _clean(row[6]) if len(row) > 6 else None,
+                "permanent_number": str(int(car)) if pd.notna(car) else None,
+                "transponder_number": str(int(tx)) if pd.notna(tx) else None,
+                "verificado": pd.notna(verificado),
+            })
+    return out
+
+
+# ---------------------------------------------------------------
 # GenericImport.csv (ya viene limpio, solo lo leemos)
 # ---------------------------------------------------------------
 

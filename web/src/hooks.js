@@ -232,3 +232,106 @@ export function useCampeonato() {
 
   return { campeonato, porClase, loading, error };
 }
+
+// ¿El usuario logueado es admin de verdad? Chequea la tabla `admins`
+// (server-side, ver touringrc-sync/sql/migrations/0002_admin_y_vinculo_por_nombre.sql)
+// -- no confundir con el toggle visual "ADMIN" del header, que ahora
+// depende de esto para siquiera mostrarse.
+export function useEsAdmin(session) {
+  const [esAdmin, setEsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setEsAdmin(false);
+      setLoading(false);
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("admins")
+      .select("email")
+      .eq("email", session.user.email)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!activo) return;
+        setEsAdmin(!!data);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [session?.user?.email]);
+
+  return { esAdmin, loading };
+}
+
+// Logins que no matchearon 1 a 1 contra el roster ya cargado (el admin
+// tiene que confirmar el piloto nuevo o fusionarlo con uno existente).
+// Trae también los pilotos candidatos/creado para mostrar sus nombres,
+// en una segunda consulta (evita depender de nombres de foreign keys
+// autogenerados por Postgres para el nested select).
+export function useVinculosPendientes(habilitado) {
+  const [vinculos, setVinculos] = useState([]);
+  const [pilotosPorId, setPilotosPorId] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!habilitado) return;
+    let activo = true;
+    setLoading(true);
+
+    async function cargar() {
+      const { data: pendientes, error: errVinculos } = await supabase
+        .from("vinculos_pendientes")
+        .select("*")
+        .eq("resuelto", false)
+        .order("creado_at", { ascending: false });
+
+      if (!activo) return;
+      if (errVinculos) {
+        setError(errVinculos);
+        setLoading(false);
+        return;
+      }
+
+      const ids = new Set();
+      for (const v of pendientes ?? []) {
+        if (v.piloto_creado_id) ids.add(v.piloto_creado_id);
+        for (const c of v.candidatos ?? []) ids.add(c);
+      }
+
+      let mapa = {};
+      if (ids.size > 0) {
+        const { data: pilotos, error: errPilotos } = await supabase
+          .from("pilotos")
+          .select("id, first_name, last_name, permanent_number")
+          .in("id", Array.from(ids));
+        if (!activo) return;
+        if (errPilotos) {
+          setError(errPilotos);
+          setLoading(false);
+          return;
+        }
+        mapa = Object.fromEntries((pilotos ?? []).map((p) => [p.id, p]));
+      }
+
+      setVinculos(pendientes ?? []);
+      setPilotosPorId(mapa);
+      setLoading(false);
+    }
+
+    cargar();
+    return () => {
+      activo = false;
+    };
+  }, [habilitado, version]);
+
+  return { vinculos, pilotosPorId, loading, error, recargar };
+}
+

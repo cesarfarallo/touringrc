@@ -79,6 +79,8 @@ botones de login/admin en `web/` son placeholders visuales. Ver "Roadmap" más a
 | `resultados_finales` | Resultado final de un piloto en una clase de un evento (posición, resultado crudo, heat, `tq`, `vuelta_rapida`). Unique `(evento_id, clase_id, piloto_id)`. | sin RLS |
 | `resultados_ronda` | Detalle por ronda/heat (laps, tiempos, promedios). Unique `(evento_id, clase_id, ronda, piloto_id)`. **Ojo**: la columna `tiempo interval` existe pero `sync_evento.py` no la completa hoy (solo llena `vueltas`). | sin RLS |
 | `campeonato_puntos` | Acumulado de campeonato por clase/piloto (puntos, TQs, victorias, `detalle_por_fecha` jsonb). Unique `(campeonato_id, clase_id, piloto_id)`. | sin RLS |
+| `admins` | Lista de emails autorizados como admin (migración 0002). Reemplaza el viejo toggle "ADMIN" puramente visual del frontend por una verificación real del lado del servidor. | select propio (un admin se ve a sí mismo) |
+| `vinculos_pendientes` | Cola de revisión (migración 0002): logins que no matchearon 1 a 1 contra el roster de `pilotos` ya cargado — o crearon un piloto nuevo (0 candidatos) o quedaron ambiguos (2+ candidatos con mismo nombre). El admin confirma o fusiona vía `fusionar_pilotos()`. | select/update solo admin |
 
 **Nota de RLS**: hoy solo `pilotos`, `inscripciones` y `eventos` tienen RLS habilitado. El resto
 queda con el comportamiento default de Postgres/Supabase (sin política = sin acceso vía la
@@ -145,6 +147,58 @@ imprimir (secciones por clase, columnas vacías intercaladas, headers repetidos)
 como datos tabulares — cada parser reconstruye la estructura fila por fila con regex y
 detección de secciones. Requiere `xlrd` porque son `.xls` viejos (formato OLE2/CDFV2), no
 `.xlsx`.
+
+**`parse_event_verification`** parsea `EventVerification-*.xls` — el reporte que Live Timing
+exporta con los pilotos registrados/verificados en un evento, por clase, con `Name`, `Email`
+(en la práctica siempre vacío), `Car` (número) y `Tx` (transponder). No es lo mismo que
+`GenericImport.csv` (ese es para *importar* hacia Live Timing, no lo exporta la herramienta).
+Se usa desde `cargar_roster.py` para volcar el roster ya cargado en Live Timing a `pilotos` —
+ver sección siguiente.
+
+## Admin real y vinculación de login por nombre (migración 0002)
+
+El toggle "ADMIN" del header ahora depende de una verificación real: la tabla `admins` (email →
+autorizado) más una función `es_admin()` (`security definer`, chequea
+`auth.jwt() ->> 'email'`) usada en las policies de RLS. Antes de esta migración, el toggle era
+puramente visual — cualquier usuario logueado lo podía prender sin que eso habilitara nada real
+del lado del servidor (no era un agujero de seguridad porque nada escribía en la base todavía,
+pero dejó de ser seguro en cuanto el panel de revisión de abajo necesitó escribir).
+
+**Por qué hizo falta cambiar el trigger de vinculación de la migración 0001**: matchear por
+email (como hacía 0001) no sirve para el roster que el club ya tiene cargado en Live Timing,
+porque esos pilotos no tienen email guardado ahí (confirmado con un `EventVerification-*.xls`
+real: ni un pilot tenía el campo Email completo). La migración 0002 reemplaza
+`handle_new_user()`: intenta por email primero (por si acaso), y si no, por nombre+apellido
+exacto contra pilotos sin vincular — misma filosofía que `PilotoResolver` para el lado del sync
+de resultados, pero para el lado del login:
+- 1 candidato → vincula solo.
+- 0 o 2+ candidatos → crea un piloto nuevo igual (no bloquea el login) y encola una fila en
+  `vinculos_pendientes` para que el admin la revise.
+
+**`cargar_roster.py`** (nuevo, standalone, no depende de `sync_evento.py` porque no hay un
+evento/resultados de por medio): lee un `EventVerification-*.xls` y hace upsert en `pilotos`
+por nombre+apellido (separando el texto crudo por espacios, el último token es el apellido —
+funciona bien con nombres de 2 palabras, con nombres compuestos de 3+ palabras es una
+heurística que puede fallar y hay que corregir a mano después). Completa
+`permanent_number`/`transponder_number` si el archivo los trae.
+
+```
+python cargar_roster.py --archivo EventVerification-Event30.xls
+```
+
+**Panel admin `VinculosPendientes`** (`web/src/components/VinculosPendientes.jsx`): lista las
+filas de `vinculos_pendientes` sin resolver. Para cada una, el admin puede:
+- **Confirmar** que el piloto nuevo creado automáticamente está bien (marca `resuelto=true`).
+- **Fusionar** con uno de los candidatos ambiguos, si los hay — llama a la función Postgres
+  `fusionar_pilotos(duplicado, correcto)` (`security definer`, valida `es_admin()` internamente),
+  que reasigna todo el historial (`resultados_finales`, `resultados_ronda`,
+  `campeonato_puntos`, `inscripciones`, `piloto_alias`) del piloto duplicado al correcto, y
+  borra el duplicado. Como el piloto duplicado se acaba de crear en el login, en la práctica
+  nunca tiene historial propio que reasignar — es una fusión segura.
+
+⚠️ Antes de correr la migración 0002 en cualquier proyecto, hay que editar el `INSERT` de la
+sección 1 del archivo y poner el email real que va a ser admin (reemplazar
+`'TU_EMAIL_AQUI@gmail.com'`).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
@@ -299,10 +353,15 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    - Apple Sign In: descartado por ahora (cuenta de Apple Developer paga); el magic link a
      email cubre el mismo caso de uso sin costo — se puede sumar Apple más adelante si hace
      falta.
-3. **Fase C — Inscripción online**: formulario que inserta en `inscripciones` (la policy RLS ya
-   existe). Reemplazar el booleano manual `inscripcion_habilitada` por una ventana calculada
-   (ej. columnas `inscripcion_desde`/`inscripcion_hasta`, o `fecha - N días` con N configurable
-   por evento o global).
+3. 🔧 **Fase C — Inscripción online** (en curso): prerrequisitos ya resueltos — admin real +
+   vinculación de login por nombre (migración 0002, ver sección arriba) y `cargar_roster.py`
+   para volcar el roster ya cargado en Live Timing. Falta correr `cargar_roster.py` con el
+   roster completo del club (hoy solo se probó con el `EventVerification-Event30.xls` de
+   ejemplo) y construir el formulario en sí: inserta en `inscripciones` (la policy RLS ya
+   existe), pre-completa nombre/apellido si el piloto vinculado ya los tiene. Reemplazar el
+   booleano manual `inscripcion_habilitada` por una ventana calculada (ej. columnas
+   `inscripcion_desde`/`inscripcion_hasta`, o `fecha - N días` con N configurable por evento o
+   global).
 4. **Fase D — Export de inscriptos**: botón admin que genera `GenericImport.csv` (formato real
    confirmado en `touringrc-sync/files/GenericImport.csv`, ~55 columnas) desde `inscripciones` +
    `pilotos` del evento — resuelve la dirección web→Live Timing que hoy falta. Como mínimo hay

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Calendar, Trophy, Flag, User, Shield, Plus, Clock, AlertTriangle } from "lucide-react";
 import { T, FONTS } from "./theme";
-import { useEventos, useResultadosEvento, useCampeonato, useSession, usePilotoActual } from "./hooks";
+import { useEventos, useResultadosEvento, useCampeonato, useSession, usePilotoActual, useEsAdmin } from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
@@ -11,6 +11,7 @@ import TablaCampeonato from "./components/TablaCampeonato";
 import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
 import PilotosAdmin from "./components/PilotosAdmin";
+import VinculosPendientes from "./components/VinculosPendientes";
 import DevRibbon from "./components/DevRibbon";
 
 function nombreParaMostrar(piloto, session) {
@@ -23,7 +24,8 @@ export default function TouringRCApp() {
   const { session } = useSession();
   const { piloto, loading: cargandoPiloto } = usePilotoActual(session);
   const logueado = !!session;
-  const [esAdmin, setEsAdmin] = useState(false);
+  const { esAdmin: esAdminReal } = useEsAdmin(session);
+  const [verComoAdmin, setVerComoAdmin] = useState(false);
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
   const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato, error: errorCampeonato } = useCampeonato();
@@ -52,12 +54,12 @@ export default function TouringRCApp() {
   const dias = proximo ? Math.ceil((new Date(proximo.fecha) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 
   const error = errorEventos || errorCampeonato || errorResultados;
-  const mostrarAdmin = logueado && esAdmin;
+  const mostrarAdmin = logueado && esAdminReal && verComoAdmin;
 
   const ingresar = () =>
     supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   const salir = () => {
-    setEsAdmin(false);
+    setVerComoAdmin(false);
     supabase.auth.signOut();
   };
 
@@ -90,19 +92,19 @@ export default function TouringRCApp() {
             <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {logueado && (
+            {logueado && esAdminReal && (
               <button
-                onClick={() => setEsAdmin(!esAdmin)}
-                title="Alternar modo admin (demo visual — el rol de admin todavía no existe en la base, ver Fase E)"
+                onClick={() => setVerComoAdmin(!verComoAdmin)}
+                title="Alternar vista admin"
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
                   padding: "6px 10px",
                   borderRadius: 6,
-                  border: `1px solid ${esAdmin ? T.amber : T.line}`,
-                  background: esAdmin ? `${T.amber}18` : "transparent",
-                  color: esAdmin ? T.amber : T.muted,
+                  border: `1px solid ${verComoAdmin ? T.amber : T.line}`,
+                  background: verComoAdmin ? `${T.amber}18` : "transparent",
+                  color: verComoAdmin ? T.amber : T.muted,
                   fontSize: 11,
                   fontFamily: "JetBrains Mono, monospace",
                   cursor: "pointer",
@@ -191,6 +193,7 @@ export default function TouringRCApp() {
               </div>
             )}
 
+            {mostrarAdmin && <VinculosPendientes />}
             {mostrarAdmin && <PilotosAdmin />}
 
             {mostrarAdmin && (
