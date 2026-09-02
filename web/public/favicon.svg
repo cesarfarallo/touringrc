@@ -5,6 +5,8 @@
  width="250.000000pt" height="320.000000pt" viewBox="0 0 250.000000 320.000000"
  preserveAspectRatio="xMidYMid meet">
 
+<circle cx="125" cy="160" r="155" fill="#4B5563"/>
+
 <g transform="translate(0.000000,320.000000) scale(0.100000,-0.100000)"
 fill="#00D9FF" stroke="#000000" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
 <path d="M611 2907 c-13 -6 -32 -23 -42 -37 -20 -28 -323 -1574 -340 -1735
