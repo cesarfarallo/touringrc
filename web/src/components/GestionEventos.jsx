@@ -436,8 +436,24 @@ function FilaEvento({ evento, onSubido }) {
     setSubiendo(true);
     setMensaje([]);
     const resultados = [];
-    for (const file of files) {
-      const tipo = inferirTipo(file.name);
+    // FinalResults must exist before TopTimes can mark its pilot. This also
+    // makes multi-file uploads deterministic regardless of selection order.
+    const prioridad = {
+      resultadosFinales: 0,
+      vueltaRapida: 1,
+      detalleRondas: 2,
+      clasificacion: 3,
+      campeonato: 4,
+    };
+    const archivosOrdenados = files
+      .map((file, indice) => ({ file, indice, tipo: inferirTipo(file.name) }))
+      .sort((a, b) => {
+        const prioridadA = prioridad[a.tipo] ?? Number.MAX_SAFE_INTEGER;
+        const prioridadB = prioridad[b.tipo] ?? Number.MAX_SAFE_INTEGER;
+        return prioridadA - prioridadB || a.indice - b.indice;
+      });
+
+    for (const { file, tipo } of archivosOrdenados) {
       if (!tipo) {
         resultados.push({ nombre: file.name, ok: false, texto: "No lo reconozco como un export de Live Timing" });
         setMensaje([...resultados]);

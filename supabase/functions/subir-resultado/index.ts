@@ -230,16 +230,19 @@ async function syncTopTimes(
     if (!pilotoId) continue;
     const claseId = await getOrCreateClase(sb, f.clase);
 
-    const { error } = await sb
+    const { data, error } = await sb
       .from("resultados_finales")
       .update({ vuelta_rapida: true })
       .eq("evento_id", eventoId)
       .eq("clase_id", claseId)
-      .eq("piloto_id", pilotoId);
+      .eq("piloto_id", pilotoId)
+      .select("id");
     if (error) throw new Error(`resultados_finales.update vuelta_rapida (${f.pilotoCrudo}): ${error.message}`);
-    count++;
+    count += data?.length ?? 0;
   }
-  return `Vuelta rápida marcada (${count})`;
+  return count > 0
+    ? `Vuelta rápida marcada (${count})`
+    : "No se encontró ningún resultado final para marcar; subí primero FinalResults.xls";
 }
 
 async function syncClasificacion(

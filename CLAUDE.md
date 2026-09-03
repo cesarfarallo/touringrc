@@ -255,7 +255,9 @@ componente por tab en un array `TABS`):
   botón "Subir resultados" **funcional** por evento: abre el selector de archivos del
   navegador (acepta selección múltiple), infiere el tipo de cada archivo por el nombre
   (`inferirTipo`, mismos patrones que `TIPOS_ARCHIVO` en `theme.js`) y los manda **de a uno, en
-  secuencia** (no en paralelo) a la Edge Function `subir-resultado` — secuencial a propósito,
+  secuencia** (no en paralelo) a la Edge Function `subir-resultado` — primero procesa
+  `FinalResults.xls` y luego `RoundTopTimes-*.xls`, para que la fila de resultados exista antes
+  de marcar la vuelta rápida; dentro de cada prioridad mantiene el orden elegido. Es secuencial a propósito,
   porque `marcarArchivo()` del lado de la función hace un read-modify-write sobre
   `eventos.archivos` y dos uploads simultáneos para el mismo evento se pisarían el checklist
   entre sí. Muestra el resultado de cada archivo por separado (✓/✗ con el nombre) y al final
