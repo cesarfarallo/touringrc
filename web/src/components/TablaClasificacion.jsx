@@ -1,6 +1,6 @@
 import { T } from "../theme";
 
-export default function TablaClasificacion({ data }) {
+export default function TablaClasificacion({ data, pilotoId }) {
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
@@ -28,7 +28,13 @@ export default function TablaClasificacion({ data }) {
         </thead>
         <tbody>
           {data.map((r) => (
-            <tr key={`${r.pos}-${r.piloto}`} style={{ borderBottom: `1px solid ${T.line}` }}>
+            <tr
+              key={`${r.pos}-${r.piloto}`}
+              style={{
+                borderBottom: `1px solid ${T.line}`,
+                background: r.pilotoId === pilotoId ? `${T.amber}18` : "transparent",
+              }}
+            >
               <td
                 style={{
                   padding: "12px 16px",
@@ -39,7 +45,9 @@ export default function TablaClasificacion({ data }) {
               >
                 {r.pos}
               </td>
-              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif" }}>{r.piloto}</td>
+              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400 }}>
+                {r.piloto}
+              </td>
               <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", color: T.muted }}>
                 {r.resultado}
               </td>

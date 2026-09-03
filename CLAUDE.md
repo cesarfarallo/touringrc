@@ -345,6 +345,9 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   que lee `ArchivosChecklist`. Devuelve `{ ok: true, resumen }` o `{ error }`.
   La migración `0008_clasificacion_lectura_publica.sql` agrega la policy de lectura pública que
   necesita el frontend; sin ella la función puede sincronizar filas, pero la web devuelve cero.
+- **Resaltado del piloto logueado**: las grillas de resultados finales, clasificación y
+  campeonato reciben el `pilotoId` de `usePilotoActual`; la fila propia se destaca con fondo y
+  nombre ámbar cuando hay una sesión autenticada.
 
 **Deploy** (manual, el admin lo corre local — no hay CI/CD para Edge Functions todavía):
 ```

@@ -41,7 +41,7 @@ function IconoPodio({ tipo, lugar }) {
   );
 }
 
-export default function TablaResultados({ data }) {
+export default function TablaResultados({ data, pilotoId }) {
   const podios = calcularPodios(data);
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
@@ -72,7 +72,13 @@ export default function TablaResultados({ data }) {
           {data.map((r) => {
             const podio = podios.get(`${r.pos}-${r.piloto}`);
             return (
-              <tr key={`${r.pos}-${r.piloto}`} style={{ borderBottom: `1px solid ${T.line}` }}>
+              <tr
+                key={`${r.pos}-${r.piloto}`}
+                style={{
+                  borderBottom: `1px solid ${T.line}`,
+                  background: r.pilotoId === pilotoId ? `${T.amber}18` : "transparent",
+                }}
+              >
                 <td
                   style={{
                     padding: "12px 16px",
@@ -85,7 +91,9 @@ export default function TablaResultados({ data }) {
                 </td>
                 <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center" }}>
                   {podio && <IconoPodio tipo={podio.tipo} lugar={podio.lugar} />}
-                  {r.piloto}
+                  <span style={{ color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400 }}>
+                    {r.piloto}
+                  </span>
                   {r.tq && (
                     <span
                       style={{

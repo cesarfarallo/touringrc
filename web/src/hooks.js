@@ -140,7 +140,7 @@ export function useResultadosEvento(eventoId) {
     setLoading(true);
     supabase
       .from("resultados_finales")
-      .select("posicion, resultado, heat, tq, vuelta_rapida, clases ( nombre ), pilotos ( first_name, last_name )")
+      .select("posicion, resultado, heat, tq, vuelta_rapida, clases ( nombre ), pilotos ( id, first_name, last_name )")
       .eq("evento_id", eventoId)
       .order("posicion", { ascending: true })
       .then(({ data, error }) => {
@@ -155,6 +155,7 @@ export function useResultadosEvento(eventoId) {
           const clase = fila.clases?.nombre ?? "Sin clase";
           if (!agrupado[clase]) agrupado[clase] = [];
           agrupado[clase].push({
+            pilotoId: fila.pilotos?.id,
             pos: fila.posicion,
             piloto: nombrePiloto(fila.pilotos),
             resultado: fila.resultado,
@@ -192,7 +193,7 @@ export function useClasificacionEvento(eventoId) {
     setLoading(true);
     supabase
       .from("clasificacion")
-      .select("posicion, resultado, rondas, tie_breaker, clases ( nombre ), pilotos ( first_name, last_name )")
+      .select("posicion, resultado, rondas, tie_breaker, clases ( nombre ), pilotos ( id, first_name, last_name )")
       .eq("evento_id", eventoId)
       .order("posicion", { ascending: true })
       .then(({ data, error }) => {
@@ -207,6 +208,7 @@ export function useClasificacionEvento(eventoId) {
           const clase = fila.clases?.nombre ?? "Sin clase";
           if (!agrupado[clase]) agrupado[clase] = [];
           agrupado[clase].push({
+            pilotoId: fila.pilotos?.id,
             pos: fila.posicion,
             piloto: nombrePiloto(fila.pilotos),
             resultado: fila.resultado,
@@ -254,7 +256,7 @@ export function useCampeonato() {
 
       const { data: puntos, error: errPuntos } = await supabase
         .from("campeonato_puntos")
-        .select("posicion, puntos, tqs, wins_1ro, eventos_registrados, clases ( nombre ), pilotos ( first_name, last_name )")
+        .select("posicion, puntos, tqs, wins_1ro, eventos_registrados, clases ( nombre ), pilotos ( id, first_name, last_name )")
         .eq("campeonato_id", actual.id)
         .order("posicion", { ascending: true });
 
@@ -269,6 +271,7 @@ export function useCampeonato() {
         const clase = fila.clases?.nombre ?? "Sin clase";
         if (!agrupado[clase]) agrupado[clase] = [];
         agrupado[clase].push({
+          pilotoId: fila.pilotos?.id,
           pos: fila.posicion,
           piloto: nombrePiloto(fila.pilotos),
           puntos: fila.puntos,

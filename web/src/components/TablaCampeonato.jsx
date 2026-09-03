@@ -1,6 +1,6 @@
 import { T } from "../theme";
 
-export default function TablaCampeonato({ data }) {
+export default function TablaCampeonato({ data, pilotoId }) {
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
@@ -28,7 +28,13 @@ export default function TablaCampeonato({ data }) {
         </thead>
         <tbody>
           {data.map((r) => (
-            <tr key={`${r.pos}-${r.piloto}`} style={{ borderBottom: `1px solid ${T.line}` }}>
+            <tr
+              key={`${r.pos}-${r.piloto}`}
+              style={{
+                borderBottom: `1px solid ${T.line}`,
+                background: r.pilotoId === pilotoId ? `${T.amber}18` : "transparent",
+              }}
+            >
               <td
                 style={{
                   padding: "12px 16px",
@@ -39,7 +45,9 @@ export default function TablaCampeonato({ data }) {
               >
                 {r.pos}
               </td>
-              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", fontWeight: 500 }}>{r.piloto}</td>
+              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", fontWeight: 500, color: r.pilotoId === pilotoId ? T.amber : T.text }}>
+                {r.piloto}
+              </td>
               <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: T.amber }}>
                 {r.puntos}
               </td>
