@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, X, Pencil, Search, UserPlus, Trash2 } from "lucide-react";
+import { Check, X, Pencil, Search, UserPlus, Trash2, Link2 } from "lucide-react";
 import { T } from "../theme";
 import { usePilotos, useRolesYModulos, usePilotoRoles } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -314,7 +314,30 @@ function NuevoPiloto({ roles, onCreado }) {
 function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol, onGuardado }) {
   const [borrando, setBorrando] = useState(false);
   const [error, setError] = useState(null);
+  const [vinculando, setVinculando] = useState(false);
+  const [errorVinculo, setErrorVinculo] = useState(null);
   const nombreCompleto = [piloto.first_name, piloto.last_name].filter(Boolean).join(" ") || "(sin nombre)";
+
+  // Re-vincula un piloto a una cuenta que ya se logueó alguna vez, pero
+  // cuyo auth_user_id se perdió (ej. se borró el piloto por error y se
+  // volvió a crear, o cualquier otra desvinculación) -- el trigger de la
+  // migración 0001 solo corre en el primer login, así que sin esto la
+  // única forma de arreglarlo era a mano por SQL.
+  async function vincular() {
+    if (!piloto.email) return;
+    setVinculando(true);
+    setErrorVinculo(null);
+    const { error } = await supabase.rpc("vincular_piloto_por_email", {
+      p_piloto_id: piloto.id,
+      p_email: piloto.email,
+    });
+    setVinculando(false);
+    if (error) {
+      setErrorVinculo(error.message);
+      return;
+    }
+    onGuardado();
+  }
 
   async function borrar() {
     const advertencia = piloto.auth_user_id
@@ -364,7 +387,39 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
           ))}
         </div>
       </td>
-      <td style={{ padding: "10px 16px" }}>{piloto.auth_user_id ? <Check size={14} color={T.teal} /> : <X size={14} color={T.red} />}</td>
+      <td style={{ padding: "10px 16px" }}>
+        {piloto.auth_user_id ? (
+          <Check size={14} color={T.teal} />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <X size={14} color={T.red} />
+              {piloto.email && (
+                <button
+                  onClick={vincular}
+                  disabled={vinculando}
+                  title="Buscar una cuenta ya logueada con este email y vincularla a este piloto"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    background: "transparent",
+                    border: "none",
+                    color: T.amber,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: vinculando ? "default" : "pointer",
+                    padding: 0,
+                  }}
+                >
+                  <Link2 size={11} /> {vinculando ? "Vinculando..." : "Vincular"}
+                </button>
+              )}
+            </div>
+            {errorVinculo && <div style={{ color: T.red, fontSize: 11, maxWidth: 200 }}>{errorVinculo}</div>}
+          </div>
+        )}
+      </td>
       <td style={{ padding: "10px 16px" }}>
         <button
           onClick={borrar}

@@ -215,10 +215,9 @@ sección 1 del archivo y poner el email real que va a ser admin (reemplazar
 **Editar y borrar pilotos** (migración 0010, `PilotosAdmin.jsx`): además del email, ahora
 también se puede editar nombre/apellido de cualquier piloto (mismo `NombreEditable` de arriba),
 y borrarlo (ícono de tacho, con confirmación — avisa si el piloto tiene una cuenta vinculada,
-porque borrarlo deja a esa persona sin piloto asociado hasta que se loguee de nuevo... lo cual
-tampoco pasa solo: el trigger de vinculación corre una sola vez, al crearse la fila en
-`auth.users`, no en cada login — un piloto vinculado que se borra por error se soluciona
-creando uno nuevo a mano y pegándole el mismo email, no relogueándose). No hace falta
+porque borrarlo deja a esa persona sin piloto asociado hasta que un admin lo revincule. El
+trigger de vinculación corre una sola vez, al crearse la fila en `auth.users`, no en cada
+login, así que re-loguearse no alcanza para arreglarlo). No hace falta
 lógica de la app para proteger historial real: como ninguna FK hacia `pilotos` tiene
 `on delete cascade`, Postgres rechaza el borrado solo si el piloto tiene resultados,
 inscripciones o alias (el mensaje de error se lo indica al admin, sugiriendo Fusionar en su
@@ -232,6 +231,17 @@ que originó el duplicado (que siempre existe, es como se detecta el caso) queda
 apuntándole. No se había notado porque el flujo real de fusión contra un candidato ambiguo
 tampoco se había probado a fondo en producción todavía. La migración 0010 corrige la
 constraint; `fusionar_pilotos()` en sí no necesitó cambios.
+
+**Re-vincular un piloto a mano** (migración 0011, `vincular_piloto_por_email()`): gap real
+encontrado al usar el borrado de arriba en la práctica — si un piloto vinculado se borra por
+error, no había forma de recuperarlo solo con la web. Cargarle de nuevo el mismo email al
+piloto (`EmailEditable`, ya existía) **no alcanza**: nada vuelve a correr el matching salvo el
+trigger de la 0001, que es de una sola vez. La función busca la cuenta en `auth.users` (una
+tabla que el cliente nunca puede leer directo, ni siquiera un admin vía RLS — de ahí que haga
+falta una función `security definer`, mismo patrón que `fusionar_pilotos()`) y pisa
+`pilotos.auth_user_id`. En la tabla de Pilotos, cualquier fila sin vincular que tenga un email
+cargado muestra un botón "Vincular" (ícono de cadena) al lado de la ✗ que la llama — falla con
+un mensaje claro si todavía no hay ninguna cuenta logueada con ese email.
 
 ## Roles y módulos (migración 0003)
 
