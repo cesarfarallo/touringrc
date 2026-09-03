@@ -59,10 +59,17 @@ export default function TouringRCApp() {
     );
   }, [eventos]);
 
-  const eventosCorridos = useMemo(
-    () => [...eventos].filter((e) => e.corrida).sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
-    [eventos]
-  );
+  // `corrida` es un flag manual que no siempre queda prendido (ver
+  // marcarArchivo() en la Edge Function) -- una fecha pasada entra igual,
+  // mismo criterio de respaldo que `resultadosDisponibles` en EventoCard.jsx,
+  // para no depender 100% de ese flag.
+  const eventosCorridos = useMemo(() => {
+    const hoyResultados = new Date();
+    hoyResultados.setHours(0, 0, 0, 0);
+    return [...eventos]
+      .filter((e) => e.corrida || new Date(`${e.fecha}T00:00:00`) < hoyResultados)
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  }, [eventos]);
   const [eventoResultadosId, setEventoResultadosId] = useState(null);
   const eventoResultadosIdActivo =
     eventoResultadosId && eventosCorridos.some((e) => e.id === eventoResultadosId)

@@ -296,6 +296,14 @@ eventos pueda escribir en `resultados_finales`/`resultados_ronda`/`campeonato_pu
 en esas tablas al navegador — la función usa la `service_role key` internamente (nunca
 expuesta al cliente) recién después de verificar que quien llama es admin.
 
+- **`eventos.corrida` se prende sola** al subir `FinalResults.xls` (`index.ts`, junto al
+  `marcarArchivo()` de siempre). Antes de este fix nada la ponía en `true` fuera del seed
+  inicial de 7 fechas — cualquier evento nuevo cargado desde la web quedaba con `corrida=false`
+  para siempre, y como el selector de fecha de la sección Resultados (`eventosCorridos` en
+  `App.jsx`) filtraba estrictamente por ese flag, ninguna fecha posterior a esas 7 aparecía ahí
+  aunque tuviera resultados subidos. `App.jsx` además suma un criterio de respaldo (fecha
+  pasada entra igual, aunque `corrida` no esté prendida) para no depender 100% del flag y cubrir
+  también los eventos ya cargados antes de este fix sin necesitar un backfill manual en la base.
 - **`parsers.ts`**: port a TypeScript de `touringrc-sync/livetime_parsers.py`, usando
   `npm:xlsx@0.18.5` (SheetJS) en vez de `pandas`/`xlrd`. Verificado **fila por fila, byte a
   byte** contra la salida real del parser de Python usando los archivos de muestra de
@@ -392,7 +400,9 @@ tome efecto en los proyectos ya deployados.
   que llegó el día del evento. El admin configura los días de antelación por evento desde
   Gestión de eventos (`InscripcionDiasEditable`, editable tanto al dar de alta una fecha nueva
   como en cualquier fecha ya existente) — nulo significa "sin inscripción online para esa
-  fecha" (el botón queda deshabilitado).
+  fecha" (el botón queda deshabilitado). En el otro extremo, el botón "Subir resultados" de la
+  misma fila (`subidaHabilitada()`) recién se habilita el día de la fecha en adelante — no
+  tiene sentido subir resultados de una carrera que todavía no se corrió.
 - **Botón "Inscribirme"** (`EventoCard.jsx`, Calendario público): visible solo logueado y
   dentro de la ventana. `useInscripcionPiloto(eventoId, pilotoId)` (`hooks.js`) chequea si el
   piloto ya tiene una inscripción para ese evento — si la tiene, muestra la categoría en vez

@@ -97,6 +97,14 @@ Deno.serve(async (req: Request) => {
     }
 
     await marcarArchivo(sb, eventoId, tipo);
+    // FinalResults.xls es la señal definitiva de que el evento ya se corrió
+    // -- `corrida` arrancaba en `false` y nada la prendía sola salvo el seed
+    // inicial, así que cualquier fecha nueva cargada desde la web quedaba
+    // invisible para siempre en el filtro de la sección Resultados.
+    if (tipo === "resultadosFinales") {
+      const { error: errCorrida } = await sb.from("eventos").update({ corrida: true }).eq("id", eventoId);
+      if (errCorrida) throw new Error(`eventos.update corrida: ${errCorrida.message}`);
+    }
 
     return json({ ok: true, resumen }, 200, cors);
   } catch (e) {

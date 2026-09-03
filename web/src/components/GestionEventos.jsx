@@ -56,6 +56,15 @@ function exportacionHabilitada(evento) {
   return hoy < fecha;
 }
 
+// No tiene sentido subir resultados de una fecha que todavía no se corrió
+// -- se habilita recién el día del evento en adelante.
+function subidaHabilitada(evento) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const fecha = new Date(evento.fecha + "T00:00:00");
+  return hoy >= fecha;
+}
+
 // El acumulado de campeonato no tiene evento propio -- se sube contra el
 // campeonato vigente (el de fecha_inicio más reciente), igual criterio que
 // useCampeonato() en ../hooks.js.
@@ -488,6 +497,7 @@ function FilaEvento({ evento, onSubido }) {
   const [exportando, setExportando] = useState(false);
 
   const exportHabilitado = exportacionHabilitada(evento);
+  const subidaOk = subidaHabilitada(evento);
 
   async function exportarInscriptos() {
     if (!exportHabilitado) return;
@@ -519,7 +529,7 @@ function FilaEvento({ evento, onSubido }) {
   async function onArchivosElegidos(e) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!files.length) return;
+    if (!files.length || !subidaOk) return;
 
     setSubiendo(true);
     setMensaje([]);
@@ -613,9 +623,13 @@ function FilaEvento({ evento, onSubido }) {
             style={{ display: "none" }}
           />
           <button
-            onClick={() => inputRef.current?.click()}
-            disabled={subiendo}
-            title="Subí uno o varios: FinalResults.xls, RoundResult-*.xls, RoundTopTimes-*.xls, Leaderboard-Event*.xls, SeriesResultReport.xls"
+            onClick={() => subidaOk && inputRef.current?.click()}
+            disabled={subiendo || !subidaOk}
+            title={
+              subidaOk
+                ? "Subí uno o varios: FinalResults.xls, RoundResult-*.xls, RoundTopTimes-*.xls, Leaderboard-Event*.xls, SeriesResultReport.xls"
+                : "Se habilita el día de la fecha en adelante"
+            }
             style={{
               display: "flex",
               alignItems: "center",
@@ -624,10 +638,10 @@ function FilaEvento({ evento, onSubido }) {
               borderRadius: 8,
               border: `1px solid ${T.amber}66`,
               background: "transparent",
-              color: T.amber,
+              color: subidaOk ? T.amber : T.muted,
               fontSize: 12,
               fontWeight: 600,
-              cursor: subiendo ? "default" : "pointer",
+              cursor: subiendo || !subidaOk ? "default" : "pointer",
             }}
           >
             <Upload size={13} />
