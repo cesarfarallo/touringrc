@@ -175,6 +175,48 @@ export function useResultadosEvento(eventoId) {
   return { porClase, loading, error };
 }
 
+// Ganador de cada final (A/B) por clase, para TODOS los eventos en una
+// sola consulta -- se usa en las tarjetas del Calendario, no tiene
+// sentido hacer una consulta por tarjeta. Mismo criterio de heat que
+// TablaResultados.jsx (heat empieza con "A"/"B" -> final A/B).
+// Devuelve { [eventoId]: { [claseNombre]: { A: nombre, B: nombre } } }.
+export function useGanadoresPorEvento() {
+  const [porEvento, setPorEvento] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("resultados_finales")
+      .select("evento_id, heat, clases ( nombre ), pilotos ( first_name, last_name )")
+      .eq("posicion", 1)
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) {
+          setLoading(false);
+          return;
+        }
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          const heat = (fila.heat ?? "").trim();
+          const tipo = /^b/i.test(heat) ? "B" : /^a/i.test(heat) ? "A" : null;
+          if (!tipo) continue;
+          const clase = fila.clases?.nombre ?? "Sin clase";
+          agrupado[fila.evento_id] ??= {};
+          agrupado[fila.evento_id][clase] ??= {};
+          agrupado[fila.evento_id][clase][tipo] = nombrePiloto(fila.pilotos);
+        }
+        setPorEvento(agrupado);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  return { porEvento, loading };
+}
+
 // Clasificación de un evento (posición de largada, calculada por Live
 // Timing a partir de las rondas clasificatorias -- distinta de
 // resultados_finales, que es el resultado de la final en sí), agrupada

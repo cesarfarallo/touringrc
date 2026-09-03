@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, Pencil } from "lucide-react";
+import { ChevronRight, Pencil, Trophy, Medal } from "lucide-react";
 import { T } from "../theme";
 import { useClases, useCategoriaPreferida, useInscripcionPiloto } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -172,6 +172,7 @@ export default function EventoCard({
   onLogin,
   refreshInscripcion,
   onInscripto,
+  ganadores,
 }) {
   const fecha = new Date(evento.fecha + "T00:00:00");
   const fechaStr = fecha.toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
@@ -287,6 +288,26 @@ export default function EventoCard({
           )}
         </div>
       </div>
+
+      {resultadosDisponibles && ganadores && Object.keys(ganadores).length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.line}`, display: "flex", flexDirection: "column", gap: 6 }}>
+          {Object.entries(ganadores).map(([clase, { A, B } = {}]) => (
+            <div key={clase} style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+              <span style={{ color: T.muted, fontFamily: "Inter, sans-serif" }}>{clase}:</span>
+              {A && (
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif" }}>
+                  <Trophy size={13} color="#FFD700" fill="#FFD700" /> {A}
+                </span>
+              )}
+              {B && (
+                <span style={{ display: "flex", alignItems: "center", gap: 5, color: T.muted, fontFamily: "Inter, sans-serif" }}>
+                  <Medal size={13} color="#C0C0C0" /> {B}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {formularioAbierto && logueado && piloto && puedeInscribirse && !inscripcion && (
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.line}` }}>

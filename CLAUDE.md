@@ -545,6 +545,42 @@ tome efecto en los proyectos ya deployados.
   del propio club, no hizo falta una Edge Function para esto. El admin lo importa a mano en
   Live Timing (no hay API para automatizar ese lado).
 
+⚠️ **Bug encontrado al armar el botón de compartir por redes (más abajo)**: `inscripciones`
+solo tenía la policy de select "cada uno ve las suyas" (ownership por `auth_user_id`) — ningún
+admin podía leer las inscripciones de otro piloto. El botón "Exportar inscriptos" de arriba
+llevaba tiempo devolviendo en silencio solo la inscripción propia del admin (si tenía alguna),
+no la lista completa del evento. La migración 0015 agrega una policy de select para admin (más
+una de insert para admin, ver "Inscribir un piloto a mano" más abajo) — Postgres combina
+policies permisivas del mismo comando con OR, así que el autoservicio de cada piloto sigue
+funcionando exactamente igual, sin tocarlo.
+
+- **Compartir inscriptos por redes** (botón "Compartir inscriptos" en la tarjeta destacada de
+  la próxima fecha, `App.jsx`, solo admin): arma un texto plano (pilotos agrupados por
+  categoría, numerados) y lo copia al portapapeles con `navigator.clipboard.writeText()` — sin
+  pasar por ningún backend, mismo criterio que el CSV de arriba. Requiere la policy de select
+  de admin de la migración 0015 (sin ella, la consulta a `inscripciones` devuelve vacío para
+  cualquiera que no sea el propio inscripto).
+- **Inscribir un piloto a mano** (`InscribirPiloto` en `GestionEventos.jsx`, un botón por fila
+  de evento): para pilotos que se anotan en boca de pista, o cualquier caso que el admin quiera
+  cargar directo sin pasar por el autoservicio. Buscador libre contra el roster completo
+  (`usePilotos()`, no limitado a pilotos ya vinculados a una cuenta), elige categoría, e
+  inserta en `inscripciones` con la policy de insert para admin de la migración 0015 — bypasea
+  a propósito el chequeo de `tiene_modulo('inscripcion')` que aplica al autoservicio (migración
+  0013): que el admin lo elija de la lista de pilotos ya es la aprobación en sí, no tiene
+  sentido bloquearlo por el mismo motivo que bloquea el autoservicio de alguien sin revisar
+  todavía.
+
+## Ganadores en la tarjeta del Calendario
+
+`useGanadoresPorEvento()` (`hooks.js`) trae en una sola consulta el piloto en posición 1 de
+cada heat de `resultados_finales` para **todos** los eventos (no tiene sentido una consulta
+por tarjeta) y arma `{ [eventoId]: { [claseNombre]: { A: nombre, B: nombre } } }` — mismo
+criterio que `calcularPodios()` en `TablaResultados.jsx` para distinguir final A de final B por
+el texto del heat (`/^a/i` / `/^b/i`), así funciona igual si el evento corrió una sola final
+(todo bajo "A Final") o dos. `EventoCard.jsx` muestra esta info debajo del header de la
+tarjeta, solo para fechas con `resultadosDisponibles` (pasadas o `corrida`), con ícono de copa
+(oro) para la A y medalla (plata) para la B.
+
 ## Responsive / mobile (`web/`)
 
 Toda la UI usa estilos inline (no hay Tailwind ni CSS modules), así que la mayoría de lo

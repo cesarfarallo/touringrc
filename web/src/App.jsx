@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2 } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -11,6 +11,7 @@ import {
   useEsAdmin,
   useInscripcionPiloto,
   useMisModulos,
+  useGanadoresPorEvento,
 } from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
@@ -38,6 +39,9 @@ export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
   const [inscripcionVersion, setInscripcionVersion] = useState(0);
   const [formularioDestacadoAbierto, setFormularioDestacadoAbierto] = useState(false);
+  const [compartiendoInscriptos, setCompartiendoInscriptos] = useState(false);
+  const [copiadoInscriptos, setCopiadoInscriptos] = useState(false);
+  const [errorCompartir, setErrorCompartir] = useState(null);
 
   useEffect(() => {
     document.title = ES_DEV ? "Touring 1:10 Arg (DEV)" : "Touring 1:10 Arg";
@@ -55,6 +59,7 @@ export default function TouringRCApp() {
   const puedeInscribirse = misModulos.has("inscripcion");
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
+  const { porEvento: ganadoresPorEvento } = useGanadoresPorEvento();
   const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato, error: errorCampeonato } = useCampeonato();
 
   const clases = Object.keys(campeonatoPorClase);
@@ -117,6 +122,50 @@ export default function TouringRCApp() {
     setTab("calendario");
     supabase.auth.signOut();
   };
+
+  // Arma un texto listo para pegar en redes con los inscriptos de la
+  // próxima fecha, agrupados por categoría, y lo copia al portapapeles.
+  // Requiere la policy de admin de la migración 0015 (antes de eso, un
+  // admin solo podía leer su propia inscripción vía RLS).
+  async function compartirInscriptos() {
+    if (!proximo) return;
+    setCompartiendoInscriptos(true);
+    setErrorCompartir(null);
+    try {
+      const { data, error } = await supabase
+        .from("inscripciones")
+        .select("pilotos ( first_name, last_name ), clases ( nombre )")
+        .eq("evento_id", proximo.id);
+      if (error) throw error;
+      if (!data?.length) throw new Error("Todavía no hay inscriptos en esta fecha");
+
+      const porClase = {};
+      for (const i of data) {
+        const clase = i.clases?.nombre ?? "Sin categoría";
+        const nombre = [i.pilotos?.first_name, i.pilotos?.last_name].filter(Boolean).join(" ");
+        (porClase[clase] ??= []).push(nombre);
+      }
+      const fechaStr = new Date(`${proximo.fecha}T00:00:00`).toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      let texto = `🏁 INSCRIPTOS — ${proximo.nombre}\n📅 ${fechaStr}\n`;
+      for (const [clase, nombres] of Object.entries(porClase)) {
+        texto += `\n${clase} (${nombres.length})\n`;
+        nombres.forEach((n, i) => {
+          texto += `${i + 1}. ${n}\n`;
+        });
+      }
+      await navigator.clipboard.writeText(texto.trim());
+      setCopiadoInscriptos(true);
+      setTimeout(() => setCopiadoInscriptos(false), 2500);
+    } catch (err) {
+      setErrorCompartir(err.message ?? String(err));
+    } finally {
+      setCompartiendoInscriptos(false);
+    }
+  }
 
   return (
     <div style={{ background: T.bg, minHeight: "100vh", color: T.text, fontFamily: "Inter, sans-serif" }}>
@@ -285,6 +334,32 @@ export default function TouringRCApp() {
                       />
                     </div>
                   )}
+                  {esAdminReal && (
+                    <div style={{ marginTop: 10 }}>
+                      <button
+                        onClick={compartirInscriptos}
+                        disabled={compartiendoInscriptos}
+                        title="Copia al portapapeles la lista de inscriptos de esta fecha, lista para pegar en redes"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "7px 12px",
+                          borderRadius: 8,
+                          border: `1px solid ${T.line}`,
+                          background: "transparent",
+                          color: T.text,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: compartiendoInscriptos ? "default" : "pointer",
+                        }}
+                      >
+                        <Share2 size={13} />
+                        {compartiendoInscriptos ? "Generando..." : copiadoInscriptos ? "¡Copiado!" : "Compartir inscriptos"}
+                      </button>
+                      {errorCompartir && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{errorCompartir}</div>}
+                    </div>
+                  )}
                 </div>
                 <div style={{ flexShrink: 0 }}>
                   <StartLights diasRestantes={dias} horasRestantes={horasRestantes} />
@@ -304,6 +379,7 @@ export default function TouringRCApp() {
                   piloto={piloto}
                   logueado={logueado}
                   puedeInscribirse={puedeInscribirse}
+                  ganadores={ganadoresPorEvento[e.id]}
                   onLogin={ingresar}
                   onVerResultados={(id) => {
                     setEventoResultadosId(id);

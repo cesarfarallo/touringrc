@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
-import { Plus, Upload, Pencil, Download } from "lucide-react";
+import { Plus, Upload, Pencil, Download, UserPlus, Search } from "lucide-react";
 import { T } from "../theme";
-import { useEventos, useCircuitos } from "../hooks";
+import { useEventos, useCircuitos, useClases, usePilotos } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
@@ -466,7 +466,147 @@ function DatosEventoEditable({ evento, onGuardado }) {
   );
 }
 
-function FilaEvento({ evento, onSubido }) {
+// Inscribir a un piloto a mano (ej. alguien que se anota en boca de
+// pista) -- busca en el roster completo, no solo entre los ya
+// vinculados a una cuenta, y hace el insert directo con la policy de
+// admin de la migración 0015 (bypassea el chequeo de tiene_modulo que
+// aplica al autoservicio del propio piloto).
+function InscribirPiloto({ evento, pilotos, onInscripto }) {
+  const [abierto, setAbierto] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [pilotoElegido, setPilotoElegido] = useState(null);
+  const [claseId, setClaseId] = useState("");
+  const { clases, loading: cargandoClases } = useClases();
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  const textoBusqueda = busqueda.trim().toLowerCase();
+  const resultados =
+    textoBusqueda.length < 2
+      ? []
+      : pilotos
+          .filter((p) => [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase().includes(textoBusqueda))
+          .slice(0, 8);
+
+  async function inscribir() {
+    if (!pilotoElegido || !claseId) return;
+    setGuardando(true);
+    setError(null);
+    const { error } = await supabase
+      .from("inscripciones")
+      .insert({ evento_id: evento.id, piloto_id: pilotoElegido.id, clase_id: claseId });
+    setGuardando(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setAbierto(false);
+    setBusqueda("");
+    setPilotoElegido(null);
+    setClaseId("");
+    onInscripto();
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        onClick={() => setAbierto(true)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "8px 14px",
+          borderRadius: 8,
+          border: `1px solid ${T.line}`,
+          background: "transparent",
+          color: T.text,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        <UserPlus size={13} /> Inscribir piloto
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 10, padding: 12, borderRadius: 10, border: `1px solid ${T.line}`, background: T.surfaceRaised, display: "flex", flexDirection: "column", gap: 8 }}>
+      {!pilotoElegido ? (
+        <div style={{ position: "relative", maxWidth: 260 }}>
+          <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar piloto por nombre o apellido..."
+            autoFocus
+            style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 8, padding: "7px 12px 7px 30px", color: T.text, fontSize: 13, width: "100%" }}
+          />
+          {resultados.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {resultados.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPilotoElegido(p)}
+                  style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${T.line}`, background: T.surface, color: T.text, fontSize: 12, cursor: "pointer" }}
+                >
+                  {[p.first_name, p.last_name].filter(Boolean).join(" ") || "(sin nombre)"}
+                </button>
+              ))}
+            </div>
+          )}
+          {textoBusqueda.length >= 2 && resultados.length === 0 && (
+            <div style={{ color: T.muted, fontSize: 12, marginTop: 6 }}>Ningún piloto coincide.</div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            {[pilotoElegido.first_name, pilotoElegido.last_name].filter(Boolean).join(" ")}
+          </span>
+          <button onClick={() => setPilotoElegido(null)} style={{ border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer" }}>
+            Cambiar
+          </button>
+          <select
+            value={claseId}
+            onChange={(e) => setClaseId(e.target.value)}
+            disabled={cargandoClases}
+            style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 10px", color: T.text, fontSize: 13 }}
+          >
+            <option value="">{cargandoClases ? "Cargando categorías..." : "Elegí la categoría"}</option>
+            {clases.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={inscribir}
+            disabled={!claseId || guardando}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 8,
+              border: "none",
+              background: claseId ? T.amber : T.surface,
+              color: claseId ? "#1A1300" : T.muted,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: claseId && !guardando ? "pointer" : "default",
+            }}
+          >
+            {guardando ? "Inscribiendo..." : "Confirmar"}
+          </button>
+        </div>
+      )}
+      <button onClick={() => setAbierto(false)} style={{ alignSelf: "flex-start", border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer", padding: 0 }}>
+        Cancelar
+      </button>
+      {error && <div style={{ color: T.red, fontSize: 12 }}>{error}</div>}
+    </div>
+  );
+}
+
+function FilaEvento({ evento, onSubido, pilotos }) {
   const inputRef = useRef(null);
   const [subiendo, setSubiendo] = useState(false);
   const [mensaje, setMensaje] = useState(null);
@@ -636,6 +776,7 @@ function FilaEvento({ evento, onSubido }) {
           ))}
         </div>
       )}
+      <InscribirPiloto evento={evento} pilotos={pilotos} onInscripto={onSubido} />
       <ArchivosChecklist archivos={evento.archivos} />
     </div>
   );
@@ -647,6 +788,7 @@ function FilaEvento({ evento, onSubido }) {
 // migración 0004.
 export default function GestionEventos() {
   const { eventos, loading, error, recargar } = useEventos();
+  const { pilotos } = usePilotos();
   const eventosOrdenados = useMemo(() => {
     return [...eventos].sort(
       (a, b) => new Date(`${b.fecha}T00:00:00`) - new Date(`${a.fecha}T00:00:00`)
@@ -660,7 +802,7 @@ export default function GestionEventos() {
       {loading && <div style={{ color: T.muted, fontSize: 13 }}>Cargando calendario...</div>}
       {error && <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>}
 
-      {!error && eventosOrdenados.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} />)}
+      {!error && eventosOrdenados.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} pilotos={pilotos} />)}
     </div>
   );
 }
