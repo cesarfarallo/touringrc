@@ -4,14 +4,7 @@ import { T } from "../theme";
 import { useCircuitos, useCircuitoRecords, useClases } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
-
-// El dibujo no se guarda en la base -- se arma por convención a partir de
-// `numero` (ver migración 0009), mismos assets estáticos que ya estaban en
-// el repo sin usar.
-function rutaImagen(circuito, sentido) {
-  const carpeta = sentido === "invertido" ? "circuitos-invertidos" : "circuitos-normales";
-  return `/${carpeta}/Circuito${circuito.numero}.png`;
-}
+import { rutaImagenCircuito as rutaImagen } from "../lib/circuitos";
 
 function NombreCircuitoEditable({ circuito, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -312,7 +305,7 @@ export default function CircuitosView({ esAdmin }) {
               cursor: "pointer",
             }}
           >
-            <img src={rutaImagen(c, "normal")} alt="" style={{ width: 32, height: 32, objectFit: "contain", borderRadius: 4, background: T.surfaceRaised }} />
+            <img src={rutaImagen(c, "normal")} alt="" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 4, background: "#FFFFFF", padding: 2 }} />
             {c.nombre}
           </button>
         ))}
@@ -350,7 +343,7 @@ export default function CircuitosView({ esAdmin }) {
           <img
             src={rutaImagen(circuitoActivo, sentido)}
             alt={`${circuitoActivo.nombre} (${sentido})`}
-            style={{ maxWidth: "100%", width: 420, borderRadius: 10, background: T.surfaceRaised, flexShrink: 0 }}
+            style={{ maxWidth: "100%", width: 420, borderRadius: 10, background: "#FFFFFF", border: `1px solid ${T.line}`, padding: 8, flexShrink: 0 }}
           />
 
           <div style={{ flex: 1, minWidth: 260 }}>

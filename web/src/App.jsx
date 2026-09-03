@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2 } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -17,6 +17,7 @@ import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
 import EventoCard, { FormularioInscripcion, inscripcionAbierta } from "./components/EventoCard";
+import { rutaImagenCircuito } from "./lib/circuitos";
 import TablaResultados from "./components/TablaResultados";
 import TablaClasificacion from "./components/TablaClasificacion";
 import TablaCampeonato from "./components/TablaCampeonato";
@@ -24,7 +25,27 @@ import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
 import AdminPanel from "./components/AdminPanel";
 import CircuitosView from "./components/CircuitosView";
+import ModalInscriptos from "./components/ModalInscriptos";
 import DevRibbon from "./components/DevRibbon";
+
+// Inscriptos de un evento agrupados por categoría: { [clase]: [nombre, ...] }.
+// Compartido entre "Compartir inscriptos" (admin, copia texto) y
+// "Ver inscriptos" (público, popup) -- requiere la policy de select de
+// las migraciones 0015 (admin)/0016 (pública).
+async function obtenerInscriptosPorClase(eventoId) {
+  const { data, error } = await supabase
+    .from("inscripciones")
+    .select("pilotos ( first_name, last_name ), clases ( nombre )")
+    .eq("evento_id", eventoId);
+  if (error) throw error;
+  const porClase = {};
+  for (const i of data ?? []) {
+    const clase = i.clases?.nombre ?? "Sin categoría";
+    const nombre = [i.pilotos?.first_name, i.pilotos?.last_name].filter(Boolean).join(" ");
+    (porClase[clase] ??= []).push(nombre);
+  }
+  return porClase;
+}
 
 function nombreParaMostrar(piloto, session) {
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
@@ -42,6 +63,10 @@ export default function TouringRCApp() {
   const [compartiendoInscriptos, setCompartiendoInscriptos] = useState(false);
   const [copiadoInscriptos, setCopiadoInscriptos] = useState(false);
   const [errorCompartir, setErrorCompartir] = useState(null);
+  const [modalInscriptosAbierto, setModalInscriptosAbierto] = useState(false);
+  const [cargandoModalInscriptos, setCargandoModalInscriptos] = useState(false);
+  const [modalInscriptosPorClase, setModalInscriptosPorClase] = useState({});
+  const [errorModalInscriptos, setErrorModalInscriptos] = useState(null);
 
   useEffect(() => {
     document.title = ES_DEV ? "Touring 1:10 Arg (DEV)" : "Touring 1:10 Arg";
@@ -132,19 +157,9 @@ export default function TouringRCApp() {
     setCompartiendoInscriptos(true);
     setErrorCompartir(null);
     try {
-      const { data, error } = await supabase
-        .from("inscripciones")
-        .select("pilotos ( first_name, last_name ), clases ( nombre )")
-        .eq("evento_id", proximo.id);
-      if (error) throw error;
-      if (!data?.length) throw new Error("Todavía no hay inscriptos en esta fecha");
+      const porClase = await obtenerInscriptosPorClase(proximo.id);
+      if (Object.keys(porClase).length === 0) throw new Error("Todavía no hay inscriptos en esta fecha");
 
-      const porClase = {};
-      for (const i of data) {
-        const clase = i.clases?.nombre ?? "Sin categoría";
-        const nombre = [i.pilotos?.first_name, i.pilotos?.last_name].filter(Boolean).join(" ");
-        (porClase[clase] ??= []).push(nombre);
-      }
       const fechaStr = new Date(`${proximo.fecha}T00:00:00`).toLocaleDateString("es-AR", {
         day: "2-digit",
         month: "long",
@@ -164,6 +179,24 @@ export default function TouringRCApp() {
       setErrorCompartir(err.message ?? String(err));
     } finally {
       setCompartiendoInscriptos(false);
+    }
+  }
+
+  // Popup público (sin necesitar login ni ser admin) con el listado de
+  // inscriptos de la próxima fecha -- requiere la policy de lectura
+  // pública de la migración 0016.
+  async function verInscriptos() {
+    if (!proximo) return;
+    setModalInscriptosAbierto(true);
+    setCargandoModalInscriptos(true);
+    setErrorModalInscriptos(null);
+    try {
+      const porClase = await obtenerInscriptosPorClase(proximo.id);
+      setModalInscriptosPorClase(porClase);
+    } catch (err) {
+      setErrorModalInscriptos(err.message ?? String(err));
+    } finally {
+      setCargandoModalInscriptos(false);
     }
   }
 
@@ -281,7 +314,25 @@ export default function TouringRCApp() {
                   gap: 16,
                 }}
               >
-                <div>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                  {proximo.circuitos && (
+                    <img
+                      src={rutaImagenCircuito(proximo.circuitos, proximo.circuito_sentido)}
+                      alt={proximo.circuitos.nombre}
+                      title={proximo.circuitos.nombre}
+                      style={{
+                        width: 64,
+                        height: 64,
+                        objectFit: "contain",
+                        borderRadius: 6,
+                        background: "#FFFFFF",
+                        border: `1px solid ${T.line}`,
+                        padding: 3,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  <div>
                   <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8 }}>
                     Próxima fecha
                   </div>
@@ -334,32 +385,54 @@ export default function TouringRCApp() {
                       />
                     </div>
                   )}
-                  {esAdminReal && (
-                    <div style={{ marginTop: 10 }}>
-                      <button
-                        onClick={compartirInscriptos}
-                        disabled={compartiendoInscriptos}
-                        title="Copia al portapapeles la lista de inscriptos de esta fecha, lista para pegar en redes"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "7px 12px",
-                          borderRadius: 8,
-                          border: `1px solid ${T.line}`,
-                          background: "transparent",
-                          color: T.text,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: compartiendoInscriptos ? "default" : "pointer",
-                        }}
-                      >
-                        <Share2 size={13} />
-                        {compartiendoInscriptos ? "Generando..." : copiadoInscriptos ? "¡Copiado!" : "Compartir inscriptos"}
-                      </button>
-                      {errorCompartir && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{errorCompartir}</div>}
-                    </div>
-                  )}
+                  <div style={{ marginTop: 10, display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={verInscriptos}
+                      title="Ver quién está anotado en esta fecha"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "7px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${T.line}`,
+                        background: "transparent",
+                        color: T.text,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Eye size={13} /> Ver inscriptos
+                    </button>
+                    {esAdminReal && (
+                      <div>
+                        <button
+                          onClick={compartirInscriptos}
+                          disabled={compartiendoInscriptos}
+                          title="Copia al portapapeles la lista de inscriptos de esta fecha, lista para pegar en redes"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "7px 12px",
+                            borderRadius: 8,
+                            border: `1px solid ${T.line}`,
+                            background: "transparent",
+                            color: T.text,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: compartiendoInscriptos ? "default" : "pointer",
+                          }}
+                        >
+                          <Share2 size={13} />
+                          {compartiendoInscriptos ? "Generando..." : copiadoInscriptos ? "¡Copiado!" : "Compartir inscriptos"}
+                        </button>
+                        {errorCompartir && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{errorCompartir}</div>}
+                      </div>
+                    )}
+                  </div>
+                  </div>
                 </div>
                 <div style={{ flexShrink: 0 }}>
                   <StartLights diasRestantes={dias} horasRestantes={horasRestantes} />
@@ -524,6 +597,16 @@ export default function TouringRCApp() {
           </>
         )}
       </div>
+
+      {modalInscriptosAbierto && (
+        <ModalInscriptos
+          evento={proximo}
+          cargando={cargandoModalInscriptos}
+          porClase={modalInscriptosPorClase}
+          error={errorModalInscriptos}
+          onClose={() => setModalInscriptosAbierto(false)}
+        />
+      )}
     </div>
   );
 }

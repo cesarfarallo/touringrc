@@ -3,6 +3,7 @@ import { ChevronRight, Pencil, Trophy, Medal } from "lucide-react";
 import { T } from "../theme";
 import { useClases, useCategoriaPreferida, useInscripcionPiloto } from "../hooks";
 import { supabase } from "../lib/supabase";
+import { rutaImagenCircuito } from "../lib/circuitos";
 
 // Ventana de PRE-inscripción: habilitada desde `inscripcion_dias_antes`
 // días antes de la fecha del evento, hasta el día ANTERIOR al evento --
@@ -17,14 +18,6 @@ export function inscripcionAbierta(evento) {
   const desde = new Date(fecha);
   desde.setDate(desde.getDate() - evento.inscripcion_dias_antes);
   return hoy >= desde && hoy < fecha;
-}
-
-// El dibujo del circuito no se guarda en la base -- se arma por convención
-// a partir de `numero` (ver migración 0009), mismo criterio que
-// CircuitosView.jsx.
-function rutaImagenCircuito(circuito, sentido) {
-  const carpeta = sentido === "invertido" ? "circuitos-invertidos" : "circuitos-normales";
-  return `/${carpeta}/Circuito${circuito.numero}.png`;
 }
 
 export function FormularioInscripcion({ evento, piloto, onInscripto }) {
@@ -204,7 +197,16 @@ export default function EventoCard({
               src={rutaImagenCircuito(evento.circuitos, evento.circuito_sentido)}
               alt={evento.circuitos.nombre}
               title={evento.circuitos.nombre}
-              style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 6, background: T.surfaceRaised, flexShrink: 0 }}
+              style={{
+                width: 64,
+                height: 64,
+                objectFit: "contain",
+                borderRadius: 6,
+                background: "#FFFFFF",
+                border: `1px solid ${T.line}`,
+                padding: 3,
+                flexShrink: 0,
+              }}
             />
           )}
           <div>

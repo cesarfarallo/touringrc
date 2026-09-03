@@ -178,7 +178,11 @@ export function useResultadosEvento(eventoId) {
 // Ganador de cada final (A/B) por clase, para TODOS los eventos en una
 // sola consulta -- se usa en las tarjetas del Calendario, no tiene
 // sentido hacer una consulta por tarjeta. Mismo criterio de heat que
-// TablaResultados.jsx (heat empieza con "A"/"B" -> final A/B).
+// TablaResultados.jsx (heat empieza con "A"/"B" -> final A/B) y mismo
+// cuidado: el ganador es la MENOR posición DENTRO de su heat, no
+// necesariamente `posicion = 1` -- Live Timing suele numerar la B
+// Final continuando después de la A (ej. A: 1-10, B: 11-20), así que
+// filtrar por posicion=1 se perdía siempre al ganador de la B.
 // Devuelve { [eventoId]: { [claseNombre]: { A: nombre, B: nombre } } }.
 export function useGanadoresPorEvento() {
   const [porEvento, setPorEvento] = useState({});
@@ -188,23 +192,36 @@ export function useGanadoresPorEvento() {
     let activo = true;
     supabase
       .from("resultados_finales")
-      .select("evento_id, heat, clases ( nombre ), pilotos ( first_name, last_name )")
-      .eq("posicion", 1)
+      .select("evento_id, heat, posicion, clases ( nombre ), pilotos ( first_name, last_name )")
       .then(({ data, error }) => {
         if (!activo) return;
         if (error) {
           setLoading(false);
           return;
         }
-        const agrupado = {};
+        const mejorPorGrupo = {};
         for (const fila of data ?? []) {
           const heat = (fila.heat ?? "").trim();
           const tipo = /^b/i.test(heat) ? "B" : /^a/i.test(heat) ? "A" : null;
           if (!tipo) continue;
           const clase = fila.clases?.nombre ?? "Sin clase";
-          agrupado[fila.evento_id] ??= {};
-          agrupado[fila.evento_id][clase] ??= {};
-          agrupado[fila.evento_id][clase][tipo] = nombrePiloto(fila.pilotos);
+          const clave = `${fila.evento_id}|${clase}|${tipo}`;
+          const actual = mejorPorGrupo[clave];
+          if (!actual || fila.posicion < actual.posicion) {
+            mejorPorGrupo[clave] = {
+              eventoId: fila.evento_id,
+              clase,
+              tipo,
+              posicion: fila.posicion,
+              nombre: nombrePiloto(fila.pilotos),
+            };
+          }
+        }
+        const agrupado = {};
+        for (const { eventoId, clase, tipo, nombre } of Object.values(mejorPorGrupo)) {
+          agrupado[eventoId] ??= {};
+          agrupado[eventoId][clase] ??= {};
+          agrupado[eventoId][clase][tipo] = nombre;
         }
         setPorEvento(agrupado);
         setLoading(false);

@@ -560,6 +560,12 @@ funcionando exactamente igual, sin tocarlo.
   pasar por ningún backend, mismo criterio que el CSV de arriba. Requiere la policy de select
   de admin de la migración 0015 (sin ella, la consulta a `inscripciones` devuelve vacío para
   cualquiera que no sea el propio inscripto).
+- **Ver inscriptos (popup público)** (botón "Ver inscriptos" al lado del anterior, visible para
+  cualquiera sin necesidad de estar logueado): abre `ModalInscriptos.jsx`, mismo listado
+  agrupado por categoría pero en un popup en vez de copiarlo — comparten el fetch
+  (`obtenerInscriptosPorClase()` en `App.jsx`). Requiere la migración 0016 (lectura pública de
+  `inscripciones` — antes de eso, un visitante no admin y no dueño de la inscripción veía la
+  lista vacía).
 - **Inscribir un piloto a mano** (`InscribirPiloto` en `GestionEventos.jsx`, un botón por fila
   de evento): para pilotos que se anotan en boca de pista, o cualquier caso que el admin quiera
   cargar directo sin pasar por el autoservicio. Buscador libre contra el roster completo
@@ -572,14 +578,35 @@ funcionando exactamente igual, sin tocarlo.
 
 ## Ganadores en la tarjeta del Calendario
 
-`useGanadoresPorEvento()` (`hooks.js`) trae en una sola consulta el piloto en posición 1 de
-cada heat de `resultados_finales` para **todos** los eventos (no tiene sentido una consulta
-por tarjeta) y arma `{ [eventoId]: { [claseNombre]: { A: nombre, B: nombre } } }` — mismo
-criterio que `calcularPodios()` en `TablaResultados.jsx` para distinguir final A de final B por
-el texto del heat (`/^a/i` / `/^b/i`), así funciona igual si el evento corrió una sola final
-(todo bajo "A Final") o dos. `EventoCard.jsx` muestra esta info debajo del header de la
-tarjeta, solo para fechas con `resultadosDisponibles` (pasadas o `corrida`), con ícono de copa
-(oro) para la A y medalla (plata) para la B.
+`useGanadoresPorEvento()` (`hooks.js`) trae en una sola consulta el ganador de cada heat de
+`resultados_finales` para **todos** los eventos (no tiene sentido una consulta por tarjeta) y
+arma `{ [eventoId]: { [claseNombre]: { A: nombre, B: nombre } } }` — mismo criterio que
+`calcularPodios()` en `TablaResultados.jsx` para distinguir final A de final B por el texto del
+heat (`/^a/i` / `/^b/i`), así funciona igual si el evento corrió una sola final (todo bajo
+"A Final") o dos. `EventoCard.jsx` muestra esta info debajo del header de la tarjeta, solo para
+fechas con `resultadosDisponibles` (pasadas o `corrida`), con ícono de copa (oro) para la A y
+medalla (plata) para la B.
+
+⚠️ **Bug encontrado en la primera prueba real**: la primera versión filtraba directo por
+`posicion = 1`, pero Live Timing numera la B Final **continuando** después de la A (ej. A: 1-10,
+B: 11-20), no reinicia en 1 — así que el ganador de la B nunca tenía `posicion = 1` y quedaba
+afuera en silencio. Corregido: en vez de filtrar por posición, agrupa las filas por
+`evento+clase+heat` y toma la de **menor posición dentro de ese grupo** como ganador — mismo
+criterio que ya usaba `calcularPodios()`, ahora replicado acá.
+
+**Dibujo del circuito y récords, no solo pilotos**: `EventoCard.jsx` y la tarjeta destacada de
+la próxima fecha (`App.jsx`) muestran el dibujo del circuito asociado (64px, con fondo blanco —
+ver nota de contraste más abajo) usando el mismo helper `rutaImagenCircuito()`, sacado a
+`web/src/lib/circuitos.js` para no duplicarlo entre `EventoCard.jsx`, `CircuitosView.jsx` y
+`App.jsx` (la tarjeta destacada no lo tenía al principio, se sumó a pedido).
+
+⚠️ **Contraste de los dibujos de circuito**: los PNG de `circuitos-normales`/`circuitos-invertidos`
+tienen fondo **transparente** con el trazado en colores oscuros (marrón grisáceo para el asfalto,
+líneas blancas/negras) — sobre el fondo oscuro de la app (`T.surfaceRaised`) el trazado se perdía
+casi por completo, más aún reducido a una miniatura chica. Todos los lugares donde se muestra el
+dibujo (`EventoCard.jsx`, la tarjeta destacada, y las dos instancias de `CircuitosView.jsx`:
+la miniatura del grid y la imagen grande) ahora usan fondo blanco (`#FFFFFF`) en vez de
+`T.surfaceRaised`, con un `padding` chico para que el trazado no quede pegado al borde.
 
 ## Responsive / mobile (`web/`)
 
