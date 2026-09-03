@@ -472,14 +472,16 @@ las más antiguas. No se limita el listado ni se filtran fechas. La próxima fec
 se calcula como la fecha futura más cercana, independientemente del valor de `corrida`, para no
 seguir mostrando una fecha pasada si el flag quedó desactualizado.
 
-`StartLights.jsx` muestra una representación visual inspirada en el semáforo de largada de F1:
-siete columnas verticales con dos luces cada una, organizadas en dos filas. Las seis primeras
-columnas usan luces rojas y la séptima, correspondiente al día de la carrera, usa luces verdes.
-Las columnas se encienden progresivamente durante la última semana: una columna por día, desde
-siete días antes hasta la fecha de la carrera. Durante las últimas 12 horas, todas las luces
-encendidas titilan. Arriba se muestra el
-número exacto de días restantes y una frase alusiva que cambia diariamente durante los últimos
-30 días.
+`StartLights.jsx` muestra un árbol de largada estilo drag strip: dos etapas rojas, tres ámbar y
+una verde, cada una con dos luces, apiladas verticalmente sobre un poste. Las etapas se van
+prendiendo progresivamente durante la última semana (misma fórmula de `progreso` de siempre,
+en base a `horasRestantes`); la verde recién se prende el día de la fecha. La última etapa que
+se prendió titila siempre, para marcar "esto es lo nuevo" — una vez que la verde está prendida,
+el titileo pasa a ella; durante las últimas 12 horas, titilan todas juntas (`todasTitilan`).
+Arriba se muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva que cambia
+diariamente durante los últimos 30 días. Diseño elegido entre varias propuestas comparadas en
+un artifact aparte (no versionado en el repo) antes de implementarlo acá — reemplaza el semáforo
+horizontal de siete columnas estilo F1 de la versión anterior.
 
 En `EventoCard.jsx`, una fecha pasada habilita `Ver resultados` aunque `corrida` sea falso. Para
 una inscripción abierta, el usuario no autenticado también ve un botón `Inscribirme` que inicia

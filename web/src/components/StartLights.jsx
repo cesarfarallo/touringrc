@@ -38,24 +38,58 @@ function fraseParaDias(diasRestantes) {
   return "La próxima fecha ya está en el horizonte.";
 }
 
+// Árbol de largada estilo drag strip: dos etapas rojas, tres ámbar, y la
+// verde recién el día de la fecha -- en vez del semáforo horizontal de F1
+// de siete columnas que tenía antes. La última etapa que se prende titila
+// siempre (marca "esto es lo nuevo"); una vez que la verde está prendida,
+// el protagonismo del titileo pasa a ella. Con `todasTitilan` (últimas 12
+// horas) titilan todas juntas, el estado de máxima urgencia.
+const ETAPAS = ["red", "red", "amber", "amber", "amber"];
+
+const COLORES = {
+  red: {
+    off: { bg: "#2A0E0E", border: "#4A1C1C" },
+    on: { bg: "radial-gradient(circle at 35% 30%, #FF9B8C, #E2372A 65%, #8A1810)", border: "#FF9B8C", glow: "#E2372AAA" },
+  },
+  amber: {
+    off: { bg: "#241A08", border: "#3D2E10" },
+    on: { bg: "radial-gradient(circle at 35% 30%, #FFE07A, #FFB400 65%, #B37800)", border: "#FFD37A", glow: "#FFB400AA" },
+  },
+  green: {
+    off: { bg: "#0C2415", border: "#1C3D28" },
+    on: { bg: "radial-gradient(circle at 35% 30%, #8CFFAE, #22E55E 65%, #0E7A34)", border: "#9CFFB8", glow: "#22E55ECC" },
+  },
+};
+
+function Bulb({ color, on, blink }) {
+  const c = COLORES[color][on ? "on" : "off"];
+  return (
+    <div
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        background: c.bg,
+        border: `2px solid ${c.border}`,
+        boxShadow: on ? `0 0 12px 2px ${c.glow}` : "none",
+        animation: blink ? "start-lights-blink 1s ease-in-out infinite" : "none",
+        transition: "all 0.3s ease",
+      }}
+    />
+  );
+}
+
 export default function StartLights({ diasRestantes, horasRestantes }) {
   const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasRestantes / 24)));
-  const todasTitilan = progreso === 7 && horasRestantes <= 12;
-  const colorDeColumna = (columna) => {
-    if (columna === 6) {
-      return progreso === 7
-        ? { activo: "#22E55E", borde: "#72FF91", glow: "#22E55ECC" }
-        : { activo: "#123A1D", borde: "#2D7A3D", glow: "transparent" };
-    }
-    if (columna < progreso) return { activo: "#F22B2B", borde: "#FF5A5A", glow: "#FF2525CC" };
-    return { activo: "#3A1111", borde: "#7A2525", glow: "transparent" };
-  };
+  const greenOn = progreso === 7;
+  const stagesLit = Math.min(ETAPAS.length, progreso);
+  const todasTitilan = greenOn && horasRestantes <= 12;
 
   return (
     <div
       title="Semáforo de largada: las luces se encienden a medida que se acerca la fecha"
-      aria-label={`Faltan ${diasRestantes} días. ${progreso} de 7 columnas encendidas.`}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}
+      aria-label={`Faltan ${diasRestantes} días. ${stagesLit} de ${ETAPAS.length} etapas encendidas${greenOn ? " y verde encendida" : ""}.`}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}
     >
       <style>{`
         @keyframes start-lights-blink {
@@ -63,52 +97,49 @@ export default function StartLights({ diasRestantes, horasRestantes }) {
           50% { opacity: 0.3; }
         }
       `}</style>
+
       <div style={{ textAlign: "center" }}>
         <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>
           Próxima largada
         </div>
-        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 27, fontWeight: 600, color: T.text }}>
-          {diasRestantes === 0 ? "HOY" : `FALTAN ${diasRestantes} DÍAS`}
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 22, fontWeight: 600, color: T.text }}>
+          {diasRestantes === 0
+            ? todasTitilan
+              ? "¡SE LARGA!"
+              : "HOY"
+            : `FALTAN ${diasRestantes} ${diasRestantes === 1 ? "DÍA" : "DÍAS"}`}
         </div>
-        <div style={{ color: T.muted, fontSize: 12, fontStyle: "italic", marginTop: 3 }}>
+        <div style={{ color: T.muted, fontSize: 12, fontStyle: "italic", marginTop: 3, maxWidth: 220 }}>
           {fraseParaDias(diasRestantes)}
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          padding: "8px 10px 10px",
-          borderRadius: 5,
-          background: "#080909",
-          border: "1px solid #303336",
-          boxShadow: "inset 0 1px 2px #000, 0 2px 5px #0006",
-        }}
-      >
-        {[0, 1, 2, 3, 4, 5, 6].map((columna) => (
-          <div key={columna} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "4px 5px" }}>
-            {[0, 1].map((luz) => {
-              const color = colorDeColumna(columna);
-              const esUltimaEncendida = progreso > 0 && columna === progreso - 1;
-              return (
-                <div
-                  key={luz}
-                  style={{
-                    width: 15,
-                    height: 15,
-                    borderRadius: "50%",
-                    background: color.activo,
-                    border: `1px solid ${color.borde}`,
-                    boxShadow: `0 0 9px ${color.glow}`,
-                    animation: todasTitilan || esUltimaEncendida ? "start-lights-blink 1s ease-in-out infinite" : "none",
-                    transition: "all 0.4s ease",
-                  }}
-                />
-              );
-            })}
+      <div style={{ display: "flex", alignItems: "stretch", gap: 14 }}>
+        <div
+          style={{
+            width: 5,
+            alignSelf: "stretch",
+            background: "linear-gradient(#3a3a3a, #1a1a1a)",
+            borderRadius: 3,
+          }}
+        />
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 7 }}>
+          {ETAPAS.map((color, i) => {
+            const on = i < stagesLit;
+            const esUltimaPrendida = on && !greenOn && i === stagesLit - 1;
+            const blink = on && (todasTitilan || esUltimaPrendida);
+            return (
+              <div key={i} style={{ display: "flex", gap: 7 }}>
+                <Bulb color={color} on={on} blink={blink} />
+                <Bulb color={color} on={on} blink={blink} />
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", gap: 7 }}>
+            <Bulb color="green" on={greenOn} blink={greenOn} />
+            <Bulb color="green" on={greenOn} blink={greenOn} />
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
