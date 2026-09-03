@@ -471,7 +471,7 @@ export default function TouringRCApp() {
 
         {tab === "circuitos" && <CircuitosView esAdmin={esAdminReal} />}
 
-        {tab === "tecnica" && puedeVerOficinaTecnica && <OficinaTecnica />}
+        {tab === "tecnica" && puedeVerOficinaTecnica && <OficinaTecnica esAdmin={esAdminReal} />}
 
         {tab === "admin" && esAdminReal && <AdminPanel />}
 

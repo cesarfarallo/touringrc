@@ -814,3 +814,104 @@ export function useNeumaticosEstadoClase(claseId) {
 
   return { estado, loading, error, recargar };
 }
+
+// Oficina técnica: historial completo de homologaciones de una
+// categoría (no solo la última, a diferencia de neumaticos_estado_clase),
+// agrupado por piloto -- para poder editar/corregir cualquiera, no solo
+// la más reciente. Cruza con homologaciones_pendientes para que cada
+// fila sepa si ya tiene una corrección propuesta esperando revisión de
+// un admin (migración 0018).
+export function useHistorialHomologaciones(claseId) {
+  const [porPiloto, setPorPiloto] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!claseId) {
+      setPorPiloto({});
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+
+    Promise.all([
+      supabase
+        .from("homologaciones_neumaticos")
+        .select("id, piloto_id, eventos ( nombre, fecha ), marcas_neumaticos ( id, nombre, logo_url )")
+        .eq("clase_id", claseId),
+      supabase.from("homologaciones_pendientes").select("id, homologacion_id, propuesto_por, marcas_neumaticos ( nombre, logo_url )").eq("resuelto", false),
+    ]).then(([homologaciones, pendientes]) => {
+      if (!activo) return;
+      if (homologaciones.error) {
+        setError(homologaciones.error);
+        setLoading(false);
+        return;
+      }
+      const pendientePorHomologacion = {};
+      for (const p of pendientes.data ?? []) {
+        pendientePorHomologacion[p.homologacion_id] = p;
+      }
+      const agrupado = {};
+      for (const h of homologaciones.data ?? []) {
+        (agrupado[h.piloto_id] ??= []).push({
+          id: h.id,
+          eventoNombre: h.eventos?.nombre,
+          fecha: h.eventos?.fecha,
+          marca: h.marcas_neumaticos,
+          pendiente: pendientePorHomologacion[h.id] ?? null,
+        });
+      }
+      for (const lista of Object.values(agrupado)) {
+        lista.sort((a, b) => new Date(b.fecha ?? 0) - new Date(a.fecha ?? 0));
+      }
+      setPorPiloto(agrupado);
+      setLoading(false);
+    });
+
+    return () => {
+      activo = false;
+    };
+  }, [claseId, version]);
+
+  return { porPiloto, loading, error, recargar };
+}
+
+// Oficina técnica, solo admin: cola de correcciones de marca que
+// propuso técnica sobre homologaciones ya cargadas, esperando
+// aprobación o rechazo (migración 0018) -- mismo patrón que
+// useVinculosPendientes.
+export function useHomologacionesPendientes(habilitado) {
+  const [pendientes, setPendientes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!habilitado) return;
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("homologaciones_pendientes")
+      .select(
+        "id, homologacion_id, marca_id_nueva, propuesto_por, creado_at, marcas_neumaticos ( nombre, logo_url ), homologaciones_neumaticos ( pilotos ( first_name, last_name ), clases ( nombre ), eventos ( nombre, fecha ), marcas_neumaticos ( nombre, logo_url ) )",
+      )
+      .eq("resuelto", false)
+      .order("creado_at")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setPendientes(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [habilitado, version]);
+
+  return { pendientes, loading, error, recargar };
+}

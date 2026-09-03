@@ -780,14 +780,45 @@ en ese evento (corrió de verdad), no por estar inscripto (esa es solo la intenc
   tooltip explicativo si el piloto no está apto **o** si no hay ninguna fecha corriendo hoy —
   antes de este cambio se podía elegir cualquier evento del calendario (pasado, futuro, o de
   otra fecha), lo cual no tenía sentido para algo que se supone que se registra en el momento.
-  "Cargar histórico" es un segundo flujo, siempre habilitado (**no** chequea `apto` — ahí se
-  está registrando un hecho que ya ocurrió, no pidiendo permiso para uno nuevo), para
-  regularizar homologaciones reales que pasaron antes de que existiera este módulo y nunca se
-  cargaron: mismo formulario pero con un `<select>` de evento restringido a fechas **ya
-  pasadas** (`fecha < hoy`, excluye la de hoy porque esa la cubre el otro botón). Los dos
-  insertan en `homologaciones_neumaticos` igual que antes (`unique (piloto_id, clase_id,
-  evento_id)` sigue evitando cargar dos veces la misma combinación, sin importar por cuál
-  botón se cargó).
+  "Cargar histórico" es un segundo flujo (**no** chequea `apto` — ahí se está registrando un
+  hecho que ya ocurrió, no pidiendo permiso para uno nuevo), para regularizar homologaciones
+  reales que pasaron antes de que existiera este módulo y nunca se cargaron: mismo formulario
+  pero con un `<select>` de evento restringido a fechas **ya pasadas** (`fecha < hoy`, excluye
+  la de hoy porque esa la cubre el otro botón). Los dos insertan en `homologaciones_neumaticos`
+  igual que antes (`unique (piloto_id, clase_id, evento_id)` sigue evitando cargar dos veces la
+  misma combinación, sin importar por cuál botón se cargó). **Visible solo para admin**
+  (`esAdmin`, prop que baja desde `App.jsx`) — es una tarea de regularización puntual del
+  arranque del módulo, no algo que técnica necesite en el uso normal del día a día.
+
+- **Corregir una homologación ya cargada — solo admin edita directo, técnica propone y admin
+  aprueba** (migración 0018): hasta esa migración, la policy de `homologaciones_neumaticos` era
+  `for all` para cualquiera con el módulo `homologacion` — técnica podía pisar o borrar
+  cualquier homologación ya cargada sin dejar rastro. Ahora la policy se separa por comando:
+  select/insert siguen abiertos a técnica+admin (así "Homologar"/"Cargar histórico" no
+  cambian), pero **update/delete quedan solo para admin** — a nivel RLS, no solo de UI. Cada
+  fila del historial de un piloto (`FilaPiloto` → botón "Historial", expandible,
+  `HistorialPiloto` en `OficinaTecnica.jsx`, lista **todas** las homologaciones de esa
+  categoría, no solo la última que ya mostraba el resumen) tiene un lápiz para corregir la
+  marca (`EditarMarcaHomologacion`, mismo archivo):
+  - Si quien edita es **admin**, el lápiz actualiza `homologaciones_neumaticos.marca_id`
+    directo.
+  - Si quien edita es **técnica**, el lápiz en cambio inserta en la tabla nueva
+    `homologaciones_pendientes` (`homologacion_id`, `marca_id_nueva`, `propuesto_por` con
+    default `auth.jwt() ->> 'email'`) — mismo patrón que `vinculos_pendientes`/
+    `alias_pendientes`: una cola de revisión, no una escritura directa. Un índice único
+    parcial (`where not resuelto`) evita dos correcciones propuestas a la vez sobre la misma
+    homologación — mientras hay una pendiente, esa fila del historial muestra "Pendiente:
+    (marca propuesta)" en vez del lápiz.
+  - **`HomologacionesPendientes.jsx`** (nuevo, visible solo si `esAdmin`, siempre mostrado en
+    la parte superior de Oficina técnica, igual que `VinculosPendientes.jsx`): lista todas las
+    correcciones sin resolver (piloto, categoría, fecha del evento, marca actual → marca
+    propuesta, quién la propuso) con botones **Aprobar** (aplica el cambio en
+    `homologaciones_neumaticos` y marca la fila de `homologaciones_pendientes` como
+    `resuelto=true, aprobado=true`) y **Rechazar** (solo marca `resuelto=true,
+    aprobado=false`, sin tocar la homologación). `useHistorialHomologaciones(claseId)` (en
+    `hooks.js`) trae el historial completo agrupado por piloto más el cruce con
+    `homologaciones_pendientes` sin resolver, para que cada fila sepa si ya tiene una
+    corrección esperando revisión.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
