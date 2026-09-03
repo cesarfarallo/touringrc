@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -21,6 +21,7 @@ import TablaCampeonato from "./components/TablaCampeonato";
 import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
 import AdminPanel from "./components/AdminPanel";
+import CircuitosView from "./components/CircuitosView";
 import DevRibbon from "./components/DevRibbon";
 
 function nombreParaMostrar(piloto, session) {
@@ -135,6 +136,7 @@ export default function TouringRCApp() {
             <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />
             <NavTab icon={Flag} label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
             <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
+            <NavTab icon={Map} label="Circuitos" active={tab === "circuitos"} onClick={() => setTab("circuitos")} />
             {logueado && esAdminReal && (
               <NavTab icon={ShieldCheck} label="Admin" active={tab === "admin"} onClick={() => setTab("admin")} />
             )}
@@ -285,6 +287,8 @@ export default function TouringRCApp() {
             </div>
           </>
         )}
+
+        {tab === "circuitos" && <CircuitosView esAdmin={esAdminReal} />}
 
         {tab === "admin" && esAdminReal && <AdminPanel />}
 

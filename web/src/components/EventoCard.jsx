@@ -19,6 +19,14 @@ export function inscripcionAbierta(evento) {
   return hoy >= desde && hoy < fecha;
 }
 
+// El dibujo del circuito no se guarda en la base -- se arma por convención
+// a partir de `numero` (ver migración 0009), mismo criterio que
+// CircuitosView.jsx.
+function rutaImagenCircuito(circuito, sentido) {
+  const carpeta = sentido === "invertido" ? "circuitos-invertidos" : "circuitos-normales";
+  return `/${carpeta}/Circuito${circuito.numero}.png`;
+}
+
 export function FormularioInscripcion({ evento, piloto, onInscripto }) {
   const { clases, loading: cargandoClases } = useClases();
   const { claseId: categoriaPreferida } = useCategoriaPreferida(piloto.id);
@@ -188,11 +196,21 @@ export default function EventoCard({
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 20, fontWeight: 600, letterSpacing: 0.3 }}>
-            {evento.nombre}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {evento.circuitos && (
+            <img
+              src={rutaImagenCircuito(evento.circuitos, evento.circuito_sentido)}
+              alt={evento.circuitos.nombre}
+              title={evento.circuitos.nombre}
+              style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 6, background: T.surfaceRaised, flexShrink: 0 }}
+            />
+          )}
+          <div>
+            <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 20, fontWeight: 600, letterSpacing: 0.3 }}>
+              {evento.nombre}
+            </div>
+            <div style={{ color: T.muted, fontSize: 13, marginTop: 4, fontFamily: "Inter, sans-serif" }}>{fechaStr}</div>
           </div>
-          <div style={{ color: T.muted, fontSize: 13, marginTop: 4, fontFamily: "Inter, sans-serif" }}>{fechaStr}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {resultadosDisponibles ? (

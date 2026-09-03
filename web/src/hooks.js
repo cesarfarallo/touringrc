@@ -108,7 +108,7 @@ export function useEventos() {
     setLoading(true);
     supabase
       .from("eventos")
-      .select("*")
+      .select("*, circuitos ( id, numero, nombre )")
       .order("fecha", { ascending: false })
       .then(({ data, error }) => {
         if (!activo) return;
@@ -291,6 +291,91 @@ export function useCampeonato() {
   }, []);
 
   return { campeonato, porClase, loading, error };
+}
+
+// Catálogo completo de circuitos (para el selector de "Circuito" al editar
+// un evento, y para el apartado público "Circuitos"). El dibujo no se
+// guarda en la base: se arma en el frontend a partir de `numero`
+// (`/circuitos-normales/Circuito{numero}.png` / `/circuitos-invertidos/...`,
+// assets estáticos ya presentes en `web/public/`).
+export function useCircuitos() {
+  const [circuitos, setCircuitos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("circuitos")
+      .select("id, numero, nombre")
+      .order("numero")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setCircuitos(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [version]);
+
+  return { circuitos, loading, error, recargar };
+}
+
+// Récords vigentes de un circuito, agrupados por categoría:
+// { [claseNombre]: { pilotoNombre, tiempo, fecha, claseId } }. Es el récord
+// actual (no un historial completo) -- el admin lo pisa a mano cuando se
+// bate uno nuevo.
+export function useCircuitoRecords(circuitoId) {
+  const [porClase, setPorClase] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!circuitoId) {
+      setPorClase({});
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("circuito_records")
+      .select("id, clase_id, piloto_nombre, tiempo, fecha, clases ( nombre )")
+      .eq("circuito_id", circuitoId)
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) {
+          setError(error);
+          setLoading(false);
+          return;
+        }
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          const clase = fila.clases?.nombre ?? "Sin categoría";
+          agrupado[clase] = {
+            id: fila.id,
+            claseId: fila.clase_id,
+            pilotoNombre: fila.piloto_nombre,
+            tiempo: fila.tiempo,
+            fecha: fila.fecha,
+          };
+        }
+        setPorClase(agrupado);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [circuitoId, version]);
+
+  return { porClase, loading, error, recargar };
 }
 
 // Catálogo completo de clases (para el selector de la inscripción online).

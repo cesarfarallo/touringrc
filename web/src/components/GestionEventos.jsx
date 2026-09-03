@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Plus, Upload, Pencil, Download } from "lucide-react";
 import { T } from "../theme";
-import { useEventos } from "../hooks";
+import { useEventos, useCircuitos } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import ArchivosChecklist from "./ArchivosChecklist";
@@ -310,6 +310,94 @@ function InscripcionDiasEditable({ evento, onGuardado }) {
   );
 }
 
+// Asocia un circuito (y su sentido) a la fecha, para que se vea el dibujo
+// en la tarjeta del Calendario público (EventoCard.jsx). Ver migración 0009.
+function CircuitoEditable({ evento, onGuardado }) {
+  const { circuitos, loading: cargandoCircuitos } = useCircuitos();
+  const [editando, setEditando] = useState(false);
+  const [circuitoId, setCircuitoId] = useState(evento.circuito_id ?? "");
+  const [sentido, setSentido] = useState(evento.circuito_sentido ?? "normal");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    const { error } = await supabase
+      .from("eventos")
+      .update({ circuito_id: circuitoId || null, circuito_sentido: sentido })
+      .eq("id", evento.id);
+    setGuardando(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEditando(false);
+    onGuardado();
+  }
+
+  if (!editando) {
+    return (
+      <button
+        onClick={() => {
+          setCircuitoId(evento.circuito_id ?? "");
+          setSentido(evento.circuito_sentido ?? "normal");
+          setEditando(true);
+        }}
+        title="Editar circuito"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          color: T.muted,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 12,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {evento.circuitos ? `Circuito: ${evento.circuitos.nombre} (${evento.circuito_sentido})` : "Sin circuito asociado"} <Pencil size={11} />
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <select
+        value={circuitoId}
+        onChange={(e) => setCircuitoId(e.target.value)}
+        disabled={cargandoCircuitos}
+        style={{ background: T.surfaceRaised, border: `1px solid ${T.line}`, borderRadius: 6, padding: "4px 8px", color: T.text, fontSize: 12 }}
+      >
+        <option value="">Sin circuito</option>
+        {circuitos.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.nombre}
+          </option>
+        ))}
+      </select>
+      <select
+        value={sentido}
+        onChange={(e) => setSentido(e.target.value)}
+        disabled={!circuitoId}
+        style={{ background: T.surfaceRaised, border: `1px solid ${T.line}`, borderRadius: 6, padding: "4px 8px", color: T.text, fontSize: 12 }}
+      >
+        <option value="normal">Normal</option>
+        <option value="invertido">Invertido</option>
+      </select>
+      <button onClick={guardar} disabled={guardando} style={{ border: "none", background: "transparent", color: T.amber, fontSize: 12, cursor: "pointer" }}>
+        {guardando ? "..." : "Guardar"}
+      </button>
+      <button onClick={() => setEditando(false)} style={{ border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer" }}>
+        Cancelar
+      </button>
+      {error && <span style={{ color: T.red, fontSize: 11 }}>{error}</span>}
+    </div>
+  );
+}
+
 function DatosEventoEditable({ evento, onGuardado }) {
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState(evento.nombre);
@@ -485,6 +573,9 @@ function FilaEvento({ evento, onSubido }) {
           <DatosEventoEditable evento={evento} onGuardado={onSubido} />
           <div style={{ marginTop: 6 }}>
             <InscripcionDiasEditable evento={evento} onGuardado={onSubido} />
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <CircuitoEditable evento={evento} onGuardado={onSubido} />
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

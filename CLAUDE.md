@@ -74,7 +74,7 @@ más abajo para el detalle fase por fase.
 | `alias_pendientes` | Cola de revisión manual para nombres ambiguos (2+ candidatos posibles). | sin RLS |
 | `clases` | Categorías recurrentes entre eventos (ej. `Touring Eco 1:10 Modified`). | sin RLS |
 | `campeonatos` | Temporada/torneo (nombre, fecha_inicio, fecha_fin). | sin RLS |
-| `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool, **sin uso desde la migración 0007** — reemplazado por la ventana calculada), `inscripcion_dias_antes` (int, migración 0007: cuántos días antes de `fecha` se habilita la inscripción online para *esa* fecha en particular — nullable, cada evento configura el suyo), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"resultadosFinales": true, ...}`). | select público, insert/update solo admin (migración 0004) |
+| `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool, **sin uso desde la migración 0007** — reemplazado por la ventana calculada), `inscripcion_dias_antes` (int, migración 0007: cuántos días antes de `fecha` se habilita la inscripción online para *esa* fecha en particular — nullable, cada evento configura el suyo), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"resultadosFinales": true, ...}`), `circuito_id`/`circuito_sentido` (migración 0009: qué circuito se corre en esa fecha y en qué sentido — ver sección "Circuitos" más abajo). | select público, insert/update solo admin (migración 0004) |
 | `inscripciones` | Inscripción de un piloto a una fecha/clase, hecha desde la web. `sincronizado_a_livetime` marca si ya se exportó hacia Live Timing. Unique `(evento_id, piloto_id, clase_id)`. | insert/select solo del propio piloto vía `auth.uid()` |
 | `resultados_finales` | Resultado final de un piloto en una clase de un evento (posición, resultado crudo, heat, `tq`, `vuelta_rapida`). Unique `(evento_id, clase_id, piloto_id)`. | sin RLS |
 | `resultados_ronda` | Detalle por ronda/heat (laps, tiempos, promedios). Unique `(evento_id, clase_id, ronda, piloto_id)`. **Ojo**: la columna `tiempo interval` existe pero `sync_evento.py` no la completa hoy (solo llena `vueltas`). | sin RLS |
@@ -82,11 +82,14 @@ más abajo para el detalle fase por fase.
 | `campeonato_puntos` | Acumulado de campeonato por clase/piloto (puntos, TQs, victorias, `detalle_por_fecha` jsonb). Unique `(campeonato_id, clase_id, piloto_id)`. | sin RLS |
 | `admins` | Lista de emails autorizados como admin (migración 0002). Reemplaza el viejo toggle "ADMIN" puramente visual del frontend por una verificación real del lado del servidor. | select propio (un admin se ve a sí mismo) |
 | `vinculos_pendientes` | Cola de revisión (migración 0002): logins que no matchearon 1 a 1 contra el roster de `pilotos` ya cargado — o crearon un piloto nuevo (0 candidatos) o quedaron ambiguos (2+ candidatos con mismo nombre). El admin confirma o fusiona vía `fusionar_pilotos()`. | select/update solo admin |
+| `circuitos` | Las 7 pistas del club (migración 0009). `numero` (1-7) es la clave que arma la ruta de la imagen en el frontend, no hay columna de imagen en la base. `nombre` editable desde la web. | select público, insert/update/delete solo admin |
+| `circuito_records` | Récord **vigente** por circuito+categoría (migración 0009) — no un historial completo, el admin lo pisa a mano cuando se bate uno nuevo. `piloto_nombre` es texto libre (sin FK a `pilotos`, para poder cargar récords viejos de pilotos que nunca se loguearon a la web). Unique `(circuito_id, clase_id)`. | select público, insert/update/delete solo admin |
 
-**Nota de RLS**: hoy solo `pilotos`, `inscripciones` y `eventos` tienen RLS habilitado. El resto
-queda con el comportamiento default de Postgres/Supabase (sin política = sin acceso vía la
-`anon key` una vez que se habilite RLS en esas tablas, o acceso abierto si nunca se habilita —
-a decidir explícitamente en la Fase F del roadmap, hoy es un punto ciego).
+**Nota de RLS**: hoy `pilotos`, `inscripciones`, `eventos`, `clasificacion` (migración 0008),
+`circuitos` y `circuito_records` (migración 0009) tienen RLS habilitado. El resto queda con el
+comportamiento default de Postgres/Supabase (sin política = sin acceso vía la `anon key` una vez
+que se habilite RLS en esas tablas, o acceso abierto si nunca se habilita — a decidir
+explícitamente en la Fase F del roadmap, hoy es un punto ciego).
 
 **Nota de diseño (`eventos` vs. `clase`)**: `eventos` NO tiene columna `clase` — un evento puede
 tener resultados de varias clases a la vez (así lo modelan `resultados_finales` y
@@ -498,6 +501,41 @@ reciente primero, sea futura o pasada, y luego las fechas más antiguas.
 Cada evento permite editar inline su nombre y fecha mediante el ícono de lápiz; el guardado
 actualiza la fila de `eventos` y refresca el listado.
 
+## Circuitos (migración 0009)
+
+Nuevo tab del nav ("Circuitos", `CircuitosView.jsx`), a la par de Calendario/Resultados/
+Campeonato. Modela el club como **7 circuitos físicos, cada uno con dos sentidos de recorrido**
+("normal"/"invertido") — no 14 circuitos independientes. El dibujo de cada uno **no se guarda en
+la base**: son 14 PNG estáticos ya presentes en el repo (`web/public/circuitos-normales/
+Circuito{1-7}.png` y `circuitos-invertidos/Circuito{1-7}.png`, 4499×2105px), y el frontend arma
+la ruta a partir de la columna `numero` de `circuitos` (`rutaImagen()`, repetida igual en
+`CircuitosView.jsx` y `EventoCard.jsx` — si se agrega una tercera vista que necesite el dibujo,
+conviene sacarla a un helper compartido). El seed de la migración carga los 7 con nombre
+genérico ("Circuito 1".."Circuito 7") — el admin los renombra desde la propia vista con el
+ícono de lápiz (mismo patrón que el nombre/fecha de `GestionEventos.jsx`).
+
+- **Asociar un circuito a una fecha**: `eventos.circuito_id` (nullable, `on delete set null`) +
+  `eventos.circuito_sentido` (`'normal'`/`'invertido'`, default `'normal'`). Se edita inline
+  desde `GestionEventos.jsx` (`CircuitoEditable`, mismo patrón de lápiz que
+  `InscripcionDiasEditable`). `useEventos()` trae el join (`circuitos ( id, numero, nombre )`)
+  para que `EventoCard.jsx` pueda mostrar el dibujo (48px, esquina superior izquierda de la
+  tarjeta) sin una consulta aparte — si no hay circuito asociado, no se muestra nada.
+- **Vista pública**: grid de los 7 circuitos (thumbnail + nombre) para elegir uno: imagen grande
+  del sentido elegido (toggle Normal/Invertido) al lado de una tabla con el récord vigente por
+  categoría (`useCircuitoRecords`).
+- **Récords** (`circuito_records`): es el récord **vigente** por circuito+categoría, no un
+  historial completo — cargar uno nuevo (`upsert` con `onConflict: "circuito_id,clase_id"`)
+  pisa el anterior. `piloto_nombre` es texto libre a propósito (sin FK a `pilotos`): hay récords
+  viejos de pilotos que nunca se loguearon a la web, y forzar un match contra el roster para
+  cargarlos sería más fricción que valor. La carga/edición/borrado de récords y el renombrado de
+  circuitos quedan visibles inline solo si `useEsAdmin()` da `true` — no hay un sub-tab aparte en
+  el panel Admin porque está atado 1 a 1 a esta vista (mismo criterio que las decoraciones de
+  admin que `EventoCard.jsx` mostraba antes de mudarse a `GestionEventos.jsx`, pero acá se quedan
+  en la vista pública porque no tiene sentido duplicar la tabla en dos lugares).
+
+⚠️ No se pudo confirmar con el club el nombre real de cada uno de los 7 circuitos — el seed usa
+nombres genéricos como placeholder, pendiente que el admin los renombre desde la web.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
@@ -687,3 +725,20 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    (`resultados_finales`, `resultados_ronda`, `campeonato_puntos`, `clases`, `campeonatos`,
    `piloto_alias`, `alias_pendientes`), tests para `livetime_parsers.py`, logging estructurado
    en `sync_evento.py`, y purga opcional del historial de git del secreto expuesto.
+7. ✅ **Fase G — Circuitos** (migración 0009, no estaba en el roadmap original, se agregó a
+   pedido después de que aparecieran sin usar 14 imágenes de circuitos en el repo): apartado
+   público nuevo con las 7 pistas del club (dibujo normal/invertido + récord vigente por
+   categoría), asociación de circuito a cada fecha del calendario (se ve el dibujo en la tarjeta
+   del evento), y carga/edición de récords y renombrado de circuitos para el admin — ver sección
+   "Circuitos" más arriba. Código escrito y verificado con build/lint; **no corrido contra un
+   proyecto de Supabase real** (mismo motivo que el resto de las migraciones recientes: sin
+   acceso de red a Supabase desde este entorno) — falta correr la migración 0009 en staging y
+   producción, y confirmar con el club el nombre real de cada circuito (el seed usa nombres
+   genéricos como placeholder).
+
+⚠️ Numeración de migraciones: hay dos archivos `0008_*.sql` distintos y sin relación entre sí
+(`0008_piloto_actualiza_su_transponder.sql` y `0008_clasificacion_lectura_publica.sql`) — quedó
+así porque se crearon en paralelo desde dos sesiones distintas trabajando sobre el mismo `dev`.
+Ninguno depende del otro, así que no hace falta renumerar para que funcionen, pero si en algún
+momento se quiere prolijidad, conviene decidir cuál de los dos pasa a `0009` y correrlo así en
+staging/producción (y en ese caso esta migración de Circuitos pasaría a ser la `0010`).
