@@ -442,12 +442,15 @@ export function useCircuitoRecords(circuitoId, sentido) {
 export function useClases() {
   const [clases, setClases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
 
   useEffect(() => {
     let activo = true;
     supabase
       .from("clases")
-      .select("id, nombre")
+      .select("id, nombre, homologacion_eventos_minimos")
       .order("nombre")
       .then(({ data, error }) => {
         if (!activo) return;
@@ -457,9 +460,9 @@ export function useClases() {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [version]);
 
-  return { clases, loading };
+  return { clases, loading, recargar };
 }
 
 // Categoría de la última inscripción del piloto (si tiene alguna), para
@@ -743,4 +746,71 @@ export function usePilotoRoles(habilitado) {
   }, [habilitado, version]);
 
   return { porPiloto, loading, error, recargar };
+}
+
+// Oficina técnica: catálogo de marcas de neumáticos (para el selector
+// visual por logo). RLS restringe select/insert/update/delete a
+// admin/tecnica (migración 0017) -- para cualquier otro usuario esta
+// consulta simplemente devuelve vacío.
+export function useMarcasNeumaticos() {
+  const [marcas, setMarcas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("marcas_neumaticos")
+      .select("id, nombre, logo_url")
+      .order("nombre")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setMarcas(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [version]);
+
+  return { marcas, loading, error, recargar };
+}
+
+// Oficina técnica: estado de homologación de cada piloto para una
+// categoría -- última marca homologada, eventos transcurridos desde
+// entonces, y si está apto para homologar un juego nuevo (ver
+// neumaticos_estado_clase() en la migración 0017 para la regla).
+export function useNeumaticosEstadoClase(claseId) {
+  const [estado, setEstado] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!claseId) {
+      setEstado([]);
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .rpc("neumaticos_estado_clase", { p_clase_id: claseId })
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setEstado(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [claseId, version]);
+
+  return { estado, loading, error, recargar };
 }

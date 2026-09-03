@@ -72,7 +72,7 @@ más abajo para el detalle fase por fase.
 | `pilotos` | Un piloto (independiente de si tiene cuenta web). `auth_user_id` nullable hasta que se vincula al primer login; `email` viene de la cuenta web, no de Live Timing. `registration_number` es un id externo pensado para inyectar EN Live Timing (dirección web→Live Timing, no implementada aún). | select público |
 | `piloto_alias` | Mapea texto crudo de un reporte (`"Bruno Bonetta ARG"`) a un `piloto_id` ya resuelto. | sin RLS |
 | `alias_pendientes` | Cola de revisión manual para nombres ambiguos (2+ candidatos posibles). | sin RLS |
-| `clases` | Categorías recurrentes entre eventos (ej. `Touring Eco 1:10 Modified`). | sin RLS |
+| `clases` | Categorías recurrentes entre eventos (ej. `Touring Eco Modified`). `homologacion_eventos_minimos` (migración 0017): cada cuántos eventos se puede homologar un juego de neumáticos nuevo — ver sección "Oficina técnica" más abajo. | select público, update para `tiene_modulo('homologacion')` (migración 0017) |
 | `campeonatos` | Temporada/torneo (nombre, fecha_inicio, fecha_fin). | sin RLS |
 | `eventos` | Calendario: una fila por fecha. `inscripcion_habilitada` (bool, **sin uso desde la migración 0007** — reemplazado por la ventana calculada), `inscripcion_dias_antes` (int, migración 0007: cuántos días antes de `fecha` se habilita la inscripción online para *esa* fecha en particular — nullable, cada evento configura el suyo), `corrida` (bool, habilita ver resultados), `archivos` (jsonb checklist de qué se subió: `{"resultadosFinales": true, ...}`), `circuito_id`/`circuito_sentido` (migración 0009: qué circuito se corre en esa fecha y en qué sentido — ver sección "Circuitos" más abajo). | select público, insert/update solo admin (migración 0004) |
 | `inscripciones` | Inscripción de un piloto a una fecha/clase, hecha desde la web. `sincronizado_a_livetime` marca si ya se exportó hacia Live Timing. Unique `(evento_id, piloto_id, clase_id)`. | insert/select solo del propio piloto vía `auth.uid()` |
@@ -84,9 +84,13 @@ más abajo para el detalle fase por fase.
 | `vinculos_pendientes` | Cola de revisión (migración 0002): logins que no matchearon 1 a 1 contra el roster de `pilotos` ya cargado — o crearon un piloto nuevo (0 candidatos) o quedaron ambiguos (2+ candidatos con mismo nombre). El admin confirma o fusiona vía `fusionar_pilotos()`. | select/update solo admin |
 | `circuitos` | Las 7 pistas del club (migración 0009). `numero` (1-7) es la clave que arma la ruta de la imagen en el frontend, no hay columna de imagen en la base. `nombre` editable desde la web. | select público, insert/update/delete solo admin |
 | `circuito_records` | Récord **vigente** por circuito+categoría+sentido (migración 0009, `sentido` sumado en la 0014) — no un historial completo, el admin lo pisa a mano cuando se bate uno nuevo. `piloto_nombre` es texto libre (sin FK a `pilotos`, para poder cargar récords viejos de pilotos que nunca se loguearon a la web). Unique `(circuito_id, clase_id, sentido)` — normal e invertido tienen cada uno su propio récord, porque cambiar de sentido puede cambiar bastante el tiempo de vuelta. | select público, insert/update/delete solo admin |
+| `marcas_neumaticos` | Catálogo de marcas de neumáticos para homologar (migración 0017). `logo_url` opcional (texto libre, sin upload de imágenes en esta app). | select/insert/update/delete para `tiene_modulo('homologacion')` |
+| `homologaciones_neumaticos` | Un juego de neumáticos homologado (marca) para un piloto, en una categoría, en un evento puntual (migración 0017). Unique `(piloto_id, clase_id, evento_id)`. Ver `neumaticos_estado_clase()` para cómo se calcula si un piloto está apto para cargar una nueva. | select/insert/update/delete para `tiene_modulo('homologacion')` |
 
-**Nota de RLS**: hoy `pilotos`, `inscripciones`, `eventos`, `clasificacion` (migración 0008),
-`circuitos` y `circuito_records` (migración 0009) tienen RLS habilitado. El resto queda con el
+**Nota de RLS**: hoy `pilotos`, `inscripciones` (select también público desde la 0016),
+`eventos`, `clasificacion` (migración 0008), `circuitos` y `circuito_records` (migración 0009),
+`clases` (select público / update técnica, migración 0017), `marcas_neumaticos` y
+`homologaciones_neumaticos` (migración 0017) tienen RLS habilitado. El resto queda con el
 comportamiento default de Postgres/Supabase (sin política = sin acceso vía la `anon key` una vez
 que se habilite RLS en esas tablas, o acceso abierto si nunca se habilita — a decidir
 explícitamente en la Fase F del roadmap, hoy es un punto ciego).
@@ -733,6 +737,46 @@ genérico ("Circuito 1".."Circuito 7") — el admin los renombra desde la propia
 
 ⚠️ No se pudo confirmar con el club el nombre real de cada uno de los 7 circuitos — el seed usa
 nombres genéricos como placeholder, pendiente que el admin los renombre desde la web.
+
+## Oficina técnica: homologación de neumáticos (migración 0017)
+
+Nuevo tab del nav ("Oficina técnica", `OficinaTecnica.jsx`), visible solo si `useMisModulos()`
+tiene el módulo `homologacion` — nuevo módulo otorgado por default a los roles `admin` y
+`tecnica` (los únicos que pueden entrar; el resto ni ve el tab). No alcanza con ocultar el tab:
+`marcas_neumaticos` y `homologaciones_neumaticos` tienen RLS con `tiene_modulo('homologacion')`
+en todas las operaciones, así que aunque alguien pegue el request directo a Supabase sin ese
+módulo, no lee ni escribe nada.
+
+**Regla de negocio**: cada categoría permite homologar un juego de neumáticos nuevo cada *N*
+eventos — *N* es `clases.homologacion_eventos_minimos` (columna nueva, default `1`), no un
+nombre de categoría hardcodeado en el código, para poder ajustarlo sin tocar código si cambia
+el reglamento. El seed de la migración deja `Touring Eco Modified` en 1 (un juego nuevo por
+cada evento) y `Touring Eco Stock` en 2 (tiene que haberse presentado a mínimo 2 eventos desde
+la última homologación) — editable inline desde la propia vista (`EventosMinimosEditable`,
+requirió habilitar RLS en `clases`, que hasta ahora no tenía ninguna — quedó con select público
+y update para `tiene_modulo('homologacion')`).
+
+"Presentarse a un evento" se mide por tener una fila en `resultados_finales` para esa categoría
+en ese evento (corrió de verdad), no por estar inscripto (esa es solo la intención de asistir,
+`inscripciones`).
+
+- **`neumaticos_estado_clase(p_clase_id)`** (función SQL, `language sql` sin `security
+  definer` — corre con los permisos de quien llama, así que la RLS de arriba ya la protege
+  sola): para cada piloto que alguna vez corrió esa categoría, calcula la fecha y marca de su
+  última homologación, cuántos eventos pasaron desde entonces (contando solo eventos con
+  resultado real posterior a esa fecha) y si está **apto** (`eventos_desde_ultima >=
+  eventos_requeridos`, o directamente apto si nunca homologó nada). `useNeumaticosEstadoClase()`
+  en `hooks.js` la llama vía `supabase.rpc(...)`.
+- **`marcas_neumaticos`**: catálogo simple (nombre + `logo_url` opcional) que técnica/admin
+  arman a medida que hace falta — no hay un seed de marcas conocidas, ni upload de imágenes en
+  esta app (`logo_url` es una URL externa que se pega a mano). `SelectorMarca` en
+  `OficinaTecnica.jsx` muestra el logo si hay URL cargada, o un círculo con las iniciales de
+  respaldo si no.
+- **Cargar una homologación**: por piloto, botón "Homologar" (deshabilitado si no está apto)
+  abre un formulario inline con selector de evento (`<select>` de todos los eventos, más
+  reciente primero) y el selector visual de marca — inserta en `homologaciones_neumaticos`
+  (`unique (piloto_id, clase_id, evento_id)`, no se puede cargar dos veces la misma
+  combinación).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

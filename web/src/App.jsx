@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -25,6 +25,7 @@ import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
 import AdminPanel from "./components/AdminPanel";
 import CircuitosView from "./components/CircuitosView";
+import OficinaTecnica from "./components/OficinaTecnica";
 import ModalInscriptos from "./components/ModalInscriptos";
 import DevRibbon from "./components/DevRibbon";
 
@@ -82,6 +83,7 @@ export default function TouringRCApp() {
   // se confirme en "Vínculos pendientes".
   const { modulos: misModulos } = useMisModulos(session);
   const puedeInscribirse = misModulos.has("inscripcion");
+  const puedeVerOficinaTecnica = misModulos.has("homologacion");
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
   const { porEvento: ganadoresPorEvento } = useGanadoresPorEvento();
@@ -233,6 +235,9 @@ export default function TouringRCApp() {
             <NavTab icon={Flag} label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
             <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
             <NavTab icon={Map} label="Circuitos" active={tab === "circuitos"} onClick={() => setTab("circuitos")} />
+            {logueado && puedeVerOficinaTecnica && (
+              <NavTab icon={Wrench} label="Oficina técnica" active={tab === "tecnica"} onClick={() => setTab("tecnica")} />
+            )}
             {logueado && esAdminReal && (
               <NavTab icon={ShieldCheck} label="Admin" active={tab === "admin"} onClick={() => setTab("admin")} />
             )}
@@ -465,6 +470,8 @@ export default function TouringRCApp() {
         )}
 
         {tab === "circuitos" && <CircuitosView esAdmin={esAdminReal} />}
+
+        {tab === "tecnica" && puedeVerOficinaTecnica && <OficinaTecnica />}
 
         {tab === "admin" && esAdminReal && <AdminPanel />}
 
