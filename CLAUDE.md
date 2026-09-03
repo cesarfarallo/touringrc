@@ -287,6 +287,38 @@ consistente con la redefinición de `es_admin()`.
 tabla `admins` para el seed inicial) — correr en orden: 0001 → 0002 → 0003, primero en
 staging.
 
+## El rol `piloto` como aprobación del admin (migración 0013)
+
+Hasta esta migración, el sistema de roles/módulos de la 0003 solo se usaba para armar el menú
+del frontend — un piloto recién creado por un login sin match (0 o 2+ candidatos, ver más
+abajo) ya podía inscribirse a una fecha antes de que ningún admin lo revisara, porque la policy
+de `inscripciones` y `actualizar_mi_transponder()` (migración 0008) solo chequeaban que el
+`piloto_id` fuera el del usuario logueado, sin mirar roles para nada.
+
+Ahora tener el rol `piloto` (que da el módulo `inscripcion`) es ese "visto bueno":
+
+- **Se otorga solo** cuando el login matcheó con confianza contra el roster ya cargado (1
+  candidato único por email o por nombre+apellido, dentro de `vincular_piloto_para_login()`,
+  migración 0012).
+- **No se otorga** cuando no hay match único (0 o 2+ candidatos): el piloto se crea igual (no
+  bloquea el login) pero sin el rol — queda pendiente hasta que un admin lo **confirme** o lo
+  **fusione/vincule** a mano desde "Vínculos pendientes" (`VinculosPendientes.jsx`), momento en
+  el que recién ahí se le otorga (`otorgarRolPiloto()`, upsert en `piloto_roles` con
+  `ignoreDuplicates`).
+- **Enforcement real, no solo de UI**: la policy de insert de `inscripciones` y
+  `actualizar_mi_transponder()` ahora chequean `tiene_modulo('inscripcion')` además de la
+  dueñidad del `piloto_id` — así no alcanza con que el frontend oculte el botón, está bloqueado
+  también contra quien pegue el request directo a Supabase.
+- **Grandfather clause**: la migración le da el rol `piloto` a todo piloto que ya existiera en
+  la base al momento de correrla, para no bloquear de golpe a nadie ya cargado (roster
+  importado, o ya logueado antes de este cambio).
+
+**Frontend**: `EventoCard.jsx` y la tarjeta destacada de `App.jsx` deshabilitan el botón
+"Inscribirme" (mostrando "Pendiente de aprobación") cuando el piloto está vinculado pero
+`puedeInscribirse` (`useMisModulos().modulos.has("inscripcion")`) da `false`. `MiPerfil.jsx`
+suma un tercer estado (ámbar, entre el rojo de "sin vincular" y el verde de "todo ok") con el
+mismo mensaje, más detallado si quien lo ve es admin.
+
 ## Migración 0004: admin escribe en `eventos`
 
 Agrega policies de `insert`/`update` en `eventos` gateadas por `es_admin()` — hacían falta

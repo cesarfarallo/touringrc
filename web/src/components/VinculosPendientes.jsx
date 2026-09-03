@@ -28,9 +28,27 @@ function Fila({ vinculo, pilotosPorId, pilotos, onResuelto }) {
           .filter((p) => [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase().includes(textoBusqueda))
           .slice(0, 8);
 
+  // Confirmar/fusionar es el "visto bueno" del admin: recién ahí se
+  // otorga el rol 'piloto' (migración 0013), que es lo que habilita
+  // inscribirse a una fecha -- hasta entonces el piloto existe y puede
+  // loguearse, pero no puede anotarse a nada.
+  async function otorgarRolPiloto(pilotoId) {
+    return supabase
+      .from("piloto_roles")
+      .upsert({ piloto_id: pilotoId, rol_id: "piloto" }, { onConflict: "piloto_id,rol_id", ignoreDuplicates: true });
+  }
+
   async function confirmarNuevo() {
     setTrabajando(true);
     setError(null);
+    if (vinculo.piloto_creado_id) {
+      const { error: errorRol } = await otorgarRolPiloto(vinculo.piloto_creado_id);
+      if (errorRol) {
+        setTrabajando(false);
+        setError(errorRol.message);
+        return;
+      }
+    }
     const { error } = await supabase
       .from("vinculos_pendientes")
       .update({ resuelto: true })
@@ -48,9 +66,17 @@ function Fila({ vinculo, pilotosPorId, pilotos, onResuelto }) {
       p_duplicado_id: vinculo.piloto_creado_id,
       p_correcto_id: candidatoId,
     });
+    if (error) {
+      setTrabajando(false);
+      setError(error.message);
+      return;
+    }
+    const { error: errorRol } = await otorgarRolPiloto(candidatoId);
     setTrabajando(false);
-    if (error) setError(error.message);
-    else onResuelto();
+    if (errorRol) {
+      setError(`Vinculado, pero no se pudo asegurar el rol 'piloto': ${errorRol.message}. Asignalo a mano en la tabla de Pilotos.`);
+    }
+    onResuelto();
   }
 
   return (

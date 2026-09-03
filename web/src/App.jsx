@@ -10,6 +10,7 @@ import {
   usePilotoActual,
   useEsAdmin,
   useInscripcionPiloto,
+  useMisModulos,
 } from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
@@ -46,6 +47,12 @@ export default function TouringRCApp() {
   const { piloto, loading: cargandoPiloto } = usePilotoActual(session);
   const logueado = !!session;
   const { esAdmin: esAdminReal } = useEsAdmin(session);
+  // El rol 'piloto' (módulo 'inscripcion') es el "visto bueno" del
+  // admin -- un piloto recién creado por un login sin match todavía no
+  // lo tiene (migración 0013), así que no puede inscribirse hasta que
+  // se confirme en "Vínculos pendientes".
+  const { modulos: misModulos } = useMisModulos(session);
+  const puedeInscribirse = misModulos.has("inscripcion");
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
   const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato, error: errorCampeonato } = useCampeonato();
@@ -197,7 +204,13 @@ export default function TouringRCApp() {
 
         {!logueado && tab === "calendario" && <LoginCard />}
         {logueado && tab === "calendario" && (
-          <MiPerfil session={session} piloto={piloto} loading={cargandoPiloto} esAdmin={esAdminReal} />
+          <MiPerfil
+            session={session}
+            piloto={piloto}
+            loading={cargandoPiloto}
+            esAdmin={esAdminReal}
+            puedeInscribirse={puedeInscribirse}
+          />
         )}
 
         {tab === "calendario" && (
@@ -230,9 +243,11 @@ export default function TouringRCApp() {
                       ingresar();
                       return;
                     }
+                    if (logueado && piloto && !puedeInscribirse) return;
                     setFormularioDestacadoAbierto((abierto) => !abierto);
                   }}
-                  disabled={!!inscripcionDestacada}
+                  disabled={!!inscripcionDestacada || (logueado && !!piloto && !puedeInscribirse)}
+                  title={logueado && piloto && !puedeInscribirse ? "Tu cuenta todavía no fue aprobada por un admin" : undefined}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -241,21 +256,23 @@ export default function TouringRCApp() {
                     padding: "8px 14px",
                     borderRadius: 8,
                     border: "none",
-                    background: inscripcionDestacada ? T.surfaceRaised : T.amber,
-                    color: inscripcionDestacada ? T.muted : "#1A1300",
+                    background: inscripcionDestacada || (logueado && piloto && !puedeInscribirse) ? T.surfaceRaised : T.amber,
+                    color: inscripcionDestacada || (logueado && piloto && !puedeInscribirse) ? T.muted : "#1A1300",
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: inscripcionDestacada ? "default" : "pointer",
+                    cursor: inscripcionDestacada || (logueado && piloto && !puedeInscribirse) ? "default" : "pointer",
                   }}
                   >
                   <UserPlus size={14} />
                   {inscripcionDestacada
                     ? "Ya estás inscripto"
-                    : formularioDestacadoAbierto
-                      ? "Cerrar inscripción"
-                      : "Inscribirme"}
+                    : logueado && piloto && !puedeInscribirse
+                      ? "Pendiente de aprobación"
+                      : formularioDestacadoAbierto
+                        ? "Cerrar inscripción"
+                        : "Inscribirme"}
                   </button>
-                  {formularioDestacadoAbierto && logueado && piloto && !inscripcionDestacada && inscripcionDestacadaAbierta && (
+                  {formularioDestacadoAbierto && logueado && piloto && puedeInscribirse && !inscripcionDestacada && inscripcionDestacadaAbierta && (
                     <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.line}` }}>
                       <FormularioInscripcion
                         evento={proximo}
@@ -286,6 +303,7 @@ export default function TouringRCApp() {
                   evento={e}
                   piloto={piloto}
                   logueado={logueado}
+                  puedeInscribirse={puedeInscribirse}
                   onLogin={ingresar}
                   onVerResultados={(id) => {
                     setEventoResultadosId(id);

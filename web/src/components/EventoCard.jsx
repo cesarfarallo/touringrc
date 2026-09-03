@@ -168,6 +168,7 @@ export default function EventoCard({
   onVerResultados,
   piloto,
   logueado,
+  puedeInscribirse,
   onLogin,
   refreshInscripcion,
   onInscripto,
@@ -267,26 +268,27 @@ export default function EventoCard({
           ) : (
             <button
               onClick={() => setFormularioAbierto((v) => !v)}
-              disabled={!abierta}
+              disabled={!abierta || !puedeInscribirse}
+              title={!puedeInscribirse ? "Tu cuenta todavía no fue aprobada por un admin" : undefined}
               style={{
                 padding: "8px 18px",
                 borderRadius: 8,
                 border: "none",
-                background: abierta ? T.amber : T.surfaceRaised,
-                color: abierta ? "#1A1300" : T.muted,
+                background: abierta && puedeInscribirse ? T.amber : T.surfaceRaised,
+                color: abierta && puedeInscribirse ? "#1A1300" : T.muted,
                 fontFamily: "Inter, sans-serif",
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: abierta ? "pointer" : "not-allowed",
+                cursor: abierta && puedeInscribirse ? "pointer" : "not-allowed",
               }}
             >
-              {abierta ? "Inscribirme" : "Cerrada"}
+              {!puedeInscribirse ? "Pendiente de aprobación" : abierta ? "Inscribirme" : "Cerrada"}
             </button>
           )}
         </div>
       </div>
 
-      {formularioAbierto && logueado && piloto && !inscripcion && (
+      {formularioAbierto && logueado && piloto && puedeInscribirse && !inscripcion && (
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.line}` }}>
           <FormularioInscripcion
             evento={evento}
