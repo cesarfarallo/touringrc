@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check, Search } from "lucide-react";
 import { T } from "../theme";
 import { useVinculosPendientes } from "../hooks";
 import { supabase } from "../lib/supabase";
+import NombreEditable from "./PilotoEditable";
 
 function nombre(piloto) {
   if (!piloto) return "(desconocido)";
@@ -11,11 +12,21 @@ function nombre(piloto) {
   return `${n || "(sin nombre)"}${num}`;
 }
 
-function Fila({ vinculo, pilotosPorId, onResuelto }) {
+function Fila({ vinculo, pilotosPorId, pilotos, onResuelto }) {
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
   const creado = pilotosPorId[vinculo.piloto_creado_id];
   const candidatos = (vinculo.candidatos ?? []).map((id) => ({ id, piloto: pilotosPorId[id] }));
+
+  const textoBusqueda = busqueda.trim().toLowerCase();
+  const resultadosBusqueda =
+    textoBusqueda.length < 2
+      ? []
+      : pilotos
+          .filter((p) => p.id !== vinculo.piloto_creado_id)
+          .filter((p) => [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase().includes(textoBusqueda))
+          .slice(0, 8);
 
   async function confirmarNuevo() {
     setTrabajando(true);
@@ -60,8 +71,13 @@ function Fila({ vinculo, pilotosPorId, onResuelto }) {
         {vinculo.email && <span style={{ color: T.muted }}> · {vinculo.email}</span>}
       </div>
 
-      <div style={{ fontSize: 13 }}>
-        <span style={{ color: T.muted }}>Se creó un piloto nuevo:</span> <strong>{nombre(creado)}</strong>
+      <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: T.muted }}>Se creó un piloto nuevo:</span>
+        {creado ? (
+          <NombreEditable piloto={creado} onGuardado={onResuelto} />
+        ) : (
+          <strong>{nombre(creado)}</strong>
+        )}
       </div>
 
       {candidatos.length > 0 && (
@@ -91,6 +107,56 @@ function Fila({ vinculo, pilotosPorId, onResuelto }) {
         </div>
       )}
 
+      <div style={{ fontSize: 13 }}>
+        <span style={{ color: T.muted }}>¿No es ninguno de estos? Buscá al piloto correcto:</span>
+        <div style={{ position: "relative", marginTop: 6, maxWidth: 260 }}>
+          <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o apellido..."
+            style={{
+              background: T.surfaceRaised,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              padding: "7px 12px 7px 30px",
+              color: T.text,
+              fontSize: 13,
+              width: "100%",
+            }}
+          />
+        </div>
+        {resultadosBusqueda.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            {resultadosBusqueda.map((p) => (
+              <button
+                key={p.id}
+                disabled={trabajando}
+                onClick={() => fusionarCon(p.id)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.line}`,
+                  background: "transparent",
+                  color: T.text,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: trabajando ? "default" : "pointer",
+                }}
+              >
+                Vincular con {nombre(p)}
+              </button>
+            ))}
+          </div>
+        )}
+        {textoBusqueda.length >= 2 && resultadosBusqueda.length === 0 && (
+          <div style={{ color: T.muted, fontSize: 12, marginTop: 6 }}>
+            Ningún piloto coincide -- corregí el nombre de arriba y confirmá, o creá uno nuevo desde "Agregar piloto a
+            mano" más abajo.
+          </div>
+        )}
+      </div>
+
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button
           disabled={trabajando}
@@ -119,11 +185,18 @@ function Fila({ vinculo, pilotosPorId, onResuelto }) {
 }
 
 // Panel admin: logins que no matchearon 1 a 1 contra el roster ya
-// cargado. Para cada uno, el admin puede confirmar que el piloto nuevo
-// que se creó está bien, o fusionarlo con un piloto ya existente (si
-// era ambiguo entre varios candidatos con el mismo nombre).
-export default function VinculosPendientes() {
+// cargado. Para cada uno, el admin puede: confirmar que el piloto nuevo
+// que se creó está bien, corregirle el nombre a mano, fusionarlo con uno
+// de los candidatos ambiguos que detectó el trigger, o buscar y elegir
+// cualquier otro piloto ya cargado (búsqueda libre, no solo los
+// candidatos automáticos) para vincular en su lugar.
+export default function VinculosPendientes({ pilotos, onCambio }) {
   const { vinculos, pilotosPorId, loading, error, recargar } = useVinculosPendientes(true);
+
+  function resuelto() {
+    recargar();
+    onCambio?.();
+  }
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -151,15 +224,15 @@ export default function VinculosPendientes() {
       {!loading && vinculos.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {vinculos.map((v) => (
-            <Fila key={v.id} vinculo={v} pilotosPorId={pilotosPorId} onResuelto={recargar} />
+            <Fila key={v.id} vinculo={v} pilotosPorId={pilotosPorId} pilotos={pilotos ?? []} onResuelto={resuelto} />
           ))}
         </div>
       )}
 
       {vinculos.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: 12, color: T.muted }}>
-          <AlertTriangle size={12} /> Fusionar reasigna todo el historial (resultados, inscripciones) del piloto
-          duplicado al que elijas, y borra el duplicado.
+          <AlertTriangle size={12} /> Fusionar/vincular reasigna todo el historial (resultados, inscripciones) del
+          piloto duplicado al que elijas, y borra el duplicado.
         </div>
       )}
     </div>

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Check, X, Pencil, Search, UserPlus } from "lucide-react";
+import { Check, X, Pencil, Search, UserPlus, Trash2 } from "lucide-react";
 import { T } from "../theme";
 import { usePilotos, useRolesYModulos, usePilotoRoles } from "../hooks";
 import { supabase } from "../lib/supabase";
 import VinculosPendientes from "./VinculosPendientes";
+import NombreEditable from "./PilotoEditable";
 
 function EmailEditable({ piloto, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -310,6 +311,67 @@ function NuevoPiloto({ roles, onCreado }) {
   );
 }
 
+function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol, onGuardado }) {
+  const [borrando, setBorrando] = useState(false);
+  const [error, setError] = useState(null);
+  const nombreCompleto = [piloto.first_name, piloto.last_name].filter(Boolean).join(" ") || "(sin nombre)";
+
+  async function borrar() {
+    const advertencia = piloto.auth_user_id
+      ? `${nombreCompleto} tiene una cuenta vinculada -- si lo borrás, esa persona se queda sin piloto asociado la próxima vez que entre. ¿Borrar igual?`
+      : `¿Borrar a ${nombreCompleto}? No se puede deshacer.`;
+    if (!confirm(advertencia)) return;
+    setBorrando(true);
+    setError(null);
+    const { error } = await supabase.from("pilotos").delete().eq("id", piloto.id);
+    setBorrando(false);
+    if (error) {
+      // Lo más común: tiene resultados/inscripciones/alias con FK hacia
+      // este piloto -- Postgres bloquea el borrado en vez de dejar
+      // historial huérfano. Fusionar es la vía correcta en ese caso.
+      setError("No se pudo borrar (probablemente tiene resultados o inscripciones asociadas -- usá Fusionar en su lugar si es un duplicado).");
+      return;
+    }
+    onGuardado();
+  }
+
+  return (
+    <tr style={{ borderBottom: `1px solid ${T.line}` }}>
+      <td style={{ padding: "10px 16px" }}>
+        <NombreEditable piloto={piloto} onGuardado={onGuardado} />
+      </td>
+      <td style={{ padding: "10px 16px" }}>
+        <EmailEditable piloto={piloto} onGuardado={onGuardado} />
+      </td>
+      <td style={{ padding: "10px 16px" }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxWidth: 260 }}>
+          {roles.map((r) => (
+            <RolChip
+              key={r.id}
+              nombre={r.nombre}
+              marcado={!!rolesDelPiloto?.has(r.id)}
+              disabled={trabajandoRol === `${piloto.id}:${r.id}`}
+              onToggle={() => onToggleRol(piloto.id, r.id)}
+            />
+          ))}
+        </div>
+      </td>
+      <td style={{ padding: "10px 16px" }}>{piloto.auth_user_id ? <Check size={14} color={T.teal} /> : <X size={14} color={T.red} />}</td>
+      <td style={{ padding: "10px 16px" }}>
+        <button
+          onClick={borrar}
+          disabled={borrando}
+          title="Borrar piloto"
+          style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: borrando ? "default" : "pointer", padding: 0 }}
+        >
+          <Trash2 size={14} />
+        </button>
+        {error && <div style={{ color: T.red, fontSize: 11, maxWidth: 200, marginTop: 4 }}>{error}</div>}
+      </td>
+    </tr>
+  );
+}
+
 // Auditoría + gestión de pilotos: email editable a mano, roles
 // asignables por chip, y un filtro para enfocarse en los que todavía
 // no tienen ninguna cuenta vinculada (para completarles el email de
@@ -363,7 +425,13 @@ export default function PilotosAdmin() {
 
   return (
     <div>
-      <VinculosPendientes />
+      <VinculosPendientes
+        pilotos={pilotos}
+        onCambio={() => {
+          recargar();
+          recargarRoles();
+        }}
+      />
 
       <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 10 }}>
         Pilotos
@@ -424,7 +492,7 @@ export default function PilotosAdmin() {
           <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${T.line}` }}>
-                {["Nombre", "Email", "Roles", "Vinculado"].map((h) => (
+                {["Nombre", "Email", "Roles", "Vinculado", ""].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -445,34 +513,22 @@ export default function PilotosAdmin() {
             </thead>
             <tbody>
               {visibles.map((p) => (
-                <tr key={p.id} style={{ borderBottom: `1px solid ${T.line}` }}>
-                  <td style={{ padding: "10px 16px", fontFamily: "Inter, sans-serif", fontSize: 13 }}>
-                    {[p.first_name, p.last_name].filter(Boolean).join(" ") || "(sin nombre)"}
-                  </td>
-                  <td style={{ padding: "10px 16px" }}>
-                    <EmailEditable piloto={p} onGuardado={recargar} />
-                  </td>
-                  <td style={{ padding: "10px 16px" }}>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxWidth: 260 }}>
-                      {roles.map((r) => (
-                        <RolChip
-                          key={r.id}
-                          nombre={r.nombre}
-                          marcado={!!porPiloto[p.id]?.has(r.id)}
-                          disabled={trabajandoRol === `${p.id}:${r.id}`}
-                          onToggle={() => toggleRol(p.id, r.id)}
-                        />
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{ padding: "10px 16px" }}>
-                    {p.auth_user_id ? <Check size={14} color={T.teal} /> : <X size={14} color={T.red} />}
-                  </td>
-                </tr>
+                <FilaPiloto
+                  key={p.id}
+                  piloto={p}
+                  roles={roles}
+                  rolesDelPiloto={porPiloto[p.id]}
+                  trabajandoRol={trabajandoRol}
+                  onToggleRol={toggleRol}
+                  onGuardado={() => {
+                    recargar();
+                    recargarRoles();
+                  }}
+                />
               ))}
               {visibles.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ padding: "16px", color: T.muted, fontSize: 13 }}>
+                  <td colSpan={5} style={{ padding: "16px", color: T.muted, fontSize: 13 }}>
                     {pilotos.length === 0
                       ? "Todavía no hay pilotos cargados."
                       : "Ningún piloto coincide con la búsqueda/filtros."}

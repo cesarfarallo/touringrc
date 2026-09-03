@@ -196,16 +196,42 @@ python cargar_roster.py --archivo EventVerification-Event30.xls   # o uno puntua
 **Panel admin `VinculosPendientes`** (`web/src/components/VinculosPendientes.jsx`): lista las
 filas de `vinculos_pendientes` sin resolver. Para cada una, el admin puede:
 - **Confirmar** que el piloto nuevo creado automáticamente está bien (marca `resuelto=true`).
-- **Fusionar** con uno de los candidatos ambiguos, si los hay — llama a la función Postgres
-  `fusionar_pilotos(duplicado, correcto)` (`security definer`, valida `es_admin()` internamente),
-  que reasigna todo el historial (`resultados_finales`, `resultados_ronda`,
-  `campeonato_puntos`, `inscripciones`, `piloto_alias`) del piloto duplicado al correcto, y
-  borra el duplicado. Como el piloto duplicado se acaba de crear en el login, en la práctica
-  nunca tiene historial propio que reasignar — es una fusión segura.
+- **Corregirle el nombre a mano** al piloto recién creado antes (o en vez) de confirmar —
+  `NombreEditable` (`web/src/components/PilotoEditable.jsx`, compartido con `PilotosAdmin.jsx`),
+  por si el trigger partió mal el nombre que trajo el login.
+- **Fusionar** con uno de los candidatos ambiguos, si los hay, o con **cualquier otro piloto ya
+  cargado** (buscador libre por nombre/apellido, no limitado a los candidatos automáticos que
+  detectó el trigger) — llama a la función Postgres `fusionar_pilotos(duplicado, correcto)`
+  (`security definer`, valida `es_admin()` internamente), que reasigna todo el historial
+  (`resultados_finales`, `resultados_ronda`, `campeonato_puntos`, `inscripciones`,
+  `piloto_alias`) del piloto duplicado al correcto, y borra el duplicado. Como el piloto
+  duplicado se acaba de crear en el login, en la práctica nunca tiene historial propio que
+  reasignar — es una fusión segura.
 
 ⚠️ Antes de correr la migración 0002 en cualquier proyecto, hay que editar el `INSERT` de la
 sección 1 del archivo y poner el email real que va a ser admin (reemplazar
 `'TU_EMAIL_AQUI@gmail.com'`).
+
+**Editar y borrar pilotos** (migración 0010, `PilotosAdmin.jsx`): además del email, ahora
+también se puede editar nombre/apellido de cualquier piloto (mismo `NombreEditable` de arriba),
+y borrarlo (ícono de tacho, con confirmación — avisa si el piloto tiene una cuenta vinculada,
+porque borrarlo deja a esa persona sin piloto asociado hasta que se loguee de nuevo... lo cual
+tampoco pasa solo: el trigger de vinculación corre una sola vez, al crearse la fila en
+`auth.users`, no en cada login — un piloto vinculado que se borra por error se soluciona
+creando uno nuevo a mano y pegándole el mismo email, no relogueándose). No hace falta
+lógica de la app para proteger historial real: como ninguna FK hacia `pilotos` tiene
+`on delete cascade`, Postgres rechaza el borrado solo si el piloto tiene resultados,
+inscripciones o alias (el mensaje de error se lo indica al admin, sugiriendo Fusionar en su
+lugar) — el borrado directo solo funciona limpio para pilotos sin historial real, que es
+exactamente el caso de uso (un piloto mal creado por un login que hay que descartar).
+
+⚠️ **Bug encontrado al escribir esta migración**: `fusionar_pilotos()` (migración 0002) borra
+el piloto duplicado al final, pero `vinculos_pendientes.piloto_creado_id` seguía apuntándolo sin
+`on delete set null` — ese borrado iba a violar la FK apenas la fila de `vinculos_pendientes`
+que originó el duplicado (que siempre existe, es como se detecta el caso) quedara sin resolver
+apuntándole. No se había notado porque el flujo real de fusión contra un candidato ambiguo
+tampoco se había probado a fondo en producción todavía. La migración 0010 corrige la
+constraint; `fusionar_pilotos()` en sí no necesitó cambios.
 
 ## Roles y módulos (migración 0003)
 
