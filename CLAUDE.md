@@ -83,7 +83,7 @@ más abajo para el detalle fase por fase.
 | `admins` | Lista de emails autorizados como admin (migración 0002). Reemplaza el viejo toggle "ADMIN" puramente visual del frontend por una verificación real del lado del servidor. | select propio (un admin se ve a sí mismo) |
 | `vinculos_pendientes` | Cola de revisión (migración 0002): logins que no matchearon 1 a 1 contra el roster de `pilotos` ya cargado — o crearon un piloto nuevo (0 candidatos) o quedaron ambiguos (2+ candidatos con mismo nombre). El admin confirma o fusiona vía `fusionar_pilotos()`. | select/update solo admin |
 | `circuitos` | Las 7 pistas del club (migración 0009). `numero` (1-7) es la clave que arma la ruta de la imagen en el frontend, no hay columna de imagen en la base. `nombre` editable desde la web. | select público, insert/update/delete solo admin |
-| `circuito_records` | Récord **vigente** por circuito+categoría (migración 0009) — no un historial completo, el admin lo pisa a mano cuando se bate uno nuevo. `piloto_nombre` es texto libre (sin FK a `pilotos`, para poder cargar récords viejos de pilotos que nunca se loguearon a la web). Unique `(circuito_id, clase_id)`. | select público, insert/update/delete solo admin |
+| `circuito_records` | Récord **vigente** por circuito+categoría+sentido (migración 0009, `sentido` sumado en la 0014) — no un historial completo, el admin lo pisa a mano cuando se bate uno nuevo. `piloto_nombre` es texto libre (sin FK a `pilotos`, para poder cargar récords viejos de pilotos que nunca se loguearon a la web). Unique `(circuito_id, clase_id, sentido)` — normal e invertido tienen cada uno su propio récord, porque cambiar de sentido puede cambiar bastante el tiempo de vuelta. | select público, insert/update/delete solo admin |
 
 **Nota de RLS**: hoy `pilotos`, `inscripciones`, `eventos`, `clasificacion` (migración 0008),
 `circuitos` y `circuito_records` (migración 0009) tienen RLS habilitado. El resto queda con el
@@ -431,12 +431,13 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   crea piloto nuevo, 2+ = encola en `alias_pendientes`), pero contra el cliente JS de
   Supabase en vez de la librería Python.
 - **`index.ts`**: el handler (`Deno.serve`). Contrato: `POST` con body JSON
-  `{ eventoId?, tipo, contenidoBase64, campeonatoId?, circuitoId? }`, donde `tipo` es uno de
-  `"resultadosFinales"` (`FinalResults.xls`), `"detalleRondas"` (`RoundResult-*.xls`),
+  `{ eventoId?, tipo, contenidoBase64, campeonatoId?, circuitoId?, sentido? }`, donde `tipo` es
+  uno de `"resultadosFinales"` (`FinalResults.xls`), `"detalleRondas"` (`RoundResult-*.xls`),
   `"vueltaRapida"` (`RoundTopTimes-*.xls`), `"clasificacion"` (`Leaderboard-Event*.xls`,
   posición de largada — ver tabla `clasificacion`, migración 0006), `"campeonato"`
   (`SeriesResultReport.xls`, requiere `campeonatoId`) o `"recordsCircuito"`
-  (`RaceResultRecords*.xls`, requiere `circuitoId` en vez de `eventoId` — ver sección
+  (`RaceResultRecords*.xls`, requiere `circuitoId` y `sentido` en vez de `eventoId` — los
+  récords se guardan por separado para normal e invertido, migración 0014 — ver sección
   "Circuitos" más abajo). **No** incluye `GenericImport.csv`: ese
   archivo es al revés, algo que la web tiene que *generar* (Fase D, botón "Exportar
   inscriptos"), nunca algo que el admin sube — sacado del checklist y del Edge Function
@@ -632,28 +633,33 @@ genérico ("Circuito 1".."Circuito 7") — el admin los renombra desde la propia
   tarjeta) sin una consulta aparte — si no hay circuito asociado, no se muestra nada.
 - **Vista pública**: grid de los 7 circuitos (thumbnail + nombre) para elegir uno: imagen grande
   del sentido elegido (toggle Normal/Invertido) al lado de una tabla con el récord vigente por
-  categoría (`useCircuitoRecords`).
-- **Récords** (`circuito_records`): es el récord **vigente** por circuito+categoría, no un
-  historial completo — cargar uno nuevo (`upsert` con `onConflict: "circuito_id,clase_id"`)
-  pisa el anterior. `piloto_nombre` es texto libre a propósito (sin FK a `pilotos`): hay récords
-  viejos de pilotos que nunca se loguearon a la web, y forzar un match contra el roster para
-  cargarlos sería más fricción que valor. La carga/edición/borrado de récords y el renombrado de
-  circuitos quedan visibles inline solo si `useEsAdmin()` da `true` — no hay un sub-tab aparte en
-  el panel Admin porque está atado 1 a 1 a esta vista (mismo criterio que las decoraciones de
-  admin que `EventoCard.jsx` mostraba antes de mudarse a `GestionEventos.jsx`, pero acá se quedan
-  en la vista pública porque no tiene sentido duplicar la tabla en dos lugares).
+  categoría **para ese sentido** (`useCircuitoRecords(circuitoId, sentido)`) — normal e
+  invertido tienen cada uno su propio récord por categoría (migración 0014: cambiar de sentido
+  puede cambiar bastante el tiempo de vuelta), así que la tabla se recarga sola al tocar el
+  toggle.
+- **Récords** (`circuito_records`): es el récord **vigente** por circuito+categoría+sentido, no
+  un historial completo — cargar uno nuevo (`upsert` con `onConflict:
+  "circuito_id,clase_id,sentido"`) pisa el anterior de esa misma combinación. `piloto_nombre` es
+  texto libre a propósito (sin FK a `pilotos`): hay récords viejos de pilotos que nunca se
+  loguearon a la web, y forzar un match contra el roster para cargarlos sería más fricción que
+  valor. La carga/edición/borrado de récords y el renombrado de circuitos quedan visibles inline
+  solo si `useEsAdmin()` da `true` — no hay un sub-tab aparte en el panel Admin porque está
+  atado 1 a 1 a esta vista (mismo criterio que las decoraciones de admin que `EventoCard.jsx`
+  mostraba antes de mudarse a `GestionEventos.jsx`, pero acá se quedan en la vista pública porque
+  no tiene sentido duplicar la tabla en dos lugares).
 - **Importar records desde Live Timing** (botón "Importar records", solo admin, al lado del
   título "Récords por categoría"): sube el reporte `RaceResultRecords*.xls` ("Track Records")
   contra la Edge Function `subir-resultado` (`tipo: "recordsCircuito"`, ver esa sección más
-  arriba), para el circuito que esté activo en la vista en ese momento (el archivo no indica a
-  qué circuito pertenece, lo elige el admin). Pisa el récord anterior de cada categoría — a
-  propósito, el reporte siempre trae el mejor tiempo vigente. Solo importa las categorías cuyo
-  nombre matchea exacto contra una fila de `clases` ya cargada; el resto se ignora (el reporte
-  puede traer más categorías de las que usa el club) y se lista en el resumen. La fecha de
-  "inicio de reporte" que trae el archivo (`1/1/0001`, placeholder de LiveTime) nunca se usa —
-  cada récord guarda su propia fecha real, o ninguna si no vino. `archivoABase64`/
-  `extraerMensajeError` se sacaron a `web/src/lib/edgeFunction.js` (antes vivían solo en
-  `GestionEventos.jsx`) para no duplicarlos acá.
+  arriba), para el circuito **y el sentido** que estén activos en la vista en ese momento (el
+  archivo no indica ninguno de los dos, los elige el admin con el toggle Normal/Invertido antes
+  de subir). Pisa el récord anterior de esa categoría+sentido — a propósito, el reporte siempre
+  trae el mejor tiempo vigente. Solo importa las categorías cuyo nombre matchea exacto contra
+  una fila de `clases` ya cargada; el resto se ignora (el reporte puede traer más categorías de
+  las que usa el club) y se lista en el resumen. La fecha de "inicio de reporte" que trae el
+  archivo (`1/1/0001`, placeholder de LiveTime) nunca se usa — cada récord guarda su propia
+  fecha real, o ninguna si no vino. `archivoABase64`/`extraerMensajeError` se sacaron a
+  `web/src/lib/edgeFunction.js` (antes vivían solo en `GestionEventos.jsx`) para no duplicarlos
+  acá.
 
 ⚠️ No se pudo confirmar con el club el nombre real de cada uno de los 7 circuitos — el seed usa
 nombres genéricos como placeholder, pendiente que el admin los renombre desde la web.

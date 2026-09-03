@@ -72,7 +72,7 @@ function NombreCircuitoEditable({ circuito, esAdmin, onGuardado }) {
   );
 }
 
-function FormularioRecord({ circuitoId, clase, record, onCancelar, onGuardado }) {
+function FormularioRecord({ circuitoId, sentido, clase, record, onCancelar, onGuardado }) {
   const [pilotoNombre, setPilotoNombre] = useState(record?.pilotoNombre ?? "");
   const [tiempo, setTiempo] = useState(record?.tiempo ?? "");
   const [fecha, setFecha] = useState(record?.fecha ?? "");
@@ -87,11 +87,12 @@ function FormularioRecord({ circuitoId, clase, record, onCancelar, onGuardado })
       {
         circuito_id: circuitoId,
         clase_id: clase.id,
+        sentido,
         piloto_nombre: pilotoNombre.trim(),
         tiempo: tiempo.trim(),
         fecha: fecha || null,
       },
-      { onConflict: "circuito_id,clase_id" }
+      { onConflict: "circuito_id,clase_id,sentido" }
     );
     setGuardando(false);
     if (error) {
@@ -133,7 +134,7 @@ function FormularioRecord({ circuitoId, clase, record, onCancelar, onGuardado })
   );
 }
 
-function FilaRecord({ clase, record, circuitoId, esAdmin, onGuardado }) {
+function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
 
   async function borrar() {
@@ -149,6 +150,7 @@ function FilaRecord({ clase, record, circuitoId, esAdmin, onGuardado }) {
         <td colSpan={3} style={{ padding: "8px 14px" }}>
           <FormularioRecord
             circuitoId={circuitoId}
+            sentido={sentido}
             clase={clase}
             record={record}
             onCancelar={() => setEditando(false)}
@@ -198,10 +200,11 @@ function FilaRecord({ clase, record, circuitoId, esAdmin, onGuardado }) {
 
 // Importa el récord vigente de cada categoría desde el reporte "Track
 // Records" que exporta Live Timing (RaceResultRecords*.xls). El archivo
-// no indica a qué circuito pertenece -- lo elige el admin (es el
-// circuito que ya está activo en la vista). Pisa el récord anterior de
-// cada categoría (el reporte siempre trae el mejor tiempo vigente).
-function ImportarRecords({ circuitoId, onImportado }) {
+// no indica a qué circuito ni a qué sentido pertenece -- se guarda para
+// el circuito y el sentido (Normal/Invertido) que estén activos en la
+// vista en ese momento. Pisa el récord anterior de esa categoría+sentido
+// (el reporte siempre trae el mejor tiempo vigente).
+function ImportarRecords({ circuitoId, sentido, onImportado }) {
   const inputRef = useRef(null);
   const [subiendo, setSubiendo] = useState(false);
   const [mensaje, setMensaje] = useState(null);
@@ -215,7 +218,7 @@ function ImportarRecords({ circuitoId, onImportado }) {
     try {
       const contenidoBase64 = await archivoABase64(file);
       const { data, error } = await supabase.functions.invoke("subir-resultado", {
-        body: { tipo: "recordsCircuito", circuitoId, contenidoBase64 },
+        body: { tipo: "recordsCircuito", circuitoId, sentido, contenidoBase64 },
       });
       if (error) throw new Error(await extraerMensajeError(error));
       if (data?.error) throw new Error(data.error);
@@ -234,7 +237,7 @@ function ImportarRecords({ circuitoId, onImportado }) {
       <button
         onClick={() => inputRef.current?.click()}
         disabled={subiendo}
-        title="Subí el reporte 'Track Records' (RaceResultRecords*.xls) que exporta Live Timing"
+        title={`Subí el reporte 'Track Records' (RaceResultRecords*.xls) que exporta Live Timing -- se guarda para el sentido ${sentido === "invertido" ? "Invertido" : "Normal"}`}
         style={{
           display: "flex",
           alignItems: "center",
@@ -282,7 +285,7 @@ export default function CircuitosView({ esAdmin }) {
     setSentido("normal");
   }, [circuitoActivo?.id]);
 
-  const { porClase: records, loading: cargandoRecords, recargar } = useCircuitoRecords(circuitoActivo?.id);
+  const { porClase: records, loading: cargandoRecords, recargar } = useCircuitoRecords(circuitoActivo?.id, sentido);
 
   if (loading) return <div style={{ color: T.muted, fontSize: 13 }}>Cargando circuitos...</div>;
   if (error) return <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>;
@@ -353,7 +356,9 @@ export default function CircuitosView({ esAdmin }) {
           <div style={{ flex: 1, minWidth: 260 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>Récords por categoría</div>
+                <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>
+                  Récords por categoría ({sentido === "invertido" ? "Invertido" : "Normal"})
+                </div>
                 <button
                   onClick={recargar}
                   title="Actualizar"
@@ -362,7 +367,7 @@ export default function CircuitosView({ esAdmin }) {
                   <RefreshCcw size={13} />
                 </button>
               </div>
-              {esAdmin && <ImportarRecords circuitoId={circuitoActivo.id} onImportado={recargar} />}
+              {esAdmin && <ImportarRecords circuitoId={circuitoActivo.id} sentido={sentido} onImportado={recargar} />}
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse" }}>
@@ -382,6 +387,7 @@ export default function CircuitosView({ esAdmin }) {
                         clase={clase}
                         record={records[clase.nombre]}
                         circuitoId={circuitoActivo.id}
+                        sentido={sentido}
                         esAdmin={esAdmin}
                         onGuardado={recargar}
                       />

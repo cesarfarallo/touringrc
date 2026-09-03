@@ -330,7 +330,7 @@ export function useCircuitos() {
 // { [claseNombre]: { pilotoNombre, tiempo, fecha, claseId } }. Es el récord
 // actual (no un historial completo) -- el admin lo pisa a mano cuando se
 // bate uno nuevo.
-export function useCircuitoRecords(circuitoId) {
+export function useCircuitoRecords(circuitoId, sentido) {
   const [porClase, setPorClase] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -349,6 +349,7 @@ export function useCircuitoRecords(circuitoId) {
       .from("circuito_records")
       .select("id, clase_id, piloto_nombre, tiempo, fecha, clases ( nombre )")
       .eq("circuito_id", circuitoId)
+      .eq("sentido", sentido)
       .then(({ data, error }) => {
         if (!activo) return;
         if (error) {
@@ -373,7 +374,7 @@ export function useCircuitoRecords(circuitoId) {
     return () => {
       activo = false;
     };
-  }, [circuitoId, version]);
+  }, [circuitoId, sentido, version]);
 
   return { porClase, loading, error, recargar };
 }

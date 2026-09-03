@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
     if (!roles.includes("admin")) return json({ error: "Solo un admin puede subir resultados" }, 403, cors);
 
     const body = await req.json();
-    const { eventoId, tipo, contenidoBase64, campeonatoId, circuitoId } = body ?? {};
+    const { eventoId, tipo, contenidoBase64, campeonatoId, circuitoId, sentido } = body ?? {};
 
     if (!tipo || !contenidoBase64) {
       return json({ error: "Faltan tipo o contenidoBase64" }, 400, cors);
@@ -71,12 +71,14 @@ Deno.serve(async (req: Request) => {
     if (!TIPOS_VALIDOS.includes(tipo)) {
       return json({ error: `Tipo desconocido: ${tipo}` }, 400, cors);
     }
-    // recordsCircuito no está atado a un evento -- va contra un circuito.
+    // recordsCircuito no está atado a un evento -- va contra un circuito
+    // (y un sentido: los récords se guardan por separado para normal e
+    // invertido, ver migración 0014).
     if (tipo !== "recordsCircuito" && !eventoId) {
       return json({ error: "Falta eventoId" }, 400, cors);
     }
-    if (tipo === "recordsCircuito" && !circuitoId) {
-      return json({ error: "Falta circuitoId" }, 400, cors);
+    if (tipo === "recordsCircuito" && (!circuitoId || !sentido)) {
+      return json({ error: "Faltan circuitoId o sentido" }, 400, cors);
     }
 
     const bytes = base64ToBytes(contenidoBase64);
@@ -101,7 +103,7 @@ Deno.serve(async (req: Request) => {
         resumen = await syncCampeonato(sb, bytes, campeonatoId, resolver);
         break;
       case "recordsCircuito":
-        resumen = await syncRecordsCircuito(sb, bytes, circuitoId);
+        resumen = await syncRecordsCircuito(sb, bytes, circuitoId, sentido);
         break;
       default:
         return json({ error: `Tipo desconocido: ${tipo}` }, 400, cors);
@@ -341,7 +343,7 @@ async function syncCampeonato(
 // nombre matchea exacto con una fila de `clases` ya cargada -- el
 // reporte puede traer más categorías de las que el club usa, y no
 // tiene sentido crear clases nuevas a partir de un archivo de récords.
-async function syncRecordsCircuito(sb: SupabaseClient, bytes: Uint8Array, circuitoId: string): Promise<string> {
+async function syncRecordsCircuito(sb: SupabaseClient, bytes: Uint8Array, circuitoId: string, sentido: string): Promise<string> {
   const filas = parseRecordsCircuito(bytes);
   let count = 0;
   const ignoradas: string[] = [];
@@ -357,11 +359,12 @@ async function syncRecordsCircuito(sb: SupabaseClient, bytes: Uint8Array, circui
       {
         circuito_id: circuitoId,
         clase_id: clase.id,
+        sentido,
         piloto_nombre: f.pilotoNombre,
         tiempo: f.tiempo,
         fecha: f.fechaIso,
       },
-      { onConflict: "circuito_id,clase_id" }
+      { onConflict: "circuito_id,clase_id,sentido" }
     );
     if (error) throw new Error(`circuito_records.upsert (${f.clase}): ${error.message}`);
     count++;
