@@ -203,8 +203,14 @@ function NuevaMarca({ onCreada }) {
   );
 }
 
-function FormularioHomologar({ piloto, claseId, eventos, marcas, onCancelar, onHomologado }) {
-  const [eventoId, setEventoId] = useState(eventos[0]?.id ?? "");
+// `modo === "hoy"`: flujo en vivo, atado sin selector a la fecha de hoy
+// (eventoHoy) -- no tiene sentido dejar elegir otra si se supone que se
+// está cargando en pista, el mismo día. `modo === "historico"`: para
+// regularizar homologaciones que ya pasaron y nunca se cargaron, con un
+// selector limitado a fechas pasadas (no tendría sentido "regularizar"
+// algo que todavía no ocurrió).
+function FormularioHomologar({ piloto, claseId, modo, eventoHoy, eventosPasados, marcas, onCancelar, onHomologado }) {
+  const [eventoId, setEventoId] = useState(modo === "hoy" ? (eventoHoy?.id ?? "") : (eventosPasados[0]?.id ?? ""));
   const [marcaId, setMarcaId] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
@@ -228,17 +234,23 @@ function FormularioHomologar({ piloto, claseId, eventos, marcas, onCancelar, onH
     <div style={{ marginTop: 10, padding: 12, borderRadius: 10, border: `1px solid ${T.line}`, background: T.surfaceRaised, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, color: T.muted }}>Fecha del evento:</span>
-        <select
-          value={eventoId}
-          onChange={(e) => setEventoId(e.target.value)}
-          style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 10px", color: T.text, fontSize: 13 }}
-        >
-          {eventos.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nombre} — {fechaCorta(e.fecha)}
-            </option>
-          ))}
-        </select>
+        {modo === "hoy" ? (
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            {eventoHoy.nombre} — {fechaCorta(eventoHoy.fecha)}
+          </span>
+        ) : (
+          <select
+            value={eventoId}
+            onChange={(e) => setEventoId(e.target.value)}
+            style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 10px", color: T.text, fontSize: 13 }}
+          >
+            {eventosPasados.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nombre} — {fechaCorta(e.fecha)}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div>
         <span style={{ fontSize: 12, color: T.muted, display: "block", marginBottom: 6 }}>Marca del juego:</span>
@@ -270,8 +282,15 @@ function FormularioHomologar({ piloto, claseId, eventos, marcas, onCancelar, onH
   );
 }
 
-function FilaPiloto({ fila, claseId, eventos, marcas, onCambio }) {
-  const [homologando, setHomologando] = useState(false);
+function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, marcas, onCambio }) {
+  const [modo, setModo] = useState(null); // null | "hoy" | "historico"
+
+  const puedeHomologarHoy = fila.apto && eventoHoy;
+  const tituloHomologar = !eventoHoy
+    ? "No hay ninguna fecha corriendo hoy"
+    : !fila.apto
+      ? "Todavía no cumple el mínimo de eventos"
+      : "Cargar homologación de hoy";
 
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
@@ -296,36 +315,56 @@ function FilaPiloto({ fila, claseId, eventos, marcas, onCambio }) {
               <XCircle size={14} /> No apto
             </span>
           )}
-          {!homologando && (
-            <button
-              onClick={() => setHomologando(true)}
-              disabled={!fila.apto}
-              title={fila.apto ? "Cargar homologación" : "Todavía no cumple el mínimo de eventos"}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: `1px solid ${fila.apto ? T.amber + "66" : T.line}`,
-                background: "transparent",
-                color: fila.apto ? T.amber : T.muted,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: fila.apto ? "pointer" : "not-allowed",
-              }}
-            >
-              Homologar
-            </button>
+          {!modo && (
+            <>
+              <button
+                onClick={() => setModo("hoy")}
+                disabled={!puedeHomologarHoy}
+                title={tituloHomologar}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${puedeHomologarHoy ? T.amber + "66" : T.line}`,
+                  background: "transparent",
+                  color: puedeHomologarHoy ? T.amber : T.muted,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: puedeHomologarHoy ? "pointer" : "not-allowed",
+                }}
+              >
+                Homologar
+              </button>
+              <button
+                onClick={() => setModo("historico")}
+                title="Cargar una homologación que ya pasó y no se registró en su momento"
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.line}`,
+                  background: "transparent",
+                  color: T.muted,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cargar histórico
+              </button>
+            </>
           )}
         </div>
       </div>
-      {homologando && (
+      {modo && (
         <FormularioHomologar
           piloto={fila}
           claseId={claseId}
-          eventos={eventos}
+          modo={modo}
+          eventoHoy={eventoHoy}
+          eventosPasados={eventosPasados}
           marcas={marcas}
-          onCancelar={() => setHomologando(false)}
+          onCancelar={() => setModo(null)}
           onHomologado={() => {
-            setHomologando(false);
+            setModo(null);
             onCambio();
           }}
         />
@@ -348,6 +387,16 @@ export default function OficinaTecnica() {
   const { estado, loading: cargandoEstado, recargar: recargarEstado } = useNeumaticosEstadoClase(claseActiva?.id);
 
   const eventosOrdenados = [...eventos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  // El flujo en vivo ("Homologar") solo se habilita el día de una fecha
+  // vigente -- se supone que se carga en pista, ese mismo día. El
+  // histórico ("Cargar histórico") queda restringido a fechas ya
+  // pasadas, para regularizar homologaciones que ocurrieron pero nunca
+  // se cargaron en su momento.
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const eventoHoy = eventos.find((e) => new Date(`${e.fecha}T00:00:00`).getTime() === hoy.getTime());
+  const eventosPasados = eventosOrdenados.filter((e) => new Date(`${e.fecha}T00:00:00`).getTime() < hoy.getTime());
 
   return (
     <div>
@@ -396,7 +445,8 @@ export default function OficinaTecnica() {
                   key={fila.piloto_id}
                   fila={fila}
                   claseId={claseActiva.id}
-                  eventos={eventosOrdenados}
+                  eventoHoy={eventoHoy}
+                  eventosPasados={eventosPasados}
                   marcas={marcas}
                   onCambio={recargarEstado}
                 />

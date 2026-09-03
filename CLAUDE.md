@@ -772,11 +772,22 @@ en ese evento (corrió de verdad), no por estar inscripto (esa es solo la intenc
   esta app (`logo_url` es una URL externa que se pega a mano). `SelectorMarca` en
   `OficinaTecnica.jsx` muestra el logo si hay URL cargada, o un círculo con las iniciales de
   respaldo si no.
-- **Cargar una homologación**: por piloto, botón "Homologar" (deshabilitado si no está apto)
-  abre un formulario inline con selector de evento (`<select>` de todos los eventos, más
-  reciente primero) y el selector visual de marca — inserta en `homologaciones_neumaticos`
-  (`unique (piloto_id, clase_id, evento_id)`, no se puede cargar dos veces la misma
-  combinación).
+- **Cargar una homologación — dos botones por piloto, dos flujos separados** (sin migración
+  nueva, `homologaciones_neumaticos` no cambió): "Homologar" es el flujo en vivo, pensado para
+  cargarse en pista el mismo día de una fecha — sin selector de evento, atado sin opción a
+  `eventoHoy` (la fecha de `eventos` cuyo `fecha` matchea la de hoy, mismo criterio de
+  comparación de `Date` que usa `inscripcionAbierta()` en `EventoCard.jsx`). Deshabilitado con
+  tooltip explicativo si el piloto no está apto **o** si no hay ninguna fecha corriendo hoy —
+  antes de este cambio se podía elegir cualquier evento del calendario (pasado, futuro, o de
+  otra fecha), lo cual no tenía sentido para algo que se supone que se registra en el momento.
+  "Cargar histórico" es un segundo flujo, siempre habilitado (**no** chequea `apto` — ahí se
+  está registrando un hecho que ya ocurrió, no pidiendo permiso para uno nuevo), para
+  regularizar homologaciones reales que pasaron antes de que existiera este módulo y nunca se
+  cargaron: mismo formulario pero con un `<select>` de evento restringido a fechas **ya
+  pasadas** (`fecha < hoy`, excluye la de hoy porque esa la cubre el otro botón). Los dos
+  insertan en `homologaciones_neumaticos` igual que antes (`unique (piloto_id, clase_id,
+  evento_id)` sigue evitando cargar dos veces la misma combinación, sin importar por cuál
+  botón se cargó).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
