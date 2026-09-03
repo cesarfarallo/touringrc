@@ -476,7 +476,8 @@ export default function PilotosAdmin() {
     if (soloSinVincular && p.auth_user_id) return false;
     if (textoBusqueda) {
       const nombreCompleto = [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase();
-      if (!nombreCompleto.includes(textoBusqueda)) return false;
+      const email = (p.email ?? "").toLowerCase();
+      if (!nombreCompleto.includes(textoBusqueda) && !email.includes(textoBusqueda)) return false;
     }
     if (rolesFiltro.size > 0) {
       const rolesDelPiloto = porPiloto[p.id];
@@ -514,7 +515,7 @@ export default function PilotosAdmin() {
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre o apellido..."
+            placeholder="Buscar por nombre, apellido o email..."
             style={{
               background: T.surfaceRaised,
               border: `1px solid ${T.line}`,
