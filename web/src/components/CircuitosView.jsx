@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Pencil, Plus, Trash2, RefreshCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Pencil, Plus, Trash2, RefreshCcw, Upload } from "lucide-react";
 import { T } from "../theme";
 import { useCircuitos, useCircuitoRecords, useClases } from "../hooks";
 import { supabase } from "../lib/supabase";
+import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
 
 // El dibujo no se guarda en la base -- se arma por convención a partir de
 // `numero` (ver migración 0009), mismos assets estáticos que ya estaban en
@@ -195,6 +196,70 @@ function FilaRecord({ clase, record, circuitoId, esAdmin, onGuardado }) {
   );
 }
 
+// Importa el récord vigente de cada categoría desde el reporte "Track
+// Records" que exporta Live Timing (RaceResultRecords*.xls). El archivo
+// no indica a qué circuito pertenece -- lo elige el admin (es el
+// circuito que ya está activo en la vista). Pisa el récord anterior de
+// cada categoría (el reporte siempre trae el mejor tiempo vigente).
+function ImportarRecords({ circuitoId, onImportado }) {
+  const inputRef = useRef(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+
+  async function onArchivoElegido(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setSubiendo(true);
+    setMensaje(null);
+    try {
+      const contenidoBase64 = await archivoABase64(file);
+      const { data, error } = await supabase.functions.invoke("subir-resultado", {
+        body: { tipo: "recordsCircuito", circuitoId, contenidoBase64 },
+      });
+      if (error) throw new Error(await extraerMensajeError(error));
+      if (data?.error) throw new Error(data.error);
+      setMensaje({ ok: true, texto: data?.resumen ?? "Listo" });
+      onImportado();
+    } catch (err) {
+      setMensaje({ ok: false, texto: err.message ?? String(err) });
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+      <input ref={inputRef} type="file" accept=".xls" onChange={onArchivoElegido} style={{ display: "none" }} />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={subiendo}
+        title="Subí el reporte 'Track Records' (RaceResultRecords*.xls) que exporta Live Timing"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          color: T.amber,
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: subiendo ? "default" : "pointer",
+          padding: 0,
+        }}
+      >
+        <Upload size={12} /> {subiendo ? "Importando..." : "Importar records"}
+      </button>
+      {mensaje && (
+        <div style={{ fontSize: 11, color: mensaje.ok ? T.teal : T.red, textAlign: "right", maxWidth: 220 }}>
+          {mensaje.ok ? "✓ " : "✗ "}
+          {mensaje.texto}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Apartado público "Circuitos": las 7 pistas del club, cada una con su
 // dibujo (normal/invertido, ver migración 0009) y el récord vigente por
 // categoría al lado. La carga/edición de récords y el renombrado quedan
@@ -286,15 +351,18 @@ export default function CircuitosView({ esAdmin }) {
           />
 
           <div style={{ flex: 1, minWidth: 260 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>Récords por categoría</div>
-              <button
-                onClick={recargar}
-                title="Actualizar"
-                style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
-              >
-                <RefreshCcw size={13} />
-              </button>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>Récords por categoría</div>
+                <button
+                  onClick={recargar}
+                  title="Actualizar"
+                  style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
+                >
+                  <RefreshCcw size={13} />
+                </button>
+              </div>
+              {esAdmin && <ImportarRecords circuitoId={circuitoActivo.id} onImportado={recargar} />}
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse" }}>

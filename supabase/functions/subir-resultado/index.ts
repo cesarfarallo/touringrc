@@ -14,6 +14,7 @@ import {
   parseTopTimes,
   parseSeriesResult,
   parseLeaderboard,
+  parseRecordsCircuito,
   parseResultadoCrudo,
   parseNombreCrudo,
 } from "./parsers.ts";
@@ -26,7 +27,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const TIPOS_VALIDOS = ["resultadosFinales", "detalleRondas", "vueltaRapida", "clasificacion", "campeonato"];
+const TIPOS_VALIDOS = ["resultadosFinales", "detalleRondas", "vueltaRapida", "clasificacion", "campeonato", "recordsCircuito"];
 
 Deno.serve(async (req: Request) => {
   const cors = {
@@ -62,13 +63,20 @@ Deno.serve(async (req: Request) => {
     if (!roles.includes("admin")) return json({ error: "Solo un admin puede subir resultados" }, 403, cors);
 
     const body = await req.json();
-    const { eventoId, tipo, contenidoBase64, campeonatoId } = body ?? {};
+    const { eventoId, tipo, contenidoBase64, campeonatoId, circuitoId } = body ?? {};
 
-    if (!eventoId || !tipo || !contenidoBase64) {
-      return json({ error: "Faltan eventoId, tipo o contenidoBase64" }, 400, cors);
+    if (!tipo || !contenidoBase64) {
+      return json({ error: "Faltan tipo o contenidoBase64" }, 400, cors);
     }
     if (!TIPOS_VALIDOS.includes(tipo)) {
       return json({ error: `Tipo desconocido: ${tipo}` }, 400, cors);
+    }
+    // recordsCircuito no está atado a un evento -- va contra un circuito.
+    if (tipo !== "recordsCircuito" && !eventoId) {
+      return json({ error: "Falta eventoId" }, 400, cors);
+    }
+    if (tipo === "recordsCircuito" && !circuitoId) {
+      return json({ error: "Falta circuitoId" }, 400, cors);
     }
 
     const bytes = base64ToBytes(contenidoBase64);
@@ -92,18 +100,23 @@ Deno.serve(async (req: Request) => {
         if (!campeonatoId) return json({ error: "Falta campeonatoId" }, 400, cors);
         resumen = await syncCampeonato(sb, bytes, campeonatoId, resolver);
         break;
+      case "recordsCircuito":
+        resumen = await syncRecordsCircuito(sb, bytes, circuitoId);
+        break;
       default:
         return json({ error: `Tipo desconocido: ${tipo}` }, 400, cors);
     }
 
-    await marcarArchivo(sb, eventoId, tipo);
-    // FinalResults.xls es la señal definitiva de que el evento ya se corrió
-    // -- `corrida` arrancaba en `false` y nada la prendía sola salvo el seed
-    // inicial, así que cualquier fecha nueva cargada desde la web quedaba
-    // invisible para siempre en el filtro de la sección Resultados.
-    if (tipo === "resultadosFinales") {
-      const { error: errCorrida } = await sb.from("eventos").update({ corrida: true }).eq("id", eventoId);
-      if (errCorrida) throw new Error(`eventos.update corrida: ${errCorrida.message}`);
+    if (eventoId) {
+      await marcarArchivo(sb, eventoId, tipo);
+      // FinalResults.xls es la señal definitiva de que el evento ya se corrió
+      // -- `corrida` arrancaba en `false` y nada la prendía sola salvo el seed
+      // inicial, así que cualquier fecha nueva cargada desde la web quedaba
+      // invisible para siempre en el filtro de la sección Resultados.
+      if (tipo === "resultadosFinales") {
+        const { error: errCorrida } = await sb.from("eventos").update({ corrida: true }).eq("id", eventoId);
+        if (errCorrida) throw new Error(`eventos.update corrida: ${errCorrida.message}`);
+      }
     }
 
     return json({ ok: true, resumen }, 200, cors);
@@ -319,4 +332,42 @@ async function syncCampeonato(
     count++;
   }
   return `${count} filas de campeonato sincronizadas`;
+}
+
+// RaceResultRecords*.xls ("Track Records"): pisa el récord vigente de
+// cada categoría para este circuito -- circuito_records guarda el
+// récord actual, no un historial, así que un upsert alcanza ("el
+// reporte siempre trae lo mejor"). Solo se importan las categorías cuyo
+// nombre matchea exacto con una fila de `clases` ya cargada -- el
+// reporte puede traer más categorías de las que el club usa, y no
+// tiene sentido crear clases nuevas a partir de un archivo de récords.
+async function syncRecordsCircuito(sb: SupabaseClient, bytes: Uint8Array, circuitoId: string): Promise<string> {
+  const filas = parseRecordsCircuito(bytes);
+  let count = 0;
+  const ignoradas: string[] = [];
+
+  for (const f of filas) {
+    const { data: clase } = await sb.from("clases").select("id").eq("nombre", f.clase).maybeSingle();
+    if (!clase) {
+      if (!ignoradas.includes(f.clase)) ignoradas.push(f.clase);
+      continue;
+    }
+
+    const { error } = await sb.from("circuito_records").upsert(
+      {
+        circuito_id: circuitoId,
+        clase_id: clase.id,
+        piloto_nombre: f.pilotoNombre,
+        tiempo: f.tiempo,
+        fecha: f.fechaIso,
+      },
+      { onConflict: "circuito_id,clase_id" }
+    );
+    if (error) throw new Error(`circuito_records.upsert (${f.clase}): ${error.message}`);
+    count++;
+  }
+
+  let resumen = `${count} récord(es) actualizados`;
+  if (ignoradas.length > 0) resumen += ` (se ignoraron categorías sin clase asociada: ${ignoradas.join(", ")})`;
+  return resumen;
 }

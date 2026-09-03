@@ -443,3 +443,103 @@ function parseHojaLeaderboard(filas: unknown[][]): FilaClasificacion[] {
   }
   return out;
 }
+
+// ---------------------------------------------------------------
+// RaceResultRecords*.xls ("Track Records -- Fastest Lap"): a diferencia
+// de todos los demás reportes, las categorías van en columnas lado a
+// lado dentro de las MISMAS filas (no apiladas verticalmente con filas
+// en blanco entre una y otra) -- una fila de títulos ("Touring Eco
+// Modified" en una columna, "Touring Eco Stock" en otra, puede haber
+// más) seguida de filas de datos donde cada categoría ocupa su propio
+// bloque de columnas (nombre, apellido, ..., tiempo, ..., fecha, en
+// cualquier posición dentro del bloque -- se detectan por patrón, no
+// por índice fijo, porque el ancho de cada bloque no es constante).
+//
+// Solo nos interesa la PRIMERA fila de datos de cada categoría (el
+// récord vigente, posición 1) -- no se listan los demás puestos.
+//
+// El reporte trae además una fila de "rango de fechas" del estilo
+// "1/1/0001 - 3/9/2026" (LiveTime usa 1/1/0001 como placeholder de
+// "desde siempre") -- se ignora por completo, nunca se usa como fecha
+// de ningún récord. Si una fecha individual de récord viniera con ese
+// mismo placeholder, `fechaIso()` también la descarta (año <= 1).
+// ---------------------------------------------------------------
+export interface FilaRecordCircuito {
+  clase: string;
+  pilotoNombre: string;
+  tiempo: string;
+  fechaIso: string | null;
+}
+
+const TIEMPO_RE = /^\d+\.\d+$/;
+const FECHA_DDMMYYYY_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/;
+
+function esFechaDdMmYyyy(v: string): boolean {
+  return FECHA_DDMMYYYY_RE.test(v);
+}
+
+function fechaIso(v: string): string | null {
+  const m = FECHA_DDMMYYYY_RE.exec(v);
+  if (!m) return null;
+  const [, d, mes, anioStr] = m;
+  const anio = parseInt(anioStr, 10);
+  if (!anio || anio <= 1) return null;
+  return `${String(anio).padStart(4, "0")}-${mes.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
+export function parseRecordsCircuito(bytes: Uint8Array): FilaRecordCircuito[] {
+  const filas = leerFilasXls(bytes);
+  const out: FilaRecordCircuito[] = [];
+
+  for (let i = 0; i < filas.length - 1; i++) {
+    const fila = filas[i];
+
+    // Fila de títulos: celdas de texto puro (ni número, ni fecha, ni el
+    // rango "X - Y", ni el watermark/encabezado) -- una por categoría.
+    const titulos: { col: number; texto: string }[] = [];
+    fila.forEach((v, col) => {
+      const s = limpiar(v);
+      if (!s) return;
+      if (TIEMPO_RE.test(s) || /^\d+$/.test(s) || esFechaDdMmYyyy(s)) return;
+      if (s.includes(" - ") || s.toLowerCase().includes("www.") || s.includes("\n")) return;
+      titulos.push({ col, texto: s });
+    });
+    if (titulos.length === 0) continue;
+
+    const siguiente = filas[i + 1];
+    const hayDatosDebajo = titulos.some(({ col }) => limpiar(siguiente[col]) !== null);
+    if (!hayDatosDebajo) continue;
+
+    for (let t = 0; t < titulos.length; t++) {
+      const { col, texto } = titulos[t];
+      const bandaFin = t + 1 < titulos.length ? titulos[t + 1].col : siguiente.length;
+
+      const nombre = limpiar(siguiente[col]);
+      if (!nombre) continue;
+      const apellido = limpiar(siguiente[col + 1]);
+
+      let tiempo: string | null = null;
+      let fecha: string | null = null;
+      for (let c = col + 2; c < bandaFin; c++) {
+        const v = limpiar(siguiente[c]);
+        if (!v) continue;
+        if (tiempo === null && TIEMPO_RE.test(v)) tiempo = v;
+        else if (fecha === null && esFechaDdMmYyyy(v)) fecha = fechaIso(v);
+      }
+      if (!tiempo) continue;
+
+      out.push({
+        clase: texto,
+        pilotoNombre: apellido ? `${nombre} ${apellido}` : nombre,
+        tiempo,
+        fechaIso: fecha,
+      });
+    }
+    // Ya se extrajo la primera fila de datos (el récord) de cada
+    // categoría detectada en esta fila de títulos -- no hace falta
+    // seguir escaneando el resto del archivo.
+    break;
+  }
+
+  return out;
+}

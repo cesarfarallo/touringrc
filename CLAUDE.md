@@ -411,16 +411,33 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   silencio todas las clases menos la primera. Corregido con `leerTodasLasHojasXls()` (itera
   todos los sheets del workbook, no solo el primero) — verificado contra el archivo real de
   muestra: pasó de leer 13 filas (solo Modified) a 20 (13 Modified + 7 Stock).
+  `parseRecordsCircuito` (`RaceResultRecords*.xls`, "Track Records") es la otra excepción sin
+  equivalente en Python, y con una estructura distinta a todos los demás reportes: las
+  categorías van en **columnas lado a lado** dentro de las mismas filas (una fila de títulos,
+  ej. "Touring Eco Modified" en una columna y "Touring Eco Stock" en otra — el reporte puede
+  traer más categorías de las que usa el club, se ignoran las que no matchean ninguna fila de
+  `clases`), en vez de bloques apilados verticalmente con filas en blanco entre uno y otro. El
+  parser detecta la fila de títulos por descarte (celdas de texto puro, ni número ni fecha) y
+  solo lee la primera fila de datos debajo de cada título (posición 1 = el récord vigente,
+  `circuito_records` no guarda un historial). El reporte trae una fila de "rango de fechas"
+  con `1/1/0001` como placeholder de "desde siempre" (LiveTime) — se ignora por completo, cada
+  récord usa su propia fecha de columna; si esa fecha individual viniera con el mismo
+  placeholder, también se descarta (año ≤ 1) en vez de guardar una fecha sin sentido. Verificado
+  contra el archivo real de muestra del club (dos categorías, récords de Bruno Bonetta y Pablo
+  Suarez) con un test harness de Node ad-hoc, no committeado — mismo criterio que el resto de
+  los parsers de esta función.
 - **`piloto_resolver.ts`**: port de `piloto_resolver.py` (`PilotoResolver`), misma lógica de
   resolución de identidad (alias exacto → candidatos por nombre/apellido → 1 = linkea, 0 =
   crea piloto nuevo, 2+ = encola en `alias_pendientes`), pero contra el cliente JS de
   Supabase en vez de la librería Python.
 - **`index.ts`**: el handler (`Deno.serve`). Contrato: `POST` con body JSON
-  `{ eventoId, tipo, contenidoBase64, campeonatoId? }`, donde `tipo` es uno de
+  `{ eventoId?, tipo, contenidoBase64, campeonatoId?, circuitoId? }`, donde `tipo` es uno de
   `"resultadosFinales"` (`FinalResults.xls`), `"detalleRondas"` (`RoundResult-*.xls`),
   `"vueltaRapida"` (`RoundTopTimes-*.xls`), `"clasificacion"` (`Leaderboard-Event*.xls`,
-  posición de largada — ver tabla `clasificacion`, migración 0006) o `"campeonato"`
-  (`SeriesResultReport.xls`, requiere `campeonatoId`). **No** incluye `GenericImport.csv`: ese
+  posición de largada — ver tabla `clasificacion`, migración 0006), `"campeonato"`
+  (`SeriesResultReport.xls`, requiere `campeonatoId`) o `"recordsCircuito"`
+  (`RaceResultRecords*.xls`, requiere `circuitoId` en vez de `eventoId` — ver sección
+  "Circuitos" más abajo). **No** incluye `GenericImport.csv`: ese
   archivo es al revés, algo que la web tiene que *generar* (Fase D, botón "Exportar
   inscriptos"), nunca algo que el admin sube — sacado del checklist y del Edge Function
   después de confundirlo con un archivo de subida en una prueba real. Verifica el JWT del
@@ -428,12 +445,15 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   sesión tenga el rol `admin` en `piloto_roles` (mismo criterio que `es_admin()` del lado de
   Postgres, pero reimplementado acá porque una Edge Function no corre dentro de una policy de
   RLS), y recién ahí despacha a `syncFinalResults`/`syncRoundResults`/`syncTopTimes`/
-  `syncClasificacion`/`syncCampeonato` — los primeros cuatro son ports directos de las
-  funciones homónimas de `sync_evento.py` (`syncClasificacion` es nuevo, no existe en el CLI
-  de Python todavía — pendiente si se necesita paridad ahí), mismo
-  orden y misma lógica de upsert. Al final llama `marcarArchivo()` (equivalente a
-  `marcar_archivo()` en Python) para actualizar el jsonb `archivos` de `eventos`, que es lo
-  que lee `ArchivosChecklist`. Devuelve `{ ok: true, resumen }` o `{ error }`.
+  `syncClasificacion`/`syncCampeonato`/`syncRecordsCircuito` — los primeros cuatro son ports
+  directos de las funciones homónimas de `sync_evento.py` (`syncClasificacion` es nuevo, no
+  existe en el CLI de Python todavía — pendiente si se necesita paridad ahí; `syncRecordsCircuito`
+  tampoco tiene equivalente en Python, mismo motivo que `syncClasificacion`: el flujo real es
+  100% vía la web), mismo orden y misma lógica de upsert. Al final, si el tipo es evento-scoped
+  (todos menos `recordsCircuito`), llama `marcarArchivo()` (equivalente a `marcar_archivo()` en
+  Python) para actualizar el jsonb `archivos` de `eventos`, que es lo que lee
+  `ArchivosChecklist` — `recordsCircuito` no tiene evento asociado, así que se salta ese paso.
+  Devuelve `{ ok: true, resumen }` o `{ error }`.
   La migración `0008_clasificacion_lectura_publica.sql` agrega la policy de lectura pública que
   necesita el frontend; sin ella la función puede sincronizar filas, pero la web devuelve cero.
 - **Resaltado del piloto logueado**: las grillas de resultados finales, clasificación y
@@ -622,6 +642,18 @@ genérico ("Circuito 1".."Circuito 7") — el admin los renombra desde la propia
   el panel Admin porque está atado 1 a 1 a esta vista (mismo criterio que las decoraciones de
   admin que `EventoCard.jsx` mostraba antes de mudarse a `GestionEventos.jsx`, pero acá se quedan
   en la vista pública porque no tiene sentido duplicar la tabla en dos lugares).
+- **Importar records desde Live Timing** (botón "Importar records", solo admin, al lado del
+  título "Récords por categoría"): sube el reporte `RaceResultRecords*.xls` ("Track Records")
+  contra la Edge Function `subir-resultado` (`tipo: "recordsCircuito"`, ver esa sección más
+  arriba), para el circuito que esté activo en la vista en ese momento (el archivo no indica a
+  qué circuito pertenece, lo elige el admin). Pisa el récord anterior de cada categoría — a
+  propósito, el reporte siempre trae el mejor tiempo vigente. Solo importa las categorías cuyo
+  nombre matchea exacto contra una fila de `clases` ya cargada; el resto se ignora (el reporte
+  puede traer más categorías de las que usa el club) y se lista en el resumen. La fecha de
+  "inicio de reporte" que trae el archivo (`1/1/0001`, placeholder de LiveTime) nunca se usa —
+  cada récord guarda su propia fecha real, o ninguna si no vino. `archivoABase64`/
+  `extraerMensajeError` se sacaron a `web/src/lib/edgeFunction.js` (antes vivían solo en
+  `GestionEventos.jsx`) para no duplicarlos acá.
 
 ⚠️ No se pudo confirmar con el club el nombre real de cada uno de los 7 circuitos — el seed usa
 nombres genéricos como placeholder, pendiente que el admin los renombre desde la web.

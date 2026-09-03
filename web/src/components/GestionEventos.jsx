@@ -4,6 +4,7 @@ import { T } from "../theme";
 import { useEventos, useCircuitos } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
+import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
 import ArchivosChecklist from "./ArchivosChecklist";
 
 // Infiere qué tipo de archivo de Live Timing es según el nombre, para no
@@ -19,31 +20,6 @@ function inferirTipo(nombreArchivo) {
   if (/leaderboard.*\.xls$/i.test(nombreArchivo)) return "clasificacion";
   if (/^SeriesResultReport.*\.xls$/i.test(nombreArchivo)) return "campeonato";
   return null;
-}
-
-// supabase-js resume cualquier error HTTP de una Edge Function como
-// "Edge Function returned a non-2xx status code", sin exponer el body
-// real que devolvimos (`{ error: "..." }`) -- hay que ir a buscarlo a
-// `error.context` (la Response cruda) para mostrar el motivo real.
-async function extraerMensajeError(error) {
-  if (error?.context && typeof error.context.json === "function") {
-    try {
-      const body = await error.context.clone().json();
-      if (body?.error) return body.error;
-    } catch {
-      // el body no era JSON -- nos quedamos con error.message
-    }
-  }
-  return error.message ?? String(error);
-}
-
-function archivoABase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1] ?? "");
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 // El export de inscriptos deja de tener sentido el día de la fecha (ya
