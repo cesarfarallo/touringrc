@@ -685,8 +685,3 @@ primero en staging para validar, después el mismo archivo sin cambios en produc
    (`resultados_finales`, `resultados_ronda`, `campeonato_puntos`, `clases`, `campeonatos`,
    `piloto_alias`, `alias_pendientes`), tests para `livetime_parsers.py`, logging estructurado
    en `sync_evento.py`, y purga opcional del historial de git del secreto expuesto.
-siete columnas verticales con dos luces cada una, organizadas en dos filas. Las seis primeras
-columnas usan luces rojas y la séptima, correspondiente al día de la carrera, usa luces verdes.
-Las columnas se encienden progresivamente durante la última semana: una columna por día, desde
-siete días antes hasta la fecha de la carrera. Durante las últimas 12 horas, todas las luces
-encendidas titilan. Arriba se muestra el
