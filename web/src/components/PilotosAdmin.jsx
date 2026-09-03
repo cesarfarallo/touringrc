@@ -323,13 +323,21 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
     if (!confirm(advertencia)) return;
     setBorrando(true);
     setError(null);
-    const { error } = await supabase.from("pilotos").delete().eq("id", piloto.id);
+    // .select() para poder distinguir "no borró nada" de "borró" -- sin
+    // esto, si falta la policy de delete (migración 0010) RLS filtra la
+    // fila en silencio: Postgrest no tira error, simplemente afecta 0
+    // filas, y el piloto quedaba (mal) como borrado con éxito.
+    const { data, error } = await supabase.from("pilotos").delete().eq("id", piloto.id).select("id");
     setBorrando(false);
     if (error) {
       // Lo más común: tiene resultados/inscripciones/alias con FK hacia
       // este piloto -- Postgres bloquea el borrado en vez de dejar
       // historial huérfano. Fusionar es la vía correcta en ese caso.
       setError("No se pudo borrar (probablemente tiene resultados o inscripciones asociadas -- usá Fusionar en su lugar si es un duplicado).");
+      return;
+    }
+    if (!data || data.length === 0) {
+      setError("No se borró ningún piloto -- ¿ya corriste la migración 0010 en este proyecto de Supabase? (falta la policy de borrado).");
       return;
     }
     onGuardado();
