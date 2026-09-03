@@ -446,6 +446,7 @@ export default function PilotosAdmin() {
   const { porPiloto, recargar: recargarRoles } = usePilotoRoles(true);
   const [trabajandoRol, setTrabajandoRol] = useState(null);
   const [soloSinVincular, setSoloSinVincular] = useState(false);
+  const [soloSinRol, setSoloSinRol] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [rolesFiltro, setRolesFiltro] = useState(new Set());
 
@@ -474,6 +475,7 @@ export default function PilotosAdmin() {
   const textoBusqueda = busqueda.trim().toLowerCase();
   const visibles = pilotos.filter((p) => {
     if (soloSinVincular && p.auth_user_id) return false;
+    if (soloSinRol && porPiloto[p.id]?.size) return false;
     if (textoBusqueda) {
       const nombreCompleto = [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase();
       const email = (p.email ?? "").toLowerCase();
@@ -532,6 +534,11 @@ export default function PilotosAdmin() {
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, cursor: "pointer" }}>
           <input type="checkbox" checked={soloSinVincular} onChange={(e) => setSoloSinVincular(e.target.checked)} />
           Solo sin vincular
+        </label>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, cursor: "pointer" }}>
+          <input type="checkbox" checked={soloSinRol} onChange={(e) => setSoloSinRol(e.target.checked)} />
+          Sin ningún rol (pendientes de aprobación)
         </label>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
