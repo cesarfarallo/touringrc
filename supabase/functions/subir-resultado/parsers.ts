@@ -447,15 +447,26 @@ function parseHojaLeaderboard(filas: unknown[][]): FilaClasificacion[] {
 // ---------------------------------------------------------------
 // RaceResultRecords*.xls ("Track Records -- Fastest Lap"): a diferencia
 // de todos los demás reportes, las categorías van en columnas lado a
-// lado dentro de las MISMAS filas (no apiladas verticalmente con filas
-// en blanco entre una y otra) -- una fila de títulos ("Touring Eco
-// Modified" en una columna, "Touring Eco Stock" en otra, puede haber
-// más) seguida de filas de datos donde cada categoría ocupa su propio
-// bloque de columnas (nombre, apellido, ..., tiempo, ..., fecha, en
-// cualquier posición dentro del bloque -- se detectan por patrón, no
-// por índice fijo, porque el ancho de cada bloque no es constante).
+// lado (no apiladas verticalmente con filas en blanco entre una y
+// otra) -- pero además, cuando el club tiene más de dos categorías
+// configuradas en LiveTime, cada "columna" apila sus propios títulos
+// verticalmente E INDEPENDIENTEMENTE de la otra (es un layout tipo
+// diario a dos columnas: la categoría 1 va arriba a la izquierda, la 2
+// arriba a la derecha, la 3 abajo a la izquierda debajo de la 1, la 4
+// abajo a la derecha debajo de la 2, etc.) -- así que dos títulos de
+// columnas distintas casi nunca caen en la misma fila salvo el primer
+// par. Hay que escanear el archivo entero, no solo la primera fila de
+// títulos que aparece.
 //
-// Solo nos interesa la PRIMERA fila de datos de cada categoría (el
+// Una celda es un título (y no, por ejemplo, un nombre de piloto) si
+// es texto puro y las dos celdas vecinas EN LA MISMA FILA (una a la
+// izquierda, una a la derecha) están vacías -- un nombre de piloto
+// nunca cumple esto: el apellido siempre ocupa la celda de al lado.
+// Las columnas donde aparece algún título delimitan la "banda" de
+// columnas de cada bloque de categoría (para no leerle el tiempo/fecha
+// a la categoría de al lado).
+//
+// Solo nos interesa la PRIMERA fila de datos debajo de cada título (el
 // récord vigente, posición 1) -- no se listan los demás puestos.
 //
 // El reporte trae además una fila de "rango de fechas" del estilo
@@ -471,7 +482,7 @@ export interface FilaRecordCircuito {
   fechaIso: string | null;
 }
 
-const TIEMPO_RE = /^\d+\.\d+$/;
+const TIEMPO_RE = /^\d+\.\d+(\s*\((DNS|DNF|DQ)\))?$/;
 const FECHA_DDMMYYYY_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{1,4})$/;
 
 function esFechaDdMmYyyy(v: string): boolean {
@@ -487,58 +498,66 @@ function fechaIso(v: string): string | null {
   return `${String(anio).padStart(4, "0")}-${mes.padStart(2, "0")}-${d.padStart(2, "0")}`;
 }
 
+// Texto "puro": no es un tiempo, no es un número suelto, no es una
+// fecha dd/mm/yyyy, y no es el rango de fechas / watermark / título
+// del reporte.
+function esTextoPuro(v: unknown): string | null {
+  const s = limpiar(v);
+  if (!s) return null;
+  if (TIEMPO_RE.test(s) || /^\d+(\.\d+)?$/.test(s) || esFechaDdMmYyyy(s)) return null;
+  if (s.includes(" - ") || s.toLowerCase().includes("www.") || s.includes("\n")) return null;
+  return s;
+}
+
 export function parseRecordsCircuito(bytes: Uint8Array): FilaRecordCircuito[] {
   const filas = leerFilasXls(bytes);
   const out: FilaRecordCircuito[] = [];
 
-  for (let i = 0; i < filas.length - 1; i++) {
-    const fila = filas[i];
-
-    // Fila de títulos: celdas de texto puro (ni número, ni fecha, ni el
-    // rango "X - Y", ni el watermark/encabezado) -- una por categoría.
-    const titulos: { col: number; texto: string }[] = [];
-    fila.forEach((v, col) => {
-      const s = limpiar(v);
-      if (!s) return;
-      if (TIEMPO_RE.test(s) || /^\d+$/.test(s) || esFechaDdMmYyyy(s)) return;
-      if (s.includes(" - ") || s.toLowerCase().includes("www.") || s.includes("\n")) return;
-      titulos.push({ col, texto: s });
+  // Pass 1: encontrar todas las celdas-título del archivo, sin importar
+  // en qué fila caigan.
+  const candidatos: { fila: number; col: number; texto: string }[] = [];
+  filas.forEach((fila, f) => {
+    fila.forEach((_, c) => {
+      const texto = esTextoPuro(fila[c]);
+      if (!texto) return;
+      const izquierdaVacia = c === 0 || limpiar(fila[c - 1]) === null;
+      const derechaVacia = c + 1 >= fila.length || limpiar(fila[c + 1]) === null;
+      if (izquierdaVacia && derechaVacia) candidatos.push({ fila: f, col: c, texto });
     });
-    if (titulos.length === 0) continue;
+  });
+  if (candidatos.length === 0) return out;
 
-    const siguiente = filas[i + 1];
-    const hayDatosDebajo = titulos.some(({ col }) => limpiar(siguiente[col]) !== null);
-    if (!hayDatosDebajo) continue;
+  // Columnas donde aparece algún título -- delimitan la banda de cada
+  // bloque de categoría (puede haber más de dos, lado a lado).
+  const columnasAncla = [...new Set(candidatos.map((c) => c.col))].sort((a, b) => a - b);
 
-    for (let t = 0; t < titulos.length; t++) {
-      const { col, texto } = titulos[t];
-      const bandaFin = t + 1 < titulos.length ? titulos[t + 1].col : siguiente.length;
+  for (const { fila, col, texto } of candidatos) {
+    const siguiente = filas[fila + 1];
+    if (!siguiente) continue;
 
-      const nombre = limpiar(siguiente[col]);
-      if (!nombre) continue;
-      const apellido = limpiar(siguiente[col + 1]);
+    const nombre = limpiar(siguiente[col]);
+    if (!nombre) continue; // categoría sin ningún resultado cargado
+    const apellido = limpiar(siguiente[col + 1]);
 
-      let tiempo: string | null = null;
-      let fecha: string | null = null;
-      for (let c = col + 2; c < bandaFin; c++) {
-        const v = limpiar(siguiente[c]);
-        if (!v) continue;
-        if (tiempo === null && TIEMPO_RE.test(v)) tiempo = v;
-        else if (fecha === null && esFechaDdMmYyyy(v)) fecha = fechaIso(v);
-      }
-      if (!tiempo) continue;
+    const siguienteAncla = columnasAncla.find((c) => c > col);
+    const bandaFin = siguienteAncla ?? siguiente.length;
 
-      out.push({
-        clase: texto,
-        pilotoNombre: apellido ? `${nombre} ${apellido}` : nombre,
-        tiempo,
-        fechaIso: fecha,
-      });
+    let tiempo: string | null = null;
+    let fechaCruda: string | null = null;
+    for (let c = col + 2; c < bandaFin; c++) {
+      const v = limpiar(siguiente[c]);
+      if (!v) continue;
+      if (tiempo === null && TIEMPO_RE.test(v)) tiempo = v;
+      else if (fechaCruda === null && esFechaDdMmYyyy(v)) fechaCruda = v;
     }
-    // Ya se extrajo la primera fila de datos (el récord) de cada
-    // categoría detectada en esta fila de títulos -- no hace falta
-    // seguir escaneando el resto del archivo.
-    break;
+    if (!tiempo) continue;
+
+    out.push({
+      clase: texto,
+      pilotoNombre: apellido ? `${nombre} ${apellido}` : nombre,
+      tiempo,
+      fechaIso: fechaCruda ? fechaIso(fechaCruda) : null,
+    });
   }
 
   return out;

@@ -413,19 +413,26 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   muestra: pasó de leer 13 filas (solo Modified) a 20 (13 Modified + 7 Stock).
   `parseRecordsCircuito` (`RaceResultRecords*.xls`, "Track Records") es la otra excepción sin
   equivalente en Python, y con una estructura distinta a todos los demás reportes: las
-  categorías van en **columnas lado a lado** dentro de las mismas filas (una fila de títulos,
-  ej. "Touring Eco Modified" en una columna y "Touring Eco Stock" en otra — el reporte puede
-  traer más categorías de las que usa el club, se ignoran las que no matchean ninguna fila de
-  `clases`), en vez de bloques apilados verticalmente con filas en blanco entre uno y otro. El
-  parser detecta la fila de títulos por descarte (celdas de texto puro, ni número ni fecha) y
-  solo lee la primera fila de datos debajo de cada título (posición 1 = el récord vigente,
-  `circuito_records` no guarda un historial). El reporte trae una fila de "rango de fechas"
-  con `1/1/0001` como placeholder de "desde siempre" (LiveTime) — se ignora por completo, cada
-  récord usa su propia fecha de columna; si esa fecha individual viniera con el mismo
-  placeholder, también se descarta (año ≤ 1) en vez de guardar una fecha sin sentido. Verificado
-  contra el archivo real de muestra del club (dos categorías, récords de Bruno Bonetta y Pablo
-  Suarez) con un test harness de Node ad-hoc, no committeado — mismo criterio que el resto de
-  los parsers de esta función.
+  categorías van en **columnas lado a lado** (el reporte puede traer más categorías de las que
+  usa el club, se ignoran las que no matchean ninguna fila de `clases`) en vez de bloques
+  apilados verticalmente con filas en blanco entre uno y otro. Solo lee la primera fila de datos
+  debajo de cada título (posición 1 = el récord vigente, `circuito_records` no guarda un
+  historial). El reporte trae una fila de "rango de fechas" con `1/1/0001` como placeholder de
+  "desde siempre" (LiveTime) — se ignora por completo, cada récord usa su propia fecha de
+  columna; si esa fecha individual viniera con el mismo placeholder, también se descarta (año ≤
+  1) en vez de guardar una fecha sin sentido. **Bug encontrado con un archivo real de más de dos
+  categorías**: la primera versión asumía que todas las categorías compartían una única fila de
+  títulos (válido con solo 2, como el primer archivo de prueba) — con más categorías, LiveTime
+  arma un layout tipo diario a dos columnas donde cada columna apila sus propios títulos
+  verticalmente e independientemente de la otra (la categoría 1 arriba-izquierda, la 2
+  arriba-derecha, la 3 abajo-izquierda debajo de la 1, etc.), así que dos títulos de columnas
+  distintas casi nunca caen en la misma fila salvo el primer par — con la versión vieja, la
+  categoría Stock (bien al final del archivo) no se importaba nunca. Corregido escaneando el
+  archivo entero por celdas-título (texto puro con las dos celdas vecinas de esa fila vacías —
+  un nombre de piloto nunca cumple eso, el apellido ocupa la celda de al lado) en vez de cortar
+  en la primera fila de títulos que aparece. Verificado contra dos archivos reales del club (uno
+  con 2 categorías, otro con 7) con un test harness de Node ad-hoc, no committeado — mismo
+  criterio que el resto de los parsers de esta función.
 - **`piloto_resolver.ts`**: port de `piloto_resolver.py` (`PilotoResolver`), misma lógica de
   resolución de identidad (alias exacto → candidatos por nombre/apellido → 1 = linkea, 0 =
   crea piloto nuevo, 2+ = encola en `alias_pendientes`), pero contra el cliente JS de
