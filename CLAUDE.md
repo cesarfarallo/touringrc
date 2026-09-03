@@ -179,6 +179,18 @@ de resultados, pero para el lado del login:
 - 0 o 2+ candidatos → crea un piloto nuevo igual (no bloquea el login) y encola una fila en
   `vinculos_pendientes` para que el admin la revise.
 
+**Re-vincular también en cada re-login, no solo en el primero** (migración 0012): el trigger de
+arriba es `AFTER INSERT ON auth.users`, así que solo corre la primera vez que se crea la cuenta.
+Si el piloto vinculado se borra después (por error, o el admin lo borra a propósito) y esa
+persona se vuelve a loguear, un re-login no inserta una fila nueva en `auth.users` — Supabase
+Auth la actualiza (`last_sign_in_at`, etc.), no la crea de nuevo — así que sin este agregado no
+pasaba nada, y la cuenta quedaba sin piloto para siempre hasta que un admin lo notara. La
+migración 0012 factoriza el matching a `vincular_piloto_para_login()` (misma lógica: email →
+nombre+apellido → crear nuevo + encolar) y la llama tanto desde `handle_new_user()` (INSERT)
+como desde un trigger nuevo `on_auth_user_login` (`AFTER UPDATE`) — la función arranca
+chequeando si ya hay un piloto vinculado, así que en el 99% de los logins (el caso normal) no
+hace nada más que esa consulta.
+
 **`cargar_roster.py`** (nuevo, standalone, no depende de `sync_evento.py` porque no hay un
 evento/resultados de por medio): lee un `EventVerification-*.xls` y hace upsert en `pilotos`
 por nombre+apellido (separando el texto crudo por espacios, el último token es el apellido —
