@@ -14,9 +14,9 @@ import ArchivosChecklist from "./ArchivosChecklist";
 // nunca algo que el admin sube.
 function inferirTipo(nombreArchivo) {
   if (/^FinalResults.*\.xls$/i.test(nombreArchivo)) return "resultadosFinales";
-  if (/^RoundTopTimes-.*\.xls$/i.test(nombreArchivo)) return "vueltaRapida";
+  if (/roundtoptimes.*\.xls$/i.test(nombreArchivo) || /top[\s_-]*times.*\.xls$/i.test(nombreArchivo)) return "vueltaRapida";
   if (/^RoundResult-.*\.xls$/i.test(nombreArchivo)) return "detalleRondas";
-  if (/^Leaderboard-.*\.xls$/i.test(nombreArchivo)) return "clasificacion";
+  if (/leaderboard.*\.xls$/i.test(nombreArchivo)) return "clasificacion";
   if (/^SeriesResultReport.*\.xls$/i.test(nombreArchivo)) return "campeonato";
   return null;
 }
@@ -579,7 +579,7 @@ export default function GestionEventos() {
       {loading && <div style={{ color: T.muted, fontSize: 13 }}>Cargando calendario...</div>}
       {error && <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>}
 
-      {!loading && !error && eventosOrdenados.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} />)}
+      {!error && eventosOrdenados.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} />)}
     </div>
   );
 }

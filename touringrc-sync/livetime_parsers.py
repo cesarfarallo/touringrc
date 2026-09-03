@@ -259,6 +259,48 @@ def parse_top_times(path):
     return out
 
 
+def parse_leaderboard(path):
+    """Parsea Leaderboard-Event*.xls, que puede traer una clase por hoja."""
+    libro = pd.ExcelFile(path, engine="xlrd")
+    out = []
+    for hoja in libro.sheet_names:
+        df = pd.read_excel(path, sheet_name=hoja, header=None, engine="xlrd")
+        clase_actual = None
+        col_pos = col_driver = col_result = col_tie = -1
+        cols_rondas = []
+        for _, row in df.iterrows():
+            raw = [_clean(v) for v in row.tolist()]
+            vals = [v for v in raw if v]
+            if not vals:
+                continue
+            if len(vals) == 1 and "\n" not in vals[0] and "www." not in vals[0]:
+                clase_actual = vals[0]
+                col_pos = col_driver = col_result = col_tie = -1
+                cols_rondas = []
+                continue
+            if "Driver Name" in raw:
+                col_pos = raw.index("Pos") if "Pos" in raw else -1
+                col_driver = raw.index("Driver Name")
+                col_result = raw.index("Result") if "Result" in raw else -1
+                col_tie = raw.index("Tie Breaker") if "Tie Breaker" in raw else -1
+                cols_rondas = [i for i, value in enumerate(raw) if value and re.match(r"^Round \d+$", value)]
+                continue
+            if not clase_actual or col_pos < 0 or col_pos >= len(raw):
+                continue
+            posicion = raw[col_pos]
+            if not posicion or not re.match(r"^\d+(\.0)?$", posicion):
+                continue
+            out.append({
+                "clase": clase_actual,
+                "posicion": int(float(posicion)),
+                "piloto_crudo": raw[col_driver] if col_driver < len(raw) else "",
+                "resultado_crudo": raw[col_result] if col_result >= 0 and col_result < len(raw) else None,
+                "tie_breaker": raw[col_tie] if col_tie >= 0 and col_tie < len(raw) else None,
+                "rondas": [raw[i] if i < len(raw) else None for i in cols_rondas],
+            })
+    return out
+
+
 # ---------------------------------------------------------------
 # SeriesResultReport.xls (campeonato acumulado)
 # ---------------------------------------------------------------

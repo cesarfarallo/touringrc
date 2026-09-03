@@ -343,6 +343,8 @@ expuesta al cliente) recién después de verificar que quien llama es admin.
   orden y misma lógica de upsert. Al final llama `marcarArchivo()` (equivalente a
   `marcar_archivo()` en Python) para actualizar el jsonb `archivos` de `eventos`, que es lo
   que lee `ArchivosChecklist`. Devuelve `{ ok: true, resumen }` o `{ error }`.
+  La migración `0008_clasificacion_lectura_publica.sql` agrega la policy de lectura pública que
+  necesita el frontend; sin ella la función puede sincronizar filas, pero la web devuelve cero.
 
 **Deploy** (manual, el admin lo corre local — no hay CI/CD para Edge Functions todavía):
 ```

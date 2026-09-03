@@ -139,10 +139,12 @@ create table campeonato_puntos (
 alter table pilotos enable row level security;
 alter table inscripciones enable row level security;
 alter table eventos enable row level security;
+alter table clasificacion enable row level security;
 
 -- Lectura pública de calendario y resultados
 create policy "eventos publicos" on eventos for select using (true);
 create policy "pilotos publicos" on pilotos for select using (true);
+create policy "clasificacion publica" on clasificacion for select using (true);
 
 -- Un usuario logueado puede inscribirse a sí mismo (vía su piloto vinculado)
 create policy "usuario se inscribe a si mismo" on inscripciones for insert

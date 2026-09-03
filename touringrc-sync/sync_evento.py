@@ -41,6 +41,7 @@ from livetime_parsers import (
     parse_final_results,
     parse_round_result,
     parse_top_times,
+    parse_leaderboard,
     parse_series_result,
 )
 from piloto_resolver import PilotoResolver
@@ -197,6 +198,35 @@ def sync_top_times(sb, carpeta, evento_id, resolver):
     marcar_archivo(sb, evento_id, "vueltaRapida")
 
 
+def sync_clasificacion(sb, carpeta, evento_id, resolver):
+    archivos = glob.glob(os.path.join(carpeta, "*Leaderboard*.xls"))
+    if not archivos:
+        print("  (sin archivo Leaderboard, se omite)")
+        return
+    total = 0
+    for path in archivos:
+        for f in parse_leaderboard(path):
+            piloto_id = resolver.resolver_o_avisar(f["piloto_crudo"])
+            if not piloto_id:
+                continue
+            clase_id = get_or_create_clase(sb, f["clase"])
+            sb.table("clasificacion").upsert(
+                {
+                    "evento_id": evento_id,
+                    "clase_id": clase_id,
+                    "piloto_id": piloto_id,
+                    "posicion": f["posicion"],
+                    "resultado": f["resultado_crudo"],
+                    "rondas": f["rondas"],
+                    "tie_breaker": f["tie_breaker"],
+                },
+                on_conflict="evento_id,clase_id,piloto_id",
+            ).execute()
+            total += 1
+    print(f"  {total} filas de clasificación sincronizadas ({len(archivos)} archivos)")
+    marcar_archivo(sb, evento_id, "clasificacion")
+
+
 def sync_campeonato(sb, carpeta, campeonato_id, resolver):
     path = os.path.join(carpeta, "SeriesResultReport.xls")
     if not os.path.exists(path):
@@ -290,9 +320,11 @@ def main():
     sync_round_results(sb, args.carpeta, args.evento_id, resolver)
     print("4. Vuelta rápida...")
     sync_top_times(sb, args.carpeta, args.evento_id, resolver)
+    print("5. Clasificación...")
+    sync_clasificacion(sb, args.carpeta, args.evento_id, resolver)
 
     if args.campeonato_id:
-        print("5. Campeonato...")
+        print("6. Campeonato...")
         sync_campeonato(sb, args.carpeta, args.campeonato_id, resolver)
 
     print("Listo.")
