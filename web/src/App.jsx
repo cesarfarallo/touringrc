@@ -196,7 +196,9 @@ export default function TouringRCApp() {
         )}
 
         {!logueado && tab === "calendario" && <LoginCard />}
-        {logueado && tab === "calendario" && <MiPerfil session={session} piloto={piloto} loading={cargandoPiloto} />}
+        {logueado && tab === "calendario" && (
+          <MiPerfil session={session} piloto={piloto} loading={cargandoPiloto} esAdmin={esAdminReal} />
+        )}
 
         {tab === "calendario" && (
           <>

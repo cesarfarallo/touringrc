@@ -5,7 +5,11 @@ import { T } from "../theme";
 // piloto (el trigger on_auth_user_created de
 // touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql corre en el
 // primer login). Si loading terminó y piloto es null, algo no vinculó.
-export default function MiPerfil({ session, piloto, loading }) {
+// El texto que ve un piloto común es amigable (avisarle al admin); el
+// detalle técnico (migración, panel de Pilotos) solo se muestra si quien
+// está viendo el cartel es admin -- a un piloto normal decirle "revisá la
+// migración 0001" no le sirve para nada.
+export default function MiPerfil({ session, piloto, loading, esAdmin }) {
   if (!session) return null;
 
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
@@ -37,9 +41,11 @@ export default function MiPerfil({ session, piloto, loading }) {
       )}
       {faltaVincular && (
         <span>
-          Conectado como <strong>{session.user.email}</strong>, pero no se encontró ningún piloto
-          vinculado a esta cuenta — revisá que la migración 0001 esté corrida en este proyecto de
-          Supabase.
+          Conectado como <strong>{session.user.email}</strong>, pero todavía no hay ningún piloto
+          vinculado a esta cuenta.{" "}
+          {esAdmin
+            ? "Revisá la migración 0001, o vinculalo a mano desde Admin → Pilotos."
+            : "Avisale al administrador de la categoría para que te vincule la cuenta con tu piloto."}
         </span>
       )}
     </div>
