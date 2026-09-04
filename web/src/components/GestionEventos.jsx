@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
 import ArchivosChecklist from "./ArchivosChecklist";
+import { inscripcionAbierta } from "./EventoCard";
 
 // Infiere qué tipo de archivo de Live Timing es según el nombre, para no
 // tener que pedirle al admin que lo indique a mano (ver TIPOS_ARCHIVO en
@@ -470,7 +471,11 @@ function DatosEventoEditable({ evento, onGuardado }) {
 // pista) -- busca en el roster completo, no solo entre los ya
 // vinculados a una cuenta, y hace el insert directo con la policy de
 // admin de la migración 0015 (bypassea el chequeo de tiene_modulo que
-// aplica al autoservicio del propio piloto).
+// aplica al autoservicio del propio piloto). Respeta la misma ventana
+// que "Inscribirme" en el Calendario público (inscripcionAbierta(),
+// desde `fecha - inscripcion_dias_antes` hasta el día anterior a la
+// fecha) -- no tiene sentido anotar a alguien a mano a una inscripción
+// que ya cerró o todavía no abrió, aunque sea el admin quien lo haga.
 function InscribirPiloto({ evento, pilotos, onInscripto }) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState("");
@@ -479,6 +484,8 @@ function InscribirPiloto({ evento, pilotos, onInscripto }) {
   const { clases, loading: cargandoClases } = useClases();
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
+
+  const abierta = inscripcionAbierta(evento);
 
   const textoBusqueda = busqueda.trim().toLowerCase();
   const resultados =
@@ -489,7 +496,7 @@ function InscribirPiloto({ evento, pilotos, onInscripto }) {
           .slice(0, 8);
 
   async function inscribir() {
-    if (!pilotoElegido || !claseId) return;
+    if (!pilotoElegido || !claseId || !abierta) return;
     setGuardando(true);
     setError(null);
     const { error } = await supabase
@@ -511,6 +518,8 @@ function InscribirPiloto({ evento, pilotos, onInscripto }) {
     return (
       <button
         onClick={() => setAbierto(true)}
+        disabled={!abierta}
+        title={!abierta ? "La inscripción no está abierta para esta fecha (ver días de antelación)" : undefined}
         style={{
           display: "flex",
           alignItems: "center",
@@ -519,10 +528,10 @@ function InscribirPiloto({ evento, pilotos, onInscripto }) {
           borderRadius: 8,
           border: `1px solid ${T.line}`,
           background: "transparent",
-          color: T.text,
+          color: abierta ? T.text : T.muted,
           fontSize: 12,
           fontWeight: 600,
-          cursor: "pointer",
+          cursor: abierta ? "pointer" : "not-allowed",
         }}
       >
         <UserPlus size={13} /> Inscribir piloto
@@ -582,16 +591,16 @@ function InscribirPiloto({ evento, pilotos, onInscripto }) {
           </select>
           <button
             onClick={inscribir}
-            disabled={!claseId || guardando}
+            disabled={!claseId || !abierta || guardando}
             style={{
               padding: "6px 14px",
               borderRadius: 8,
               border: "none",
-              background: claseId ? T.amber : T.surface,
-              color: claseId ? "#1A1300" : T.muted,
+              background: claseId && abierta ? T.amber : T.surface,
+              color: claseId && abierta ? "#1A1300" : T.muted,
               fontSize: 12,
               fontWeight: 600,
-              cursor: claseId && !guardando ? "pointer" : "default",
+              cursor: claseId && abierta && !guardando ? "pointer" : "default",
             }}
           >
             {guardando ? "Inscribiendo..." : "Confirmar"}

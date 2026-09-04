@@ -627,7 +627,16 @@ funcionando exactamente igual, sin tocarlo.
   a propósito el chequeo de `tiene_modulo('inscripcion')` que aplica al autoservicio (migración
   0013): que el admin lo elija de la lista de pilotos ya es la aprobación en sí, no tiene
   sentido bloquearlo por el mismo motivo que bloquea el autoservicio de alguien sin revisar
-  todavía.
+  todavía. **Respeta la misma ventana que "Inscribirme"** (`inscripcionAbierta()`, exportada
+  desde `EventoCard.jsx` y reutilizada acá tal cual): el botón "Inscribir piloto" se deshabilita
+  (con tooltip) fuera de la ventana `fecha - inscripcion_dias_antes` .. `fecha - 1 día` — antes
+  de este fix estaba siempre habilitado sin mirar la fecha, así que el admin podía anotar a
+  alguien a mano a una inscripción que técnicamente ya había cerrado (o que ni siquiera había
+  abierto todavía). Ojo: es una ventana más angosta que "Exportar inscriptos"
+  (`exportacionHabilitada()`, que solo chequea `hoy < fecha`, sin mirar
+  `inscripcion_dias_antes`) — son criterios distintos a propósito, uno es para *anotar* gente
+  (tiene sentido que respete la ventana real de inscripción) y el otro para *descargar* lo ya
+  anotado (tiene sentido mientras falte para la fecha, sin importar cuándo abrió la ventana).
 
 ## Ganadores en la tarjeta del Calendario
 
