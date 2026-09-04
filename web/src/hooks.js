@@ -31,6 +31,10 @@ export function useSession() {
 // touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql).
 // `loading` distingue "todavía consultando" de "consulté y no hay piloto
 // vinculado" (esto último no debería pasar nunca si el trigger corrió bien).
+// Trae también `piloto_roles` anidado -- MiPerfil.jsx lo usa para saber si
+// la cuenta ya tiene AL MENOS UN rol asignado (no necesariamente 'piloto':
+// una cuenta de solo técnica o solo admin también cuenta como "ya
+// revisada por un admin", aunque no pueda inscribirse a una fecha).
 export function usePilotoActual(session) {
   const [piloto, setPiloto] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +49,7 @@ export function usePilotoActual(session) {
     setLoading(true);
     supabase
       .from("pilotos")
-      .select("*")
+      .select("*, piloto_roles ( rol_id )")
       .eq("auth_user_id", session.user.id)
       .maybeSingle()
       .then(({ data }) => {

@@ -323,6 +323,18 @@ Ahora tener el rol `piloto` (que da el módulo `inscripcion`) es ese "visto buen
 suma un tercer estado (ámbar, entre el rojo de "sin vincular" y el verde de "todo ok") con el
 mismo mensaje, más detallado si quien lo ve es admin.
 
+⚠️ **Bug encontrado con cuentas de staff sin rol `piloto`**: la primera versión de `MiPerfil.jsx`
+clasificaba ese tercer estado por `puedeInscribirse`, así que una cuenta con **algún** rol
+asignado pero sin el rol `piloto` en particular (ej. alguien de técnica al que un admin solo le
+tildó `tecnica`, porque no corre) se quedaba mostrando "pendiente de aprobación" para siempre,
+aunque el admin ya la hubiera revisado. `usePilotoActual()` ahora trae también
+`piloto_roles ( rol_id )` anidado, y `MiPerfil.jsx` clasifica por **tener al menos un rol
+asignado** (`piloto.piloto_roles.length > 0`), no específicamente el rol `piloto` — una cuenta de
+solo técnica o solo admin ya fue revisada al asignarle ese rol, aunque nunca vaya a poder
+inscribirse a una fecha. El botón "Inscribirme" (`EventoCard.jsx`/tarjeta destacada) sigue
+gateado por `puedeInscribirse` sin cambios, porque ahí sí importa específicamente el rol
+`piloto`.
+
 ## Migración 0004: admin escribe en `eventos`
 
 Agrega policies de `insert`/`update` en `eventos` gateadas por `es_admin()` — hacían falta

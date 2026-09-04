@@ -5,20 +5,27 @@ import { T } from "../theme";
 // piloto vinculado (el trigger de
 // touringrc-sync/sql/migrations/0001_auth_vincula_piloto.sql no encontró
 // match y no debería tardar, o falta correrlo en este proyecto), (2) con
-// piloto vinculado pero sin el rol 'piloto' -- pendiente de que un admin
-// lo confirme en "Vínculos pendientes" (migración 0013, el rol 'piloto'
-// es el "visto bueno": sin él no se puede inscribir a ninguna fecha), o
+// piloto vinculado pero sin NINGÚN rol asignado todavía -- pendiente de
+// que un admin lo revise en "Vínculos pendientes" (migración 0013), o
 // (3) todo en orden. El texto que ve un piloto común es amigable (avisarle
 // al admin); el detalle técnico solo se muestra si quien está viendo el
 // cartel es admin -- a un piloto normal decirle "revisá la migración
 // 0001" no le sirve para nada.
-export default function MiPerfil({ session, piloto, loading, esAdmin, puedeInscribirse }) {
+//
+// "Todo en orden" se mide por tener AL MENOS UN rol, no específicamente
+// el rol 'piloto' -- una cuenta de solo técnica o solo admin (staff del
+// club que no corre) ya fue revisada por un admin al asignarle ese rol,
+// aunque no pueda inscribirse a ninguna fecha. Antes de este chequeo, ese
+// tipo de cuenta se quedaba mostrando "pendiente de aprobación" para
+// siempre, aunque su situación ya estuviera resuelta.
+export default function MiPerfil({ session, piloto, loading, esAdmin }) {
   if (!session) return null;
 
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
+  const tieneAlgunRol = (piloto?.piloto_roles ?? []).length > 0;
   const faltaVincular = !loading && !piloto;
-  const pendienteAprobacion = !loading && !!piloto && !puedeInscribirse;
-  const ok = !loading && !!piloto && puedeInscribirse;
+  const pendienteAprobacion = !loading && !!piloto && !tieneAlgunRol;
+  const ok = !loading && !!piloto && tieneAlgunRol;
 
   const color = faltaVincular ? T.red : pendienteAprobacion ? T.amber : T.teal;
 
