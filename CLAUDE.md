@@ -256,11 +256,23 @@ cargado a mano dos veces, sin que ningún login ambiguo lo detectara). Cada fila
 Pilotos ahora suma un ícono de fusión (`Merge`, al lado del tacho) que despliega el mismo
 buscador libre por nombre/apellido de `VinculosPendientes` (`FilaPiloto` ya recibe `pilotos`
 completo desde `PilotosAdmin`) — la fila donde tocaste el ícono es el "duplicado" (se borra),
-el que elijas en la búsqueda es el "correcto" (se queda con historial de los dos). Mismo
-`fusionar_pilotos()` RPC de siempre, sin cambios. Ojo: a diferencia del flujo de
-`VinculosPendientes`, este no reasigna `piloto_roles` — si el duplicado tenía roles que el
-correcto no tiene, se pierden al fusionar (conviene revisar los chips de rol de ambos antes de
-fusionar).
+el que elijas en la búsqueda es el "correcto" (se queda con historial de los dos). Ojo: a
+diferencia del flujo de `VinculosPendientes`, este no reasigna `piloto_roles` — si el duplicado
+tenía roles que el correcto no tiene, se pierden al fusionar (conviene revisar los chips de rol
+de ambos antes de fusionar).
+
+⚠️ **Bug encontrado al usar este botón nuevo**: `fusionar_pilotos()` (migración 0002) hacía un
+`update` ciego de `piloto_id = correcto` en `resultados_finales`, `resultados_ronda`,
+`campeonato_puntos` e `inscripciones` — si el "correcto" ya tenía su propia fila para el mismo
+`(evento, clase[, ronda])` que el duplicado (esperable acá: a diferencia del duplicado recién
+creado por un login sin match, que nunca tiene historial propio, dos pilotos ya cargados y
+resueltos pueden ser la misma persona real que corrió/se inscribió dos veces, una con cada
+piloto), el `update` violaba el `unique` de esa tabla en vez de fusionar — reportado primero
+como `inscripciones_evento_id_piloto_id_clase_id_key`, pero el mismo problema existía en las
+otras tres tablas. La migración 0019 redefine `fusionar_pilotos()` para borrar antes la fila
+del duplicado que entraría en conflicto (se prioriza lo que ya tiene el correcto) y recién ahí
+reasignar el resto. `piloto_alias` no necesitó el mismo tratamiento: `texto_crudo` es unique
+por sí solo, no por `piloto_id`, así que ahí nunca hay conflicto posible entre dos pilotos.
 
 **Re-vincular un piloto a mano** (migración 0011, `vincular_piloto_por_email()`): gap real
 encontrado al usar el borrado de arriba en la práctica — si un piloto vinculado se borra por
