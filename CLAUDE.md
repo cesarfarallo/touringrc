@@ -819,6 +819,18 @@ en ese evento (corrió de verdad), no por estar inscripto (esa es solo la intenc
     `hooks.js`) trae el historial completo agrupado por piloto más el cruce con
     `homologaciones_pendientes` sin resolver, para que cada fila sepa si ya tiene una
     corrección esperando revisión.
+  - **Borrar una homologación** (`FilaHistorial` en `OficinaTecnica.jsx`, tacho al lado del
+    lápiz, **solo admin** -- RLS de la 0018 tampoco le da `delete` a técnica): confirmación
+    (`confirm()`, mismo patrón que "Borrar piloto" en `PilotosAdmin.jsx`) y borrado directo de
+    la fila en `homologaciones_neumaticos`. Pensado para revertir una carga hecha en el evento
+    equivocado.
+  - **"Cargar histórico" no ofrece un evento donde el piloto ya tiene una homologación
+    cargada** en esa categoría: antes de este fix, elegirlo violaba el `unique (piloto_id,
+    clase_id, evento_id)` con un error de Postgres crudo. `FilaPiloto` cruza `eventosPasados`
+    contra el `eventoId` de cada fila del historial de ese piloto (por eso
+    `useHistorialHomologaciones` ahora también trae `evento_id`) y le pasa a
+    `FormularioHomologar` solo los que le quedan disponibles -- el botón "Cargar histórico" se
+    deshabilita del todo (con tooltip) si no le queda ninguno.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

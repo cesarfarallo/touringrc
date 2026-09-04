@@ -840,7 +840,7 @@ export function useHistorialHomologaciones(claseId) {
     Promise.all([
       supabase
         .from("homologaciones_neumaticos")
-        .select("id, piloto_id, eventos ( nombre, fecha ), marcas_neumaticos ( id, nombre, logo_url )")
+        .select("id, piloto_id, evento_id, eventos ( nombre, fecha ), marcas_neumaticos ( id, nombre, logo_url )")
         .eq("clase_id", claseId),
       supabase.from("homologaciones_pendientes").select("id, homologacion_id, propuesto_por, marcas_neumaticos ( nombre, logo_url )").eq("resuelto", false),
     ]).then(([homologaciones, pendientes]) => {
@@ -858,6 +858,7 @@ export function useHistorialHomologaciones(claseId) {
       for (const h of homologaciones.data ?? []) {
         (agrupado[h.piloto_id] ??= []).push({
           id: h.id,
+          eventoId: h.evento_id,
           eventoNombre: h.eventos?.nombre,
           fecha: h.eventos?.fecha,
           marca: h.marcas_neumaticos,

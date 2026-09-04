@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2 } from "lucide-react";
 import { T } from "../theme";
 import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -341,50 +341,88 @@ function EditarMarcaHomologacion({ homologacion, marcas, esAdmin, onCancelar, on
   );
 }
 
+// Una fila del historial: nombre del evento + marca cargada, con lápiz
+// para corregir la marca y (solo admin, RLS de la migración 0018 no le
+// da delete a técnica) un tacho para borrar la homologación entera --
+// útil para revertir una carga hecha en el evento equivocado.
+function FilaHistorial({ homologacion, marcas, esAdmin, onCambio }) {
+  const [editando, setEditando] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function borrar() {
+    if (!confirm(`¿Borrar la homologación de ${homologacion.eventoNombre}? No se puede deshacer.`)) return;
+    setBorrando(true);
+    setError(null);
+    const { error } = await supabase.from("homologaciones_neumaticos").delete().eq("id", homologacion.id);
+    setBorrando(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    onCambio();
+  }
+
+  return (
+    <div style={{ fontSize: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ color: T.muted }}>
+          {homologacion.eventoNombre} ({fechaCorta(homologacion.fecha)}):
+        </span>
+        <span>{homologacion.marca?.nombre ?? "—"}</span>
+        {homologacion.pendiente ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 4, color: T.amber }}>
+            <Clock size={11} /> Pendiente: {homologacion.pendiente.marcas_neumaticos?.nombre}
+          </span>
+        ) : (
+          !editando && (
+            <>
+              <button
+                onClick={() => setEditando(true)}
+                title="Corregir la marca cargada"
+                style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
+              >
+                <Pencil size={11} />
+              </button>
+              {esAdmin && (
+                <button
+                  onClick={borrar}
+                  disabled={borrando}
+                  title="Borrar esta homologación"
+                  style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: borrando ? "default" : "pointer", padding: 0 }}
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </>
+          )
+        )}
+      </div>
+      {editando && (
+        <EditarMarcaHomologacion
+          homologacion={homologacion}
+          marcas={marcas}
+          esAdmin={esAdmin}
+          onCancelar={() => setEditando(false)}
+          onGuardado={() => {
+            setEditando(false);
+            onCambio();
+          }}
+        />
+      )}
+      {error && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{error}</div>}
+    </div>
+  );
+}
+
 // Historial completo de homologaciones de un piloto en la categoría
 // activa (no solo la última) -- cada una con un lápiz para corregir la
 // marca, salvo que ya tenga una corrección pendiente de revisión.
 function HistorialPiloto({ historial, marcas, esAdmin, onCambio }) {
-  const [editando, setEditando] = useState(null);
-
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.line}`, display: "flex", flexDirection: "column", gap: 8 }}>
       {historial.map((h) => (
-        <div key={h.id} style={{ fontSize: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ color: T.muted }}>
-              {h.eventoNombre} ({fechaCorta(h.fecha)}):
-            </span>
-            <span>{h.marca?.nombre ?? "—"}</span>
-            {h.pendiente ? (
-              <span style={{ display: "flex", alignItems: "center", gap: 4, color: T.amber }}>
-                <Clock size={11} /> Pendiente: {h.pendiente.marcas_neumaticos?.nombre}
-              </span>
-            ) : (
-              editando !== h.id && (
-                <button
-                  onClick={() => setEditando(h.id)}
-                  title="Corregir la marca cargada"
-                  style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
-                >
-                  <Pencil size={11} />
-                </button>
-              )
-            )}
-          </div>
-          {editando === h.id && (
-            <EditarMarcaHomologacion
-              homologacion={h}
-              marcas={marcas}
-              esAdmin={esAdmin}
-              onCancelar={() => setEditando(null)}
-              onGuardado={() => {
-                setEditando(null);
-                onCambio();
-              }}
-            />
-          )}
-        </div>
+        <FilaHistorial key={h.id} homologacion={h} marcas={marcas} esAdmin={esAdmin} onCambio={onCambio} />
       ))}
       {historial.length === 0 && <div style={{ color: T.muted, fontSize: 12 }}>Sin homologaciones cargadas todavía.</div>}
     </div>
@@ -400,6 +438,12 @@ function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marca
     : !fila.apto
       ? "Todavía no cumple el mínimo de eventos"
       : "Cargar homologación de hoy";
+
+  // Este piloto ya tiene una homologación cargada en estos eventos --
+  // sacarlos de la lista de histórico, si no la carga viola el unique
+  // (piloto_id, clase_id, evento_id) de homologaciones_neumaticos.
+  const eventosYaHomologados = new Set((historial ?? []).map((h) => h.eventoId));
+  const eventosPasadosDisponibles = eventosPasados.filter((e) => !eventosYaHomologados.has(e.id));
 
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
@@ -446,16 +490,21 @@ function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marca
               {esAdmin && (
                 <button
                   onClick={() => setModo("historico")}
-                  title="Cargar una homologación que ya pasó y no se registró en su momento"
+                  disabled={eventosPasadosDisponibles.length === 0}
+                  title={
+                    eventosPasadosDisponibles.length === 0
+                      ? "Ya tiene una homologación cargada en todas las fechas pasadas"
+                      : "Cargar una homologación que ya pasó y no se registró en su momento"
+                  }
                   style={{
                     padding: "6px 12px",
                     borderRadius: 8,
                     border: `1px solid ${T.line}`,
                     background: "transparent",
-                    color: T.muted,
+                    color: eventosPasadosDisponibles.length === 0 ? T.line : T.muted,
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: "pointer",
+                    cursor: eventosPasadosDisponibles.length === 0 ? "not-allowed" : "pointer",
                   }}
                 >
                   Cargar histórico
@@ -490,7 +539,7 @@ function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marca
           claseId={claseId}
           modo={modo}
           eventoHoy={eventoHoy}
-          eventosPasados={eventosPasados}
+          eventosPasados={eventosPasadosDisponibles}
           marcas={marcas}
           onCancelar={() => setModo(null)}
           onHomologado={() => {
