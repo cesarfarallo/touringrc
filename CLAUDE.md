@@ -274,6 +274,17 @@ del duplicado que entraría en conflicto (se prioriza lo que ya tiene el correct
 reasignar el resto. `piloto_alias` no necesitó el mismo tratamiento: `texto_crudo` es unique
 por sí solo, no por `piloto_id`, así que ahí nunca hay conflicto posible entre dos pilotos.
 
+⚠️ **Segunda vuelta del mismo bug, en tablas más nuevas**: `fusionar_pilotos()` se escribió en
+la migración 0002, antes de que existieran `clasificacion` (0006) y `homologaciones_neumaticos`
+(0017) — nunca se actualizó para reasignarlas. `clasificacion` tiene una FK normal (sin
+`on delete cascade`) hacia `pilotos`, así que el `delete` final del duplicado fallaba con
+`update or delete on table "pilotos" violates foreign key constraint
+"clasificacion_piloto_id_fkey"` apenas tuviera una fila ahí.
+`homologaciones_neumaticos` sí tiene `on delete cascade` — no rompía con un error, pero por el
+mismo motivo perdía en silencio el historial de homologaciones del duplicado en vez de
+pasárselo al correcto. La migración 0020 suma las dos tablas a `fusionar_pilotos()`, con el
+mismo patrón de borrar-el-conflicto-antes-de-reasignar de la 0019.
+
 **Re-vincular un piloto a mano** (migración 0011, `vincular_piloto_por_email()`): gap real
 encontrado al usar el borrado de arriba en la práctica — si un piloto vinculado se borra por
 error, no había forma de recuperarlo solo con la web. Cargarle de nuevo el mismo email al
