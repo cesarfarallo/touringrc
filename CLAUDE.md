@@ -248,6 +248,20 @@ apuntándole. No se había notado porque el flujo real de fusión contra un cand
 tampoco se había probado a fondo en producción todavía. La migración 0010 corrige la
 constraint; `fusionar_pilotos()` en sí no necesitó cambios.
 
+**Fusionar dos pilotos ya cargados, sin vínculo pendiente** (sin migración nueva, `FilaPiloto`
+en `PilotosAdmin.jsx`): hasta acá, `fusionar_pilotos()` solo se podía disparar desde
+`VinculosPendientes.jsx`, atado a una fila de `vinculos_pendientes` — no había forma de
+fusionar dos pilotos que ya estuvieran ambos resueltos en la tabla normal (ej. un duplicado
+cargado a mano dos veces, sin que ningún login ambiguo lo detectara). Cada fila de la tabla de
+Pilotos ahora suma un ícono de fusión (`Merge`, al lado del tacho) que despliega el mismo
+buscador libre por nombre/apellido de `VinculosPendientes` (`FilaPiloto` ya recibe `pilotos`
+completo desde `PilotosAdmin`) — la fila donde tocaste el ícono es el "duplicado" (se borra),
+el que elijas en la búsqueda es el "correcto" (se queda con historial de los dos). Mismo
+`fusionar_pilotos()` RPC de siempre, sin cambios. Ojo: a diferencia del flujo de
+`VinculosPendientes`, este no reasigna `piloto_roles` — si el duplicado tenía roles que el
+correcto no tiene, se pierden al fusionar (conviene revisar los chips de rol de ambos antes de
+fusionar).
+
 **Re-vincular un piloto a mano** (migración 0011, `vincular_piloto_por_email()`): gap real
 encontrado al usar el borrado de arriba en la práctica — si un piloto vinculado se borra por
 error, no había forma de recuperarlo solo con la web. Cargarle de nuevo el mismo email al
