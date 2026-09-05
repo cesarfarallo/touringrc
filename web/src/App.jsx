@@ -314,28 +314,22 @@ export default function TouringRCApp() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  {proximo.circuitos && (
-                    <img
-                      src={rutaImagenCircuito(proximo.circuitos, proximo.circuito_sentido)}
-                      alt={proximo.circuitos.nombre}
-                      title={proximo.circuitos.nombre}
-                      style={{
-                        width: 64,
-                        height: 64,
-                        objectFit: "contain",
-                        borderRadius: 6,
-                        background: "#FFFFFF",
-                        border: `1px solid ${T.line}`,
-                        padding: 3,
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
                   <div>
                   <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8 }}>
                     Próxima fecha
                   </div>
                   <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700 }}>{proximo.nombre}</div>
+                  <div style={{ color: T.muted, fontSize: 14, marginTop: 4 }}>
+                    {(() => {
+                      const fechaCompleta = new Date(`${proximo.fecha}T00:00:00`).toLocaleDateString("es-AR", {
+                        weekday: "long",
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      });
+                      return fechaCompleta.charAt(0).toUpperCase() + fechaCompleta.slice(1);
+                    })()}
+                  </div>
                   <button
                   onClick={() => {
                     if (!logueado) {
@@ -433,6 +427,24 @@ export default function TouringRCApp() {
                   </div>
                   </div>
                 </div>
+                {proximo.circuitos && (
+                  <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", flex: "1 1 160px" }}>
+                    <img
+                      src={rutaImagenCircuito(proximo.circuitos, proximo.circuito_sentido)}
+                      alt={proximo.circuitos.nombre}
+                      title={proximo.circuitos.nombre}
+                      style={{
+                        width: 160,
+                        height: 160,
+                        objectFit: "contain",
+                        borderRadius: 8,
+                        background: "#FFFFFF",
+                        border: `1px solid ${T.line}`,
+                        padding: 8,
+                      }}
+                    />
+                  </div>
+                )}
                 <div style={{ flexShrink: 0 }}>
                   <StartLights diasRestantes={dias} horasRestantes={horasRestantes} />
                 </div>

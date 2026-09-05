@@ -656,11 +656,18 @@ afuera en silencio. Corregido: en vez de filtrar por posición, agrupa las filas
 `evento+clase+heat` y toma la de **menor posición dentro de ese grupo** como ganador — mismo
 criterio que ya usaba `calcularPodios()`, ahora replicado acá.
 
-**Dibujo del circuito y récords, no solo pilotos**: `EventoCard.jsx` y la tarjeta destacada de
-la próxima fecha (`App.jsx`) muestran el dibujo del circuito asociado (64px, con fondo blanco —
-ver nota de contraste más abajo) usando el mismo helper `rutaImagenCircuito()`, sacado a
-`web/src/lib/circuitos.js` para no duplicarlo entre `EventoCard.jsx`, `CircuitosView.jsx` y
-`App.jsx` (la tarjeta destacada no lo tenía al principio, se sumó a pedido).
+**Dibujo del circuito y récords, no solo pilotos**: `EventoCard.jsx` muestra el dibujo del
+circuito asociado a 64px (con fondo blanco — ver nota de contraste más abajo) usando el mismo
+helper `rutaImagenCircuito()`, sacado a `web/src/lib/circuitos.js` para no duplicarlo entre
+`EventoCard.jsx`, `CircuitosView.jsx` y `App.jsx`. En la tarjeta destacada de la próxima fecha
+(`App.jsx`) el dibujo es más grande (160px) y va como bloque propio, centrado entre la columna
+de texto (nombre + fecha completa + botones) y el `StartLights` — al ser el elemento más
+destacado del Calendario, se le da más protagonismo que a las miniaturas de 48-64px del resto
+de la app. La tarjeta destacada también muestra la **fecha completa** (`weekday: "long", day:
+"2-digit", month: "long", year: "numeric"`, con la primera letra en mayúscula a mano porque
+`toLocaleDateString("es-AR")` devuelve el nombre del día/mes en minúscula) debajo del nombre del
+evento — antes solo mostraba el nombre, sin fecha, la única referencia temporal era el
+countdown del `StartLights`.
 
 ⚠️ **Contraste de los dibujos de circuito**: los PNG de `circuitos-normales`/`circuitos-invertidos`
 tienen fondo **transparente** con el trazado en colores oscuros (marrón grisáceo para el asfalto,
