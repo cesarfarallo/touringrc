@@ -4,7 +4,7 @@ import { T } from "../theme";
 import { useCircuitos, useCircuitoRecords, useClases } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
-import { rutaImagenCircuito as rutaImagen } from "../lib/circuitos";
+import { rutaImagenCircuito as rutaImagen, contornoCircuito } from "../lib/circuitos";
 
 function NombreCircuitoEditable({ circuito, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -305,7 +305,7 @@ export default function CircuitosView({ esAdmin }) {
               cursor: "pointer",
             }}
           >
-            <img src={rutaImagen(c, "normal")} alt="" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 4, background: "#FFFFFF", padding: 2 }} />
+            <img src={rutaImagen(c, "normal")} alt="" style={{ width: 36, height: 36, objectFit: "contain", filter: contornoCircuito(1) }} />
             {c.nombre}
           </button>
         ))}
@@ -343,7 +343,7 @@ export default function CircuitosView({ esAdmin }) {
           <img
             src={rutaImagen(circuitoActivo, sentido)}
             alt={`${circuitoActivo.nombre} (${sentido})`}
-            style={{ maxWidth: "100%", width: 420, borderRadius: 10, background: "#FFFFFF", border: `1px solid ${T.line}`, padding: 8, flexShrink: 0 }}
+            style={{ maxWidth: "100%", width: 420, filter: contornoCircuito(4), flexShrink: 0 }}
           />
 
           <div style={{ flex: 1, minWidth: 260 }}>

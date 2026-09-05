@@ -17,7 +17,7 @@ import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
 import EventoCard, { FormularioInscripcion, inscripcionAbierta } from "./components/EventoCard";
-import { rutaImagenCircuito } from "./lib/circuitos";
+import { rutaImagenCircuito, contornoCircuito } from "./lib/circuitos";
 import TablaResultados from "./components/TablaResultados";
 import TablaClasificacion from "./components/TablaClasificacion";
 import TablaCampeonato from "./components/TablaCampeonato";
@@ -437,10 +437,7 @@ export default function TouringRCApp() {
                         width: 160,
                         height: 160,
                         objectFit: "contain",
-                        borderRadius: 8,
-                        background: "#FFFFFF",
-                        border: `1px solid ${T.line}`,
-                        padding: 8,
+                        filter: contornoCircuito(3),
                       }}
                     />
                   </div>

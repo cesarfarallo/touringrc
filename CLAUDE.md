@@ -672,10 +672,25 @@ countdown del `StartLights`.
 ⚠️ **Contraste de los dibujos de circuito**: los PNG de `circuitos-normales`/`circuitos-invertidos`
 tienen fondo **transparente** con el trazado en colores oscuros (marrón grisáceo para el asfalto,
 líneas blancas/negras) — sobre el fondo oscuro de la app (`T.surfaceRaised`) el trazado se perdía
-casi por completo, más aún reducido a una miniatura chica. Todos los lugares donde se muestra el
-dibujo (`EventoCard.jsx`, la tarjeta destacada, y las dos instancias de `CircuitosView.jsx`:
-la miniatura del grid y la imagen grande) ahora usan fondo blanco (`#FFFFFF`) en vez de
-`T.surfaceRaised`, con un `padding` chico para que el trazado no quede pegado al borde.
+casi por completo, más aún reducido a una miniatura chica. La primera solución fue taparlos con
+fondo blanco sólido (`#FFFFFF`) — funcionaba, pero se veía como un cuadrado blanco pegado a la
+tarjeta, no como parte del diseño.
+
+**Contorno en vez de fondo sólido** (`contornoCircuito(grosor)` en `web/src/lib/circuitos.js`):
+en vez de un `background` blanco detrás de todo el `<img>`, arma un `filter` con 16
+`drop-shadow` sin blur repartidos en círculo alrededor del centro — cada uno sigue el canal
+alfa del PNG (transparente vs. no transparente), así que superpuestos dibujan un contorno
+blanco parejo pegado al trazado en vez de rellenar todo el rectángulo. Verificado a ojo con
+Playwright + captura de pantalla contra `Circuito1.png` real (no hay proceso automatizado, fue
+prueba manual): con menos de 16 direcciones el contorno se nota como una estrella de puntas en
+vez de una línea pareja, sobre todo con `grosor` alto — 16 alcanza para que se vea liso en los
+tres tamaños que usa la app. Efecto colateral esperado y aceptado: el filtro contornea *todo*
+lo que no sea transparente en el PNG, no solo el trazado principal — el logo, el texto
+"Circuito Nº X" y las marcas de curva/largada del dibujo también quedan con su propio halo
+blanco individual, en vez de destacarse solo la pista. Reemplaza el fondo blanco en los cuatro
+lugares donde se muestra el dibujo, con un `grosor` mayor cuanto más grande se ve la imagen en
+pantalla (`EventoCard.jsx`: 1.5 a 64px: la tarjeta destacada y el grid/imagen grande de
+`CircuitosView.jsx`: 1, 3 y 4 a 36/160/420px respectivamente).
 
 ## Responsive / mobile (`web/`)
 
