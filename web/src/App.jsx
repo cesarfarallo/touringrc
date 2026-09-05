@@ -443,8 +443,13 @@ export default function TouringRCApp() {
                         padding: 8,
                       }}
                     />
-                    <div style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif", textAlign: "center" }}>
-                      {proximo.circuitos.nombre} ({proximo.circuito_sentido === "invertido" ? "Invertido" : "Normal"})
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 17, fontWeight: 600, color: T.text }}>
+                        {proximo.circuitos.nombre}
+                      </div>
+                      <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
+                        {proximo.circuito_sentido === "invertido" ? "Invertido" : "Normal"}
+                      </div>
                     </div>
                   </div>
                 )}
