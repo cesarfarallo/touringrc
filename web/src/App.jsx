@@ -428,7 +428,7 @@ export default function TouringRCApp() {
                   </div>
                 </div>
                 {proximo.circuitos && (
-                  <div style={{ flexShrink: 0, display: "flex", justifyContent: "center", flex: "1 1 160px" }}>
+                  <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flex: "1 1 160px" }}>
                     <img
                       src={rutaImagenCircuito(proximo.circuitos, proximo.circuito_sentido)}
                       alt={proximo.circuitos.nombre}
@@ -443,6 +443,9 @@ export default function TouringRCApp() {
                         padding: 8,
                       }}
                     />
+                    <div style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif", textAlign: "center" }}>
+                      {proximo.circuitos.nombre} ({proximo.circuito_sentido === "invertido" ? "Invertido" : "Normal"})
+                    </div>
                   </div>
                 )}
                 <div style={{ flexShrink: 0 }}>

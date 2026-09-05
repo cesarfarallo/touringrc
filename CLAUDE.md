@@ -669,6 +669,12 @@ de la app. La tarjeta destacada también muestra la **fecha completa** (`weekday
 evento — antes solo mostraba el nombre, sin fecha, la única referencia temporal era el
 countdown del `StartLights`.
 
+**Nombre y sentido del circuito, en texto, no solo en la imagen**: antes de esto, el nombre del
+circuito solo se veía como `title` (tooltip al pasar el mouse) sobre el dibujo — nada visible
+sin hacer hover, y el sentido (`normal`/`invertido`) no se mostraba en ningún lado del
+Calendario. Tanto `EventoCard.jsx` (debajo de la fecha) como la tarjeta destacada (`App.jsx`,
+debajo del dibujo grande) ahora muestran un renglón de texto chico con `{circuito.nombre} (Normal|Invertido)`, además de seguir teniendo el `title` para quien sí pasa el mouse.
+
 ⚠️ **Contraste de los dibujos de circuito**: los PNG de `circuitos-normales`/`circuitos-invertidos`
 tienen fondo **transparente** con el trazado en colores oscuros (marrón grisáceo para el asfalto,
 líneas blancas/negras) — sobre el fondo oscuro de la app (`T.surfaceRaised`) el trazado se perdía

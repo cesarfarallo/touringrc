@@ -214,6 +214,11 @@ export default function EventoCard({
               {evento.nombre}
             </div>
             <div style={{ color: T.muted, fontSize: 13, marginTop: 4, fontFamily: "Inter, sans-serif" }}>{fechaStr}</div>
+            {evento.circuitos && (
+              <div style={{ color: T.muted, fontSize: 12, marginTop: 2, fontFamily: "Inter, sans-serif" }}>
+                {evento.circuitos.nombre} ({evento.circuito_sentido === "invertido" ? "Invertido" : "Normal"})
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
