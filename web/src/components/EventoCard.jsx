@@ -3,7 +3,7 @@ import { ChevronRight, Pencil, Trophy, Medal } from "lucide-react";
 import { T } from "../theme";
 import { useClases, useCategoriaPreferida, useInscripcionPiloto } from "../hooks";
 import { supabase } from "../lib/supabase";
-import { rutaImagenCircuito, contornoCircuito } from "../lib/circuitos";
+import { rutaImagenCircuito } from "../lib/circuitos";
 
 // Ventana de PRE-inscripción: habilitada desde `inscripcion_dias_antes`
 // días antes de la fecha del evento, hasta el día ANTERIOR al evento --
@@ -201,7 +201,10 @@ export default function EventoCard({
                 width: 64,
                 height: 64,
                 objectFit: "contain",
-                filter: contornoCircuito(1.5),
+                borderRadius: 6,
+                background: "#FFFFFF",
+                border: `1px solid ${T.line}`,
+                padding: 3,
                 flexShrink: 0,
               }}
             />
