@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Plus, Trash2, RefreshCcw, Upload } from "lucide-react";
 import { T } from "../theme";
 import { useCircuitos, useCircuitoRecords, useClases } from "../hooks";
@@ -127,6 +127,10 @@ function FormularioRecord({ circuitoId, sentido, clase, record, onCancelar, onGu
   );
 }
 
+// Una fila de la lista de récords -- `div`s con flex-wrap en vez de
+// `<table>`, para que en una tarjeta angosta (grilla de dos columnas)
+// piloto/tiempo/fecha se acomoden en más de una línea en vez de forzar
+// scroll horizontal como hacía la tabla vieja.
 function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
 
@@ -137,10 +141,10 @@ function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado })
   }
 
   return (
-    <tr style={{ borderBottom: `1px solid ${T.line}` }}>
-      <td style={{ padding: "10px 14px", fontFamily: "Inter, sans-serif", color: T.muted, fontSize: 13 }}>{clase.nombre}</td>
+    <div style={{ padding: "10px 0", borderBottom: `1px solid ${T.line}` }}>
+      <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{clase.nombre}</div>
       {editando ? (
-        <td colSpan={3} style={{ padding: "8px 14px" }}>
+        <div style={{ marginTop: 6 }}>
           <FormularioRecord
             circuitoId={circuitoId}
             sentido={sentido}
@@ -152,29 +156,29 @@ function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado })
               onGuardado();
             }}
           />
-        </td>
+        </div>
       ) : record ? (
-        <>
-          <td style={{ padding: "10px 14px", fontFamily: "Inter, sans-serif", color: T.text, fontWeight: 500 }}>{record.pilotoNombre}</td>
-          <td style={{ padding: "10px 14px", fontFamily: "JetBrains Mono, monospace", color: T.amber, fontWeight: 700 }}>{record.tiempo}</td>
-          <td style={{ padding: "10px 14px", fontFamily: "JetBrains Mono, monospace", color: T.muted, fontSize: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "Inter, sans-serif", color: T.text, fontWeight: 500, fontSize: 13 }}>{record.pilotoNombre}</span>
+            <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.amber, fontWeight: 700, fontSize: 13 }}>{record.tiempo}</span>
+            <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.muted, fontSize: 12 }}>
               {record.fecha ? new Date(record.fecha + "T00:00:00").toLocaleDateString("es-AR") : "—"}
-              {esAdmin && (
-                <span style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setEditando(true)} title="Editar" style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}>
-                    <Pencil size={12} />
-                  </button>
-                  <button onClick={borrar} title="Borrar" style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: "pointer", padding: 0 }}>
-                    <Trash2 size={12} />
-                  </button>
-                </span>
-              )}
-            </div>
-          </td>
-        </>
+            </span>
+          </div>
+          {esAdmin && (
+            <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button onClick={() => setEditando(true)} title="Editar" style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}>
+                <Pencil size={12} />
+              </button>
+              <button onClick={borrar} title="Borrar" style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: "pointer", padding: 0 }}>
+                <Trash2 size={12} />
+              </button>
+            </span>
+          )}
+        </div>
       ) : (
-        <td colSpan={3} style={{ padding: "10px 14px" }}>
+        <div style={{ marginTop: 4 }}>
           {esAdmin ? (
             <button
               onClick={() => setEditando(true)}
@@ -185,9 +189,9 @@ function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado })
           ) : (
             <span style={{ color: T.muted, fontSize: 12 }}>Sin récord cargado</span>
           )}
-        </td>
+        </div>
       )}
-    </tr>
+    </div>
   );
 }
 
@@ -256,142 +260,116 @@ function ImportarRecords({ circuitoId, sentido, onImportado }) {
   );
 }
 
+// Una tarjeta por circuito: dibujo achicado (antes 420px, ahora
+// miniatura) al lado del encabezado, y la lista de récords ocupando el
+// ancho completo de la tarjeta debajo -- así tiene lugar de sobra sin
+// necesitar scroll horizontal, incluso en la grilla de dos columnas.
+// Cada tarjeta maneja su propio sentido (Normal/Invertido): antes había
+// un solo circuito "activo" a la vez con un selector de botones arriba;
+// ahora se ven los 7 circuitos juntos, cada uno con su propio toggle.
+function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
+  const [sentido, setSentido] = useState("normal");
+  const { porClase: records, loading: cargandoRecords, recargar } = useCircuitoRecords(circuito.id, sentido);
+
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+        <NombreCircuitoEditable circuito={circuito} esAdmin={esAdmin} onGuardado={onCircuitoGuardado} />
+        <div style={{ display: "flex", gap: 6 }}>
+          {[
+            { id: "normal", label: "Normal" },
+            { id: "invertido", label: "Invertido" },
+          ].map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSentido(s.id)}
+              style={{
+                padding: "5px 10px",
+                borderRadius: 8,
+                border: `1px solid ${sentido === s.id ? T.amber : T.line}`,
+                background: sentido === s.id ? `${T.amber}18` : "transparent",
+                color: sentido === s.id ? T.amber : T.muted,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 12 }}>
+        <img
+          src={rutaImagen(circuito, sentido)}
+          alt={`${circuito.nombre} (${sentido})`}
+          style={{ width: 140, height: 70, objectFit: "contain", borderRadius: 8, background: "#FFFFFF", border: `1px solid ${T.line}`, padding: 6, flexShrink: 0 }}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+              Récords ({sentido === "invertido" ? "Invertido" : "Normal"})
+            </span>
+            <button
+              onClick={recargar}
+              title="Actualizar"
+              style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
+            >
+              <RefreshCcw size={12} />
+            </button>
+          </div>
+          {esAdmin && <ImportarRecords circuitoId={circuito.id} sentido={sentido} onImportado={recargar} />}
+        </div>
+      </div>
+
+      <div>
+        {cargandoRecords ? (
+          <div style={{ color: T.muted, fontSize: 13, padding: "10px 0" }}>Cargando récords...</div>
+        ) : clases.length === 0 ? (
+          <div style={{ color: T.muted, fontSize: 13, padding: "10px 0" }}>No hay categorías cargadas.</div>
+        ) : (
+          clases.map((clase) => (
+            <FilaRecord
+              key={clase.id}
+              clase={clase}
+              record={records[clase.nombre]}
+              circuitoId={circuito.id}
+              sentido={sentido}
+              esAdmin={esAdmin}
+              onGuardado={recargar}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Apartado público "Circuitos": las 7 pistas del club, cada una con su
 // dibujo (normal/invertido, ver migración 0009) y el récord vigente por
 // categoría al lado. La carga/edición de récords y el renombrado quedan
 // visibles inline (mismo patrón de lápiz que GestionEventos.jsx) solo para
 // admin -- no hace falta un sub-tab aparte dentro de Admin porque está
 // atado 1 a 1 a esta vista.
+//
+// Grilla de dos columnas (`repeat(auto-fit, minmax(380px, 1fr))` cae solo
+// a una columna en mobile, sin necesitar una media query aparte) en vez
+// del selector de botones + panel único de antes -- se ven los 7
+// circuitos de una, cada uno con su propia tarjeta.
 export default function CircuitosView({ esAdmin }) {
   const { circuitos, loading, error, recargar: recargarCircuitos } = useCircuitos();
   const { clases } = useClases();
-  const [seleccionadoId, setSeleccionadoId] = useState(null);
-  const [sentido, setSentido] = useState("normal");
-
-  const circuitoActivo = circuitos.find((c) => c.id === seleccionadoId) ?? circuitos[0];
-
-  useEffect(() => {
-    if (!seleccionadoId && circuitos.length > 0) setSeleccionadoId(circuitos[0].id);
-  }, [circuitos, seleccionadoId]);
-
-  useEffect(() => {
-    setSentido("normal");
-  }, [circuitoActivo?.id]);
-
-  const { porClase: records, loading: cargandoRecords, recargar } = useCircuitoRecords(circuitoActivo?.id, sentido);
 
   if (loading) return <div style={{ color: T.muted, fontSize: 13 }}>Cargando circuitos...</div>;
   if (error) return <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>;
-  if (!circuitoActivo) return <div style={{ color: T.muted, fontSize: 13 }}>Todavía no hay circuitos cargados.</div>;
+  if (circuitos.length === 0) return <div style={{ color: T.muted, fontSize: 13 }}>Todavía no hay circuitos cargados.</div>;
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        {circuitos.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setSeleccionadoId(c.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 12px 6px 6px",
-              borderRadius: 8,
-              border: `1px solid ${circuitoActivo.id === c.id ? T.amber : T.line}`,
-              background: circuitoActivo.id === c.id ? `${T.amber}18` : "transparent",
-              color: circuitoActivo.id === c.id ? T.amber : T.muted,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            <img src={rutaImagen(c, "normal")} alt="" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 4, background: "#FFFFFF", padding: 2 }} />
-            {c.nombre}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
-          <NombreCircuitoEditable circuito={circuitoActivo} esAdmin={esAdmin} onGuardado={recargarCircuitos} />
-          <div style={{ display: "flex", gap: 6 }}>
-            {[
-              { id: "normal", label: "Normal" },
-              { id: "invertido", label: "Invertido" },
-            ].map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSentido(s.id)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${sentido === s.id ? T.amber : T.line}`,
-                  background: sentido === s.id ? `${T.amber}18` : "transparent",
-                  color: sentido === s.id ? T.amber : T.muted,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-          <img
-            src={rutaImagen(circuitoActivo, sentido)}
-            alt={`${circuitoActivo.nombre} (${sentido})`}
-            style={{ maxWidth: "100%", width: 420, borderRadius: 10, background: "#FFFFFF", border: `1px solid ${T.line}`, padding: 8, flexShrink: 0 }}
-          />
-
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8, gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>
-                  Récords por categoría ({sentido === "invertido" ? "Invertido" : "Normal"})
-                </div>
-                <button
-                  onClick={recargar}
-                  title="Actualizar"
-                  style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}
-                >
-                  <RefreshCcw size={13} />
-                </button>
-              </div>
-              {esAdmin && <ImportarRecords circuitoId={circuitoActivo.id} sentido={sentido} onImportado={recargar} />}
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse" }}>
-                <tbody>
-                  {cargandoRecords ? (
-                    <tr>
-                      <td style={{ padding: "10px 14px", color: T.muted, fontSize: 13 }}>Cargando récords...</td>
-                    </tr>
-                  ) : clases.length === 0 ? (
-                    <tr>
-                      <td style={{ padding: "10px 14px", color: T.muted, fontSize: 13 }}>No hay categorías cargadas.</td>
-                    </tr>
-                  ) : (
-                    clases.map((clase) => (
-                      <FilaRecord
-                        key={clase.id}
-                        clase={clase}
-                        record={records[clase.nombre]}
-                        circuitoId={circuitoActivo.id}
-                        sentido={sentido}
-                        esAdmin={esAdmin}
-                        onGuardado={recargar}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: 20 }}>
+      {circuitos.map((c) => (
+        <CircuitoCard key={c.id} circuito={c} clases={clases} esAdmin={esAdmin} onCircuitoGuardado={recargarCircuitos} />
+      ))}
     </div>
   );
 }

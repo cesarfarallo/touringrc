@@ -804,12 +804,23 @@ genérico ("Circuito 1".."Circuito 7") — el admin los renombra desde la propia
   `InscripcionDiasEditable`). `useEventos()` trae el join (`circuitos ( id, numero, nombre )`)
   para que `EventoCard.jsx` pueda mostrar el dibujo (48px, esquina superior izquierda de la
   tarjeta) sin una consulta aparte — si no hay circuito asociado, no se muestra nada.
-- **Vista pública**: grid de los 7 circuitos (thumbnail + nombre) para elegir uno: imagen grande
-  del sentido elegido (toggle Normal/Invertido) al lado de una tabla con el récord vigente por
-  categoría **para ese sentido** (`useCircuitoRecords(circuitoId, sentido)`) — normal e
-  invertido tienen cada uno su propio récord por categoría (migración 0014: cambiar de sentido
-  puede cambiar bastante el tiempo de vuelta), así que la tabla se recarga sola al tocar el
-  toggle.
+- **Vista pública**: grilla de tarjetas, una por circuito (`CircuitoCard`, `grid-template-columns:
+  repeat(auto-fit, minmax(380px, 1fr))` — cae solo a una columna en mobile sin necesitar una
+  media query aparte). Cada tarjeta tiene su propio toggle Normal/Invertido y su propia lista de
+  récords por categoría **para ese sentido** (`useCircuitoRecords(circuitoId, sentido)`, un hook
+  por tarjeta) — normal e invertido tienen cada uno su propio récord por categoría (migración
+  0014: cambiar de sentido puede cambiar bastante el tiempo de vuelta), así que cada tarjeta se
+  recarga sola al tocar su propio toggle, sin afectar a las demás.
+
+⚠️ **Rediseño a pedido**: la versión anterior tenía un selector de botones arriba (uno por
+circuito, con la imagen a 420px) que elegía un único "circuito activo", mostrado en un panel
+debajo con una `<table>` de récords — en pantallas angostas esa tabla necesitaba
+`overflowX: auto` para no romper el layout, así que los récords quedaban con scroll horizontal
+en vez de leerse de un vistazo. Se sacó el selector: ahora se ven los 7 circuitos a la vez,
+cada uno como su propia tarjeta, con el dibujo bastante más chico (140×70px en vez de 420px) y
+la lista de récords ya no es una `<table>` sino `div`s con `flexWrap` — piloto/tiempo/fecha se
+acomodan en más de una línea en vez de forzar scroll, sin importar cuán angosta quede la
+tarjeta (ni en la grilla de dos columnas ni en el fallback a una columna en mobile).
 - **Récords** (`circuito_records`): es el récord **vigente** por circuito+categoría+sentido, no
   un historial completo — cargar uno nuevo (`upsert` con `onConflict:
   "circuito_id,clase_id,sentido"`) pisa el anterior de esa misma combinación. `piloto_nombre` es
