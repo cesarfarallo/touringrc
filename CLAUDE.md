@@ -890,7 +890,11 @@ eligió nada.
   dos módulos para esa temporada puntual, reutilizando los mismos hooks/tablas que ya existían
   en vez de duplicar lógica: "Resultados de eventos" (selector de fecha + Resultados
   finales/Clasificación, mismo patrón que el tab Resultados) y "Campeonato" (standings vía
-  `useCampeonato(campeonatoId)`, mismo `TablaCampeonato` de siempre).
+  `useCampeonato(campeonatoId)`, mismo `TablaCampeonato` de siempre). El `<select>` excluye a
+  propósito la temporada vigente (el primer resultado de `useCampeonatos()`, que ordena igual
+  que el criterio de "vigente" — fecha_inicio más reciente): esa ya se ve en
+  Calendario/Resultados/Campeonato, así que esta sección es exclusivamente para años
+  anteriores — si todavía no hay ninguno, muestra un mensaje en vez de un selector vacío.
 - **Admin — nuevo sub-tab "Campeonatos"** (`CampeonatosAdmin.jsx`, en `AdminPanel.jsx`): alta y
   edición de temporadas (nombre, fecha de inicio, fecha de fin), mismo patrón de formulario
   inline que "Agregar fecha al calendario" en Gestión de eventos. Marca con un badge "Vigente"

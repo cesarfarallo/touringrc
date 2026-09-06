@@ -37,7 +37,12 @@ function SelectorClase({ clases, activa, onChange }) {
 // campeonato) para ese año puntual, reutilizando los mismos hooks/tablas
 // del resto de la app.
 export default function ResultadosHistoricos({ pilotoId }) {
-  const { campeonatos, loading: cargandoCampeonatos, error: errorCampeonatos } = useCampeonatos();
+  const { campeonatos: todosLosCampeonatos, loading: cargandoCampeonatos, error: errorCampeonatos } = useCampeonatos();
+  // El vigente (fecha_inicio más reciente -- primero de la lista, ya que
+  // useCampeonatos() ordena igual que el criterio de "vigente") ya se ve
+  // en Calendario/Resultados/Campeonato -- acá solo interesan los años
+  // anteriores.
+  const campeonatos = useMemo(() => todosLosCampeonatos.slice(1), [todosLosCampeonatos]);
   const { eventos, loading: cargandoEventos } = useEventos();
   const [campeonatoId, setCampeonatoId] = useState("");
 
@@ -93,7 +98,9 @@ export default function ResultadosHistoricos({ pilotoId }) {
             minWidth: 260,
           }}
         >
-          <option value="">{cargandoCampeonatos ? "Cargando temporadas..." : "Seleccioná un campeonato..."}</option>
+          <option value="">
+            {cargandoCampeonatos ? "Cargando temporadas..." : "Seleccioná un campeonato..."}
+          </option>
           {campeonatos.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}
@@ -105,7 +112,13 @@ export default function ResultadosHistoricos({ pilotoId }) {
         )}
       </div>
 
-      {!campeonatoId && (
+      {!cargandoCampeonatos && campeonatos.length === 0 && (
+        <div style={{ color: T.muted, fontSize: 13 }}>
+          Todavía no hay temporadas anteriores a la vigente para mostrar acá.
+        </div>
+      )}
+
+      {!campeonatoId && campeonatos.length > 0 && (
         <div style={{ color: T.muted, fontSize: 13 }}>
           Elegí una temporada para ver sus resultados y el acumulado del campeonato.
         </div>
