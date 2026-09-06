@@ -29,6 +29,14 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const TIPOS_VALIDOS = ["resultadosFinales", "detalleRondas", "vueltaRapida", "clasificacion", "campeonato", "recordsCircuito"];
 
+// El club solo corre estas dos categorías por ahora -- Live Timing puede
+// traer en el mismo reporte otras categorías ajenas (de otros clubes/otras
+// disciplinas que comparten pista, ej. "Touring" a secas, "GT", "1/8 IC"),
+// y antes de este filtro getOrCreateClase() las creaba igual en `clases` y
+// les cargaba resultados. Si el club suma una categoría nueva, agregarla acá
+// (con el nombre EXACTO tal como lo exporta Live Timing).
+const CLASES_PERMITIDAS = new Set(["Touring Eco 1:10 Stock", "Touring Eco 1:10 Modified"]);
+
 Deno.serve(async (req: Request) => {
   const cors = {
     "Access-Control-Allow-Origin": "*",
@@ -154,12 +162,20 @@ function toFloat(v: string | null | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-async function getOrCreateClase(sb: SupabaseClient, nombre: string): Promise<string> {
+// Devuelve null (en vez de crear la clase) si `nombre` no está en
+// CLASES_PERMITIDAS -- así una fila de una categoría ajena se salta en vez
+// de crear una `clases` nueva y cargarle resultados.
+async function getClasePermitida(sb: SupabaseClient, nombre: string): Promise<string | null> {
+  if (!CLASES_PERMITIDAS.has(nombre)) return null;
   const { data } = await sb.from("clases").select("id").eq("nombre", nombre).maybeSingle();
   if (data) return data.id;
   const { data: nuevo, error } = await sb.from("clases").insert({ nombre }).select("id").single();
   if (error) throw error;
   return nuevo.id;
+}
+
+function resumenIgnoradas(ignoradas: Set<string>): string {
+  return ignoradas.size > 0 ? ` (se ignoraron filas de categorías no habilitadas: ${[...ignoradas].join(", ")})` : "";
 }
 
 async function marcarArchivo(sb: SupabaseClient, eventoId: string, tipo: string) {
@@ -177,10 +193,15 @@ async function syncFinalResults(
 ): Promise<string> {
   const filas = parseFinalResults(bytes);
   let count = 0;
+  const ignoradas = new Set<string>();
   for (const f of filas) {
+    const claseId = await getClasePermitida(sb, f.clase);
+    if (!claseId) {
+      ignoradas.add(f.clase);
+      continue;
+    }
     const pilotoId = await resolver.resolverOAvisar(f.pilotoCrudo);
     if (!pilotoId) continue;
-    const claseId = await getOrCreateClase(sb, f.clase);
     const { flags } = parseNombreCrudo(f.pilotoCrudo);
 
     const { error } = await sb.from("resultados_finales").upsert(
@@ -198,7 +219,7 @@ async function syncFinalResults(
     if (error) throw new Error(`resultados_finales.upsert (${f.pilotoCrudo}): ${error.message}`);
     count++;
   }
-  return `${count} resultados finales sincronizados`;
+  return `${count} resultados finales sincronizados${resumenIgnoradas(ignoradas)}`;
 }
 
 async function syncRoundResults(
@@ -209,10 +230,15 @@ async function syncRoundResults(
 ): Promise<string> {
   const filas = parseRoundResult(bytes);
   let count = 0;
+  const ignoradas = new Set<string>();
   for (const f of filas) {
+    const claseId = await getClasePermitida(sb, f.clase);
+    if (!claseId) {
+      ignoradas.add(f.clase);
+      continue;
+    }
     const pilotoId = await resolver.resolverOAvisar(f.pilotoCrudo);
     if (!pilotoId) continue;
-    const claseId = await getOrCreateClase(sb, f.clase);
     const r = parseResultadoCrudo(f.lapsTimeCrudo);
 
     const { error } = await sb.from("resultados_ronda").upsert(
@@ -236,7 +262,7 @@ async function syncRoundResults(
     if (error) throw new Error(`resultados_ronda.upsert (${f.pilotoCrudo}, ${f.ronda}): ${error.message}`);
     count++;
   }
-  return `${count} filas de detalle de ronda sincronizadas`;
+  return `${count} filas de detalle de ronda sincronizadas${resumenIgnoradas(ignoradas)}`;
 }
 
 async function syncTopTimes(
@@ -249,9 +275,10 @@ async function syncTopTimes(
   let count = 0;
   for (const f of filas) {
     if (!f.vueltaRapida) continue;
+    const claseId = await getClasePermitida(sb, f.clase);
+    if (!claseId) continue;
     const pilotoId = await resolver.resolverOAvisar(f.pilotoCrudo);
     if (!pilotoId) continue;
-    const claseId = await getOrCreateClase(sb, f.clase);
 
     const { data, error } = await sb
       .from("resultados_finales")
@@ -276,10 +303,15 @@ async function syncClasificacion(
 ): Promise<string> {
   const filas = parseLeaderboard(bytes);
   let count = 0;
+  const ignoradas = new Set<string>();
   for (const f of filas) {
+    const claseId = await getClasePermitida(sb, f.clase);
+    if (!claseId) {
+      ignoradas.add(f.clase);
+      continue;
+    }
     const pilotoId = await resolver.resolverOAvisar(f.pilotoCrudo);
     if (!pilotoId) continue;
-    const claseId = await getOrCreateClase(sb, f.clase);
 
     const { error } = await sb.from("clasificacion").upsert(
       {
@@ -296,7 +328,7 @@ async function syncClasificacion(
     if (error) throw new Error(`clasificacion.upsert (${f.pilotoCrudo}): ${error.message}`);
     count++;
   }
-  return `${count} filas de clasificación sincronizadas`;
+  return `${count} filas de clasificación sincronizadas${resumenIgnoradas(ignoradas)}`;
 }
 
 async function syncCampeonato(
@@ -307,10 +339,15 @@ async function syncCampeonato(
 ): Promise<string> {
   const { filas } = parseSeriesResult(bytes);
   let count = 0;
+  const ignoradas = new Set<string>();
   for (const f of filas) {
+    const claseId = await getClasePermitida(sb, f.clase);
+    if (!claseId) {
+      ignoradas.add(f.clase);
+      continue;
+    }
     const pilotoId = await resolver.resolverOAvisar(f.pilotoCrudo);
     if (!pilotoId) continue;
-    const claseId = await getOrCreateClase(sb, f.clase);
 
     const { error } = await sb.from("campeonato_puntos").upsert(
       {
@@ -333,7 +370,7 @@ async function syncCampeonato(
     if (error) throw new Error(`campeonato_puntos.upsert (${f.pilotoCrudo}): ${error.message}`);
     count++;
   }
-  return `${count} filas de campeonato sincronizadas`;
+  return `${count} filas de campeonato sincronizadas${resumenIgnoradas(ignoradas)}`;
 }
 
 // RaceResultRecords*.xls ("Track Records"): pisa el récord vigente de

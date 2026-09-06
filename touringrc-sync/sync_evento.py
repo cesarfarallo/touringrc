@@ -55,12 +55,33 @@ def get_client():
     return create_client(url, key)
 
 
-def get_or_create_clase(sb, nombre):
+# El club solo corre estas dos categorías por ahora -- Live Timing puede
+# traer en el mismo reporte otras categorías ajenas (de otros clubes/otras
+# disciplinas que comparten pista, ej. "Touring" a secas, "GT", "1/8 IC"),
+# y antes de este filtro get_or_create_clase() las creaba igual en `clases`
+# y les cargaba resultados. Si el club suma una categoría nueva, agregarla
+# acá (con el nombre EXACTO tal como lo exporta Live Timing) -- mismo
+# criterio que CLASES_PERMITIDAS en supabase/functions/subir-resultado/index.ts.
+CLASES_PERMITIDAS = {"Touring Eco 1:10 Stock", "Touring Eco 1:10 Modified"}
+
+
+def get_clase_permitida(sb, nombre):
+    """Devuelve None (en vez de crear la clase) si `nombre` no está en
+    CLASES_PERMITIDAS -- así una fila de una categoría ajena se salta en
+    vez de crear una `clases` nueva y cargarle resultados."""
+    if nombre not in CLASES_PERMITIDAS:
+        return None
     r = sb.table("clases").select("id").eq("nombre", nombre).execute()
     if r.data:
         return r.data[0]["id"]
     nuevo = sb.table("clases").insert({"nombre": nombre}).execute()
     return nuevo.data[0]["id"]
+
+
+def resumen_ignoradas(ignoradas):
+    if not ignoradas:
+        return ""
+    return f" (se ignoraron filas de categorías no habilitadas: {', '.join(sorted(ignoradas))})"
 
 
 def marcar_archivo(sb, evento_id, tipo, subido=True):
@@ -115,11 +136,16 @@ def sync_final_results(sb, carpeta, evento_id, resolver):
         print("  (sin FinalResults.xls, se omite)")
         return
     filas = parse_final_results(path)
+    count = 0
+    ignoradas = set()
     for f in filas:
+        clase_id = get_clase_permitida(sb, f["clase"])
+        if not clase_id:
+            ignoradas.add(f["clase"])
+            continue
         piloto_id = resolver.resolver_o_avisar(f["piloto_crudo"])
         if not piloto_id:
             continue
-        clase_id = get_or_create_clase(sb, f["clase"])
         partes = parse_nombre_crudo_flags(f["piloto_crudo"])
         sb.table("resultados_finales").upsert(
             {
@@ -133,7 +159,8 @@ def sync_final_results(sb, carpeta, evento_id, resolver):
             },
             on_conflict="evento_id,clase_id,piloto_id",
         ).execute()
-    print(f"  {len(filas)} resultados finales sincronizados")
+        count += 1
+    print(f"  {count} resultados finales sincronizados{resumen_ignoradas(ignoradas)}")
     marcar_archivo(sb, evento_id, "resultadosFinales")
 
 
@@ -143,13 +170,17 @@ def sync_round_results(sb, carpeta, evento_id, resolver):
         print("  (sin RoundResult-*.xls, se omite)")
         return
     total = 0
+    ignoradas = set()
     for path in archivos:
         filas = parse_round_result(path)
         for f in filas:
+            clase_id = get_clase_permitida(sb, f["clase"])
+            if not clase_id:
+                ignoradas.add(f["clase"])
+                continue
             piloto_id = resolver.resolver_o_avisar(f["piloto_crudo"])
             if not piloto_id:
                 continue
-            clase_id = get_or_create_clase(sb, f["clase"])
             r = parse_resultado_crudo_seguro(f["laps_time_crudo"])
             sb.table("resultados_ronda").upsert(
                 {
@@ -170,7 +201,7 @@ def sync_round_results(sb, carpeta, evento_id, resolver):
                 on_conflict="evento_id,clase_id,ronda,piloto_id",
             ).execute()
             total += 1
-    print(f"  {total} filas de detalle de ronda sincronizadas ({len(archivos)} archivos)")
+    print(f"  {total} filas de detalle de ronda sincronizadas ({len(archivos)} archivos){resumen_ignoradas(ignoradas)}")
     marcar_archivo(sb, evento_id, "detalleRondas")
 
 
@@ -186,10 +217,12 @@ def sync_top_times(sb, carpeta, evento_id, resolver):
         for f in filas:
             if not f["vuelta_rapida"]:
                 continue
+            clase_id = get_clase_permitida(sb, f["clase"])
+            if not clase_id:
+                continue
             piloto_id = resolver.resolver_o_avisar(f["piloto_crudo"])
             if not piloto_id:
                 continue
-            clase_id = get_or_create_clase(sb, f["clase"])
             # marca vuelta_rapida=true en el resultado final ya cargado de ese piloto/clase/evento
             sb.table("resultados_finales").update({"vuelta_rapida": True}).eq(
                 "evento_id", evento_id
@@ -204,12 +237,16 @@ def sync_clasificacion(sb, carpeta, evento_id, resolver):
         print("  (sin archivo Leaderboard, se omite)")
         return
     total = 0
+    ignoradas = set()
     for path in archivos:
         for f in parse_leaderboard(path):
+            clase_id = get_clase_permitida(sb, f["clase"])
+            if not clase_id:
+                ignoradas.add(f["clase"])
+                continue
             piloto_id = resolver.resolver_o_avisar(f["piloto_crudo"])
             if not piloto_id:
                 continue
-            clase_id = get_or_create_clase(sb, f["clase"])
             sb.table("clasificacion").upsert(
                 {
                     "evento_id": evento_id,
@@ -223,7 +260,7 @@ def sync_clasificacion(sb, carpeta, evento_id, resolver):
                 on_conflict="evento_id,clase_id,piloto_id",
             ).execute()
             total += 1
-    print(f"  {total} filas de clasificación sincronizadas ({len(archivos)} archivos)")
+    print(f"  {total} filas de clasificación sincronizadas ({len(archivos)} archivos){resumen_ignoradas(ignoradas)}")
     marcar_archivo(sb, evento_id, "clasificacion")
 
 
@@ -236,11 +273,16 @@ def sync_campeonato(sb, carpeta, campeonato_id, resolver):
     if not filas:
         print("  Sin filas en el reporte de campeonato")
         return
+    count = 0
+    ignoradas = set()
     for f in filas:
+        clase_id = get_clase_permitida(sb, f["clase"])
+        if not clase_id:
+            ignoradas.add(f["clase"])
+            continue
         piloto_id = resolver.resolver_o_avisar(f["piloto_crudo"])
         if not piloto_id:
             continue
-        clase_id = get_or_create_clase(sb, f["clase"])
         sb.table("campeonato_puntos").upsert(
             {
                 "campeonato_id": campeonato_id,
@@ -259,7 +301,8 @@ def sync_campeonato(sb, carpeta, campeonato_id, resolver):
             },
             on_conflict="campeonato_id,clase_id,piloto_id",
         ).execute()
-    print(f"  {len(filas)} filas de campeonato sincronizadas ({nombre_torneo})")
+        count += 1
+    print(f"  {count} filas de campeonato sincronizadas ({nombre_torneo}){resumen_ignoradas(ignoradas)}")
 
 
 # ---------------------------------------------------------------

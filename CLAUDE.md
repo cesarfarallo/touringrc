@@ -926,6 +926,36 @@ Corregido: ahora usa `evento.campeonato_id` directo, y solo cae a `campeonatoVig
 fallback para un evento que todavía no tenga temporada asignada (dato nulo, ej. de antes de la
 0022 si no se corrió el backfill en ese proyecto).
 
+## Solo las categorías del club (migración 0023)
+
+`get_or_create_clase()` (`sync_evento.py`) y `getOrCreateClase()` (Edge Function
+`subir-resultado`) creaban una fila nueva en `clases` por **cualquier** nombre de categoría que
+trajera un reporte de Live Timing, sin filtrar. Si la pista se comparte con otro club u otra
+categoría el mismo día (el reporte trae todas las categorías que corrieron esa jornada, no solo
+las del club), esas categorías ajenas (ej. "Touring" a secas, "GT", "1/8 IC") y sus resultados
+terminaban cargados en la base igual que las dos que efectivamente corre este club: "Touring Eco
+1:10 Stock" y "Touring Eco 1:10 Modified".
+
+- **Código** (ambos lados, mismo criterio para no perder paridad): se agrega una constante
+  `CLASES_PERMITIDAS` (`Set` en `index.ts`, `set` en `sync_evento.py`) con los dos nombres
+  exactos que corre el club hoy. `getOrCreateClase()`/`get_or_create_clase()` se reemplazan por
+  `getClasePermitida()`/`get_clase_permitida()`: si el nombre de la fila no está en el set,
+  devuelve `null`/`None` en vez de crear la clase, y el `sync*`/`syncCampeonato` que la llama
+  salta esa fila (no la resuelve como piloto tampoco, para no ensuciar `piloto_alias`/
+  `alias_pendientes` con gente de otra categoría) — el resumen que ve el admin en el botón
+  "Subir resultados" ahora lista qué categorías se ignoraron, si hubo alguna. Si el club suma
+  una tercera categoría en el futuro, agregarla a mano en las dos constantes (no hay CRUD de
+  `clases` en la web hoy).
+- **Migración 0023**: borra lo que ya había quedado cargado de categorías ajenas —
+  `resultados_finales`/`resultados_ronda`/`clasificacion`/`campeonato_puntos`/`inscripciones`
+  de esas categorías (ninguna tiene `on delete cascade` en `clase_id`, así que hay que vaciarlas
+  antes de poder borrar la fila de `clases`) y, al final, la fila de `clases` en sí.
+  `circuito_records`/`homologaciones_neumaticos` sí tienen `on delete cascade` en `clase_id`,
+  así que se limpian solas. Trae un `select` sugerido en el propio archivo para confirmar antes
+  de correrla qué hay cargado hoy en `clases`, por si el nombre real de alguna categoría del
+  club no coincidiera exacto con los dos hardcodeados (en ese caso, ajustar la lista en la
+  migración y en el código antes de correrla).
+
 ## Oficina técnica: homologación de neumáticos (migración 0017)
 
 Nuevo tab del nav ("Oficina técnica", `OficinaTecnica.jsx`), visible solo si `useMisModulos()`
