@@ -140,6 +140,12 @@ export default function TouringRCApp() {
   const { inscripcion: inscripcionDestacada, recargar: recargarInscripcionDestacada } =
     useInscripcionPiloto(proximo?.id, piloto?.id);
   const inscripcionDestacadaAbierta = proximo ? inscripcionAbierta(proximo) : false;
+  // Mismo criterio que el botón "Inscribirme" de cada EventoCard
+  // (disabled={!abierta || !puedeInscribirse}) -- el de la tarjeta
+  // destacada no lo chequeaba y quedaba clickeable aunque la ventana de
+  // inscripción todavía no hubiera abierto.
+  const puedeAbrirInscripcionDestacada =
+    !inscripcionDestacada && inscripcionDestacadaAbierta && !(logueado && piloto && !puedeInscribirse);
 
   const error = errorEventos || errorCampeonato || errorResultados || errorClasificacion;
 
@@ -332,15 +338,21 @@ export default function TouringRCApp() {
                   </div>
                   <button
                   onClick={() => {
+                    if (!puedeAbrirInscripcionDestacada) return;
                     if (!logueado) {
                       ingresar();
                       return;
                     }
-                    if (logueado && piloto && !puedeInscribirse) return;
                     setFormularioDestacadoAbierto((abierto) => !abierto);
                   }}
-                  disabled={!!inscripcionDestacada || (logueado && !!piloto && !puedeInscribirse)}
-                  title={logueado && piloto && !puedeInscribirse ? "Tu cuenta todavía no fue aprobada por un admin" : undefined}
+                  disabled={!puedeAbrirInscripcionDestacada}
+                  title={
+                    logueado && piloto && !puedeInscribirse
+                      ? "Tu cuenta todavía no fue aprobada por un admin"
+                      : !inscripcionDestacada && !inscripcionDestacadaAbierta
+                        ? "La inscripción todavía no está abierta para esta fecha"
+                        : undefined
+                  }
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -349,11 +361,11 @@ export default function TouringRCApp() {
                     padding: "8px 14px",
                     borderRadius: 8,
                     border: "none",
-                    background: inscripcionDestacada || (logueado && piloto && !puedeInscribirse) ? T.surfaceRaised : T.amber,
-                    color: inscripcionDestacada || (logueado && piloto && !puedeInscribirse) ? T.muted : "#1A1300",
+                    background: puedeAbrirInscripcionDestacada ? T.amber : T.surfaceRaised,
+                    color: puedeAbrirInscripcionDestacada ? "#1A1300" : T.muted,
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: inscripcionDestacada || (logueado && piloto && !puedeInscribirse) ? "default" : "pointer",
+                    cursor: puedeAbrirInscripcionDestacada ? "pointer" : "default",
                   }}
                   >
                   <UserPlus size={14} />
@@ -361,9 +373,11 @@ export default function TouringRCApp() {
                     ? "Ya estás inscripto"
                     : logueado && piloto && !puedeInscribirse
                       ? "Pendiente de aprobación"
-                      : formularioDestacadoAbierto
-                        ? "Cerrar inscripción"
-                        : "Inscribirme"}
+                      : !inscripcionDestacadaAbierta
+                        ? "Cerrada"
+                        : formularioDestacadoAbierto
+                          ? "Cerrar inscripción"
+                          : "Inscribirme"}
                   </button>
                   {formularioDestacadoAbierto && logueado && piloto && puedeInscribirse && !inscripcionDestacada && inscripcionDestacadaAbierta && (
                     <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.line}` }}>

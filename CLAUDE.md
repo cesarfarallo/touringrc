@@ -756,6 +756,17 @@ formulario propio dentro de la tarjeta destacada. La tarjeta del evento tiene ot
 independiente que se abre y cierra desde su propio botón. Ambos estados se sincronizan después
 de una inscripción: una vez inscripto, los dos botones quedan deshabilitados.
 
+⚠️ **Bug encontrado en producción**: el botón de la tarjeta destacada (`App.jsx`) nunca
+chequeaba `inscripcionDestacadaAbierta` (la ventana `inscripcionAbierta()`, ya calculada y
+usada más abajo solo para tapar el formulario) en su `disabled`/estilo/label — quedaba
+clickeable y con pinta de habilitado aunque todavía no hubieran pasado los
+`inscripcion_dias_antes` configurados para esa fecha, a diferencia del botón de cada
+`EventoCard.jsx` (`disabled={!abierta || !puedeInscribirse}`), que sí lo respetaba siempre.
+`puedeAbrirInscripcionDestacada` (nueva variable derivada, `App.jsx`) centraliza la misma
+condición para el `disabled`, el estilo y el label ("Cerrada" cuando la ventana no abrió
+todavía, igual que el "Cerrada" de `EventoCard.jsx`) — mismo criterio, sin duplicar la lógica
+tres veces.
+
 El módulo administrativo `GestionEventos.jsx` usa el mismo orden del calendario: fecha más
 reciente primero, sea futura o pasada, y luego las fechas más antiguas.
 Cada evento permite editar inline su nombre y fecha mediante el ícono de lápiz; el guardado
