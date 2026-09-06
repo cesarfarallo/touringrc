@@ -1002,18 +1002,67 @@ function FilaEvento({ evento, onSubido, pilotos }) {
 export default function GestionEventos() {
   const { eventos, loading, error, recargar } = useEventos();
   const { pilotos } = usePilotos();
+  const { campeonatos, loading: cargandoCampeonatos } = useCampeonatos();
+  const vigenteId = campeonatos[0]?.id ?? "";
+
+  // Lista qué temporada mostrar -- por defecto la vigente (mismo criterio
+  // que Calendario/Resultados en App.jsx), pero el admin puede elegir
+  // cualquier otra o "Todas" para ver el historial completo sin salir de
+  // Gestión de eventos. Mismo patrón "tocado" que el selector de
+  // temporada de NuevaFecha, para no pisar una elección explícita.
+  const [campeonatoFiltroId, setCampeonatoFiltroId] = useState("");
+  const [filtroTocado, setFiltroTocado] = useState(false);
+  useEffect(() => {
+    if (!filtroTocado && vigenteId) setCampeonatoFiltroId(vigenteId);
+  }, [vigenteId, filtroTocado]);
+
   const eventosOrdenados = useMemo(() => {
-    return [...eventos].sort(
+    const filtrados = campeonatoFiltroId
+      ? eventos.filter((e) => e.campeonato_id === campeonatoFiltroId)
+      : eventos;
+    return [...filtrados].sort(
       (a, b) => new Date(`${b.fecha}T00:00:00`) - new Date(`${a.fecha}T00:00:00`)
     );
-  }, [eventos]);
+  }, [eventos, campeonatoFiltroId]);
 
   return (
     <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <label style={{ fontSize: 12, color: T.muted }}>Temporada:</label>
+        <select
+          value={campeonatoFiltroId}
+          onChange={(e) => {
+            setCampeonatoFiltroId(e.target.value);
+            setFiltroTocado(true);
+          }}
+          disabled={cargandoCampeonatos}
+          style={{
+            background: T.surfaceRaised,
+            border: `1px solid ${T.line}`,
+            borderRadius: 8,
+            padding: "8px 12px",
+            color: T.text,
+            fontSize: 13,
+          }}
+        >
+          <option value="">Todas las temporadas</option>
+          {campeonatos.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+              {c.id === vigenteId ? " (vigente)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <NuevaFecha onCreado={recargar} />
 
       {loading && <div style={{ color: T.muted, fontSize: 13 }}>Cargando calendario...</div>}
       {error && <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>}
+
+      {!error && eventosOrdenados.length === 0 && !loading && (
+        <div style={{ color: T.muted, fontSize: 13 }}>No hay fechas cargadas para esta temporada.</div>
+      )}
 
       {!error && eventosOrdenados.map((e) => <FilaEvento key={e.id} evento={e} onSubido={recargar} pilotos={pilotos} />)}
     </div>

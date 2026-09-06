@@ -901,7 +901,11 @@ eligió nada.
 - **Gestión de eventos**: `NuevaFecha` suma un selector de temporada (precargado con la
   vigente) al dar de alta una fecha nueva, y cada fila de evento suma `CampeonatoEditable`
   (mismo patrón lápiz-para-editar que `CircuitoEditable`) para reasignar la temporada de una
-  fecha ya cargada.
+  fecha ya cargada. El listado en sí también suma un selector de temporada arriba de todo
+  (`GestionEventos`, mismo patrón "tocado" que el de `NuevaFecha` para no pisar una elección
+  explícita del admin) — por defecto muestra solo la vigente (marcada "(vigente)" en las
+  opciones), con una opción "Todas las temporadas" para ver/editar el historial completo sin
+  salir de esta pantalla.
 
 ⚠️ Igual que toda migración nueva: falta correr la 0022 en el proyecto de Supabase de
 **producción** (más allá de staging) para que `campeonatos` deje de estar sin RLS ahí y para
