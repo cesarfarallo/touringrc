@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
-import { Plus, Upload, Pencil, Download, UserPlus, Search } from "lucide-react";
+import { Plus, Upload, Pencil, Download, UserPlus, Search, Users, Trash2 } from "lucide-react";
 import { T } from "../theme";
-import { useEventos, useCircuitos, useClases, usePilotos } from "../hooks";
+import { useEventos, useCircuitos, useClases, usePilotos, useInscriptosEvento } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
@@ -467,6 +467,83 @@ function DatosEventoEditable({ evento, onGuardado }) {
   );
 }
 
+// Ver y desinscribir a los pilotos ya anotados a un evento -- requiere
+// la policy de delete para admin de la migración 0021 (antes de eso
+// `inscripciones` no tenía ninguna policy de delete, ni para el propio
+// piloto ni para un admin). A diferencia de "Inscribir piloto", no
+// respeta la ventana de inscripción -- sacar a alguien es una
+// corrección administrativa, tiene sentido poder hacerla aunque la
+// inscripción ya haya cerrado (ej. alguien avisa que no va a poder ir
+// después del corte).
+function InscriptosLista({ evento, onCambio }) {
+  const [abierto, setAbierto] = useState(false);
+  const { inscriptos, loading, recargar } = useInscriptosEvento(abierto ? evento.id : null);
+  const [quitandoId, setQuitandoId] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function quitar(inscripcion) {
+    const nombre = [inscripcion.pilotos?.first_name, inscripcion.pilotos?.last_name].filter(Boolean).join(" ") || "este piloto";
+    if (!confirm(`¿Desinscribir a ${nombre} de ${evento.nombre}?`)) return;
+    setQuitandoId(inscripcion.id);
+    setError(null);
+    const { error } = await supabase.from("inscripciones").delete().eq("id", inscripcion.id);
+    setQuitandoId(null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    recargar();
+    onCambio();
+  }
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "8px 14px",
+          borderRadius: 8,
+          border: `1px solid ${T.line}`,
+          background: "transparent",
+          color: T.text,
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        <Users size={13} /> {abierto ? "Ocultar inscriptos" : "Ver inscriptos"}
+      </button>
+      {abierto && (
+        <div style={{ marginTop: 10, padding: 12, borderRadius: 10, border: `1px solid ${T.line}`, background: T.surfaceRaised, display: "flex", flexDirection: "column", gap: 6 }}>
+          {loading && <div style={{ color: T.muted, fontSize: 12 }}>Cargando...</div>}
+          {!loading && inscriptos.length === 0 && <div style={{ color: T.muted, fontSize: 12 }}>Todavía no hay inscriptos en esta fecha.</div>}
+          {!loading &&
+            inscriptos.map((i) => (
+              <div key={i.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                <span>
+                  {[i.pilotos?.first_name, i.pilotos?.last_name].filter(Boolean).join(" ") || "(sin nombre)"}
+                  <span style={{ color: T.muted }}> — {i.clases?.nombre ?? "Sin categoría"}</span>
+                </span>
+                <button
+                  onClick={() => quitar(i)}
+                  disabled={quitandoId === i.id}
+                  title="Desinscribir"
+                  style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: quitandoId === i.id ? "default" : "pointer", padding: 0, flexShrink: 0 }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          {error && <div style={{ color: T.red, fontSize: 12 }}>{error}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Inscribir a un piloto a mano (ej. alguien que se anota en boca de
 // pista) -- busca en el roster completo, no solo entre los ya
 // vinculados a una cuenta, y hace el insert directo con la policy de
@@ -785,6 +862,7 @@ function FilaEvento({ evento, onSubido, pilotos }) {
           ))}
         </div>
       )}
+      <InscriptosLista evento={evento} onCambio={onSubido} />
       <InscribirPiloto evento={evento} pilotos={pilotos} onInscripto={onSubido} />
       <ArchivosChecklist archivos={evento.archivos} />
     </div>

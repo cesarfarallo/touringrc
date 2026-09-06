@@ -637,6 +637,17 @@ funcionando exactamente igual, sin tocarlo.
   `inscripcion_dias_antes`) — son criterios distintos a propósito, uno es para *anotar* gente
   (tiene sentido que respete la ventana real de inscripción) y el otro para *descargar* lo ya
   anotado (tiene sentido mientras falte para la fecha, sin importar cuándo abrió la ventana).
+- **Desinscribir a un piloto a mano** (`InscriptosLista` en `GestionEventos.jsx`, botón "Ver
+  inscriptos" al lado de "Inscribir piloto", migración 0021): `inscripciones` nunca había
+  tenido ninguna policy de `delete` — ni el propio piloto podía cancelar su inscripción ni un
+  admin podía sacarla a mano, solo se podía crear o leer. La migración agrega
+  `for delete using (public.es_admin())`. El botón despliega la lista de inscriptos de esa
+  fecha (`useInscriptosEvento(eventoId)` en `hooks.js`, se carga recién al abrir la lista, no
+  de entrada) con un tacho por fila (`confirm()` antes de borrar, mismo patrón que "Borrar
+  piloto"). A diferencia de "Inscribir piloto", **no** respeta la ventana de
+  `inscripcionAbierta()` a propósito: sacar a alguien es una corrección administrativa (ej.
+  avisó que no puede ir después de que cerró la inscripción), no una inscripción nueva, así que
+  tiene que poder hacerse en cualquier momento.
 
 ## Ganadores en la tarjeta del Calendario
 

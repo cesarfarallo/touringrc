@@ -539,6 +539,43 @@ export function useInscripcionPiloto(eventoId, pilotoId) {
   return { inscripcion, loading, recargar };
 }
 
+// Oficina admin: todos los inscriptos de un evento (para poder
+// desinscribir a mano desde GestionEventos.jsx) -- requiere la policy
+// de select de admin de la migración 0015, ya usada en otros lugares
+// de Gestión de eventos.
+export function useInscriptosEvento(eventoId) {
+  const [inscriptos, setInscriptos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!eventoId) {
+      setInscriptos([]);
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("inscripciones")
+      .select("id, pilotos ( first_name, last_name ), clases ( nombre )")
+      .eq("evento_id", eventoId)
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setInscriptos(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [eventoId, version]);
+
+  return { inscriptos, loading, error, recargar };
+}
+
 // ¿El usuario logueado es admin de verdad? Chequea que tenga el rol
 // 'admin' en `piloto_roles` (server-side, ver
 // touringrc-sync/sql/migrations/0003_roles_y_modulos.sql) -- no
