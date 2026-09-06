@@ -374,7 +374,7 @@ export default function TouringRCApp() {
                     : logueado && piloto && !puedeInscribirse
                       ? "Pendiente de aprobación"
                       : !inscripcionDestacadaAbierta
-                        ? "Cerrada"
+                        ? "Inscripción no habilitada"
                         : formularioDestacadoAbierto
                           ? "Cerrar inscripción"
                           : "Inscribirme"}

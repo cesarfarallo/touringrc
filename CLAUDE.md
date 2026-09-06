@@ -763,9 +763,11 @@ clickeable y con pinta de habilitado aunque todavía no hubieran pasado los
 `inscripcion_dias_antes` configurados para esa fecha, a diferencia del botón de cada
 `EventoCard.jsx` (`disabled={!abierta || !puedeInscribirse}`), que sí lo respetaba siempre.
 `puedeAbrirInscripcionDestacada` (nueva variable derivada, `App.jsx`) centraliza la misma
-condición para el `disabled`, el estilo y el label ("Cerrada" cuando la ventana no abrió
-todavía, igual que el "Cerrada" de `EventoCard.jsx`) — mismo criterio, sin duplicar la lógica
-tres veces.
+condición para el `disabled`, el estilo y el label ("Inscripción no habilitada" cuando la
+ventana no abrió todavía o ya cerró) — mismo criterio, sin duplicar la lógica tres veces. El
+mismo label ("Cerrada"/"Inscripción cerrada" antes) se unificó también en `EventoCard.jsx` —
+las tres variantes del botón usan ahora el mismo texto ("Inscripción no habilitada") para este
+estado, sea usuario anónimo o logueado.
 
 El módulo administrativo `GestionEventos.jsx` usa el mismo orden del calendario: fecha más
 reciente primero, sea futura o pasada, y luego las fechas más antiguas.

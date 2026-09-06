@@ -262,7 +262,7 @@ export default function EventoCard({
               </button>
             ) : (
               <span style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif" }}>
-                Inscripción cerrada
+                Inscripción no habilitada
               </span>
             )
           ) : cargandoInscripcion ? (
@@ -290,7 +290,7 @@ export default function EventoCard({
                 cursor: abierta && puedeInscribirse ? "pointer" : "not-allowed",
               }}
             >
-              {!puedeInscribirse ? "Pendiente de aprobación" : abierta ? "Inscribirme" : "Cerrada"}
+              {!puedeInscribirse ? "Pendiente de aprobación" : abierta ? "Inscribirme" : "Inscripción no habilitada"}
             </button>
           )}
         </div>
