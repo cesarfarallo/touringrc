@@ -42,9 +42,11 @@ function subidaHabilitada(evento) {
   return hoy >= fecha;
 }
 
-// El acumulado de campeonato no tiene evento propio -- se sube contra el
+// Fallback para eventos sin temporada asignada todavía (`campeonato_id`
+// nulo, ej. de antes de la migración 0022) -- en ese caso, sube contra el
 // campeonato vigente (el de fecha_inicio más reciente), igual criterio que
-// useCampeonato() en ../hooks.js.
+// useCampeonato() en ../hooks.js. El caso normal usa evento.campeonato_id
+// directo (ver bug de abajo).
 async function campeonatoVigenteId() {
   const { data, error } = await supabase
     .from("campeonatos")
@@ -885,7 +887,7 @@ function FilaEvento({ evento, onSubido, pilotos }) {
       try {
         const contenidoBase64 = await archivoABase64(file);
         const body = { eventoId: evento.id, tipo, contenidoBase64 };
-        if (tipo === "campeonato") body.campeonatoId = await campeonatoVigenteId();
+        if (tipo === "campeonato") body.campeonatoId = evento.campeonato_id ?? (await campeonatoVigenteId());
 
         const { data, error } = await supabase.functions.invoke("subir-resultado", { body });
         if (error) throw new Error(await extraerMensajeError(error));

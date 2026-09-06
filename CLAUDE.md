@@ -915,6 +915,17 @@ eligió nada.
 **producción** (más allá de staging) para que `campeonatos` deje de estar sin RLS ahí y para
 que los eventos ya cargados en producción queden asociados a "Metro Touring Eco 2026".
 
+⚠️ **Bug encontrado en producción**: subir `SeriesResultReport.xls` (tipo `campeonato`) a una
+fecha de una temporada vieja (ej. una fecha de "Metro 2025") actualizaba el acumulado de la
+temporada **vigente** en vez de la temporada real de esa fecha — `onArchivosElegidos` en
+`GestionEventos.jsx` resolvía el `campeonatoId` a mandarle a la Edge Function siempre vía
+`campeonatoVigenteId()` (el de `fecha_inicio` más reciente), sin mirar el `campeonato_id` del
+propio evento. Tenía sentido antes de la migración 0022 (no existía ese dato en el evento
+todavía), pero dejó de tenerlo en cuanto cada evento quedó asociado a su temporada real.
+Corregido: ahora usa `evento.campeonato_id` directo, y solo cae a `campeonatoVigenteId()` como
+fallback para un evento que todavía no tenga temporada asignada (dato nulo, ej. de antes de la
+0022 si no se corrió el backfill en ese proyecto).
+
 ## Oficina técnica: homologación de neumáticos (migración 0017)
 
 Nuevo tab del nav ("Oficina técnica", `OficinaTecnica.jsx`), visible solo si `useMisModulos()`
