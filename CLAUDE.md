@@ -848,6 +848,65 @@ tarjeta (ni en la grilla de dos columnas ni en el fallback a una columna en mobi
 ⚠️ No se pudo confirmar con el club el nombre real de cada uno de los 7 circuitos — el seed usa
 nombres genéricos como placeholder, pendiente que el admin los renombre desde la web.
 
+## Temporadas / campeonatos multi-año (migración 0022)
+
+Hasta esta migración, eventos/resultados/campeonato vivían todos en una sola lista plana sin
+noción de año — pensado originalmente para una sola temporada. `eventos.campeonato_id` ya
+existía desde el `schema.sql` base (nunca se había usado desde la web), y `campeonatos`
+(`nombre`, `fecha_inicio`, `fecha_fin`) tampoco tenía **ninguna** policy de RLS habilitada
+(mismo gap que tenía `circuitos` antes de la migración 0009). La migración 0022:
+
+- Habilita RLS en `campeonatos`: select público, resto (`insert`/`update`/`delete`) solo admin
+  — mismo patrón `for all using/with check (es_admin())` que `circuitos`.
+- Crea la temporada **"Metro Touring Eco 2026"** si todavía no existe un campeonato con ese
+  nombre (nombre elegido por el club para la temporada vigente al momento de escribir esto),
+  con `fecha_inicio`/`fecha_fin` calculados del rango real de fechas de los eventos ya
+  cargados (o el año calendario actual como placeholder si no hay ninguno todavía).
+- Asocia esa temporada a todos los eventos que tuvieran `campeonato_id` nulo — así el
+  Calendario no queda vacío apenas se despliega el filtro por temporada vigente (ver abajo).
+
+**"Temporada vigente"**: mismo criterio que ya usaba `useCampeonato()` para el tab Campeonato
+desde antes de esta migración (el campeonato con `fecha_inicio` más reciente) — no se inventó
+un criterio nuevo, se generalizó el existente. `useCampeonato()` (`hooks.js`) ahora acepta un
+`campeonatoId` opcional: sin argumento sigue trayendo el vigente (comportamiento de siempre,
+sin cambios para quien ya lo usaba así); con un id explícito trae ese campeonato puntual en
+cambio (usado por "Resultados históricos", ver abajo); con un string vacío (`""`, distinto de
+no pasar nada) no dispara ninguna consulta — estado inicial de un selector que todavía no
+eligió nada.
+
+- **Calendario y Resultados muestran por defecto solo la temporada vigente** (`App.jsx`): la
+  próxima fecha destacada, la lista de tarjetas del Calendario, y el selector de fecha del tab
+  Resultados ahora filtran por `evento.campeonato_id === campeonato.id` (el campeonato vigente
+  ya resuelto por `useCampeonato()`, reutilizando la misma llamada que ya alimentaba el tab
+  Campeonato). El tab Campeonato no necesitó ningún cambio: ya mostraba el vigente por
+  construcción desde antes. Mientras el campeonato vigente todavía está cargando, no se filtra
+  nada (se muestran todos los eventos sin distinción) para no parpadear una lista vacía en el
+  primer render.
+- **Nuevo tab público "Resultados históricos"** (`ResultadosHistoricos.jsx`, ícono `History`):
+  el único lugar de la app donde se navegan temporadas anteriores — decisión explícita del
+  club para no sumarle un selector de temporada a cada uno de los tabs existentes. Un
+  `<select>` de campeonatos (`useCampeonatos()`, nuevo hook — todos los campeonatos, a
+  diferencia de `useCampeonato()` que trae uno solo) es el único control; al elegir uno arma
+  dos módulos para esa temporada puntual, reutilizando los mismos hooks/tablas que ya existían
+  en vez de duplicar lógica: "Resultados de eventos" (selector de fecha + Resultados
+  finales/Clasificación, mismo patrón que el tab Resultados) y "Campeonato" (standings vía
+  `useCampeonato(campeonatoId)`, mismo `TablaCampeonato` de siempre).
+- **Admin — nuevo sub-tab "Campeonatos"** (`CampeonatosAdmin.jsx`, en `AdminPanel.jsx`): alta y
+  edición de temporadas (nombre, fecha de inicio, fecha de fin), mismo patrón de formulario
+  inline que "Agregar fecha al calendario" en Gestión de eventos. Marca con un badge "Vigente"
+  la que tiene `fecha_inicio` más reciente, para que quede claro cuál es la que el resto de la
+  app está usando como default. Sin botón de borrado a propósito (no se pidió, y borrar una
+  temporada con eventos asociados fallaría solo por la FK sin `on delete cascade` de
+  `eventos.campeonato_id` — comportamiento ya suficiente sin agregar código extra).
+- **Gestión de eventos**: `NuevaFecha` suma un selector de temporada (precargado con la
+  vigente) al dar de alta una fecha nueva, y cada fila de evento suma `CampeonatoEditable`
+  (mismo patrón lápiz-para-editar que `CircuitoEditable`) para reasignar la temporada de una
+  fecha ya cargada.
+
+⚠️ Igual que toda migración nueva: falta correr la 0022 en el proyecto de Supabase de
+**producción** (más allá de staging) para que `campeonatos` deje de estar sin RLS ahí y para
+que los eventos ya cargados en producción queden asociados a "Metro Touring Eco 2026".
+
 ## Oficina técnica: homologación de neumáticos (migración 0017)
 
 Nuevo tab del nav ("Oficina técnica", `OficinaTecnica.jsx`), visible solo si `useMisModulos()`

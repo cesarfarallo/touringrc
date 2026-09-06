@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -26,6 +26,7 @@ import MiPerfil from "./components/MiPerfil";
 import AdminPanel from "./components/AdminPanel";
 import CircuitosView from "./components/CircuitosView";
 import OficinaTecnica from "./components/OficinaTecnica";
+import ResultadosHistoricos from "./components/ResultadosHistoricos";
 import ModalInscriptos from "./components/ModalInscriptos";
 import DevRibbon from "./components/DevRibbon";
 
@@ -92,11 +93,23 @@ export default function TouringRCApp() {
   const clases = Object.keys(campeonatoPorClase);
   const [clase, setClase] = useState(null);
   const claseActiva = clase && clases.includes(clase) ? clase : clases[0];
+
+  // Calendario y Resultados muestran por defecto solo la temporada vigente
+  // (`campeonato`, el de fecha_inicio más reciente, ya calculado arriba por
+  // useCampeonato()) -- años anteriores se ven aparte, en "Resultados
+  // históricos". Mientras el campeonato vigente todavía está cargando, no
+  // se filtra nada para no mostrar una lista vacía de arranque.
+  const eventosTemporadaVigente = useMemo(() => {
+    if (cargandoCampeonato) return eventos;
+    if (!campeonato) return eventos;
+    return eventos.filter((e) => e.campeonato_id === campeonato.id);
+  }, [eventos, campeonato, cargandoCampeonato]);
+
   const eventosOrdenados = useMemo(() => {
-    return [...eventos].sort(
+    return [...eventosTemporadaVigente].sort(
       (a, b) => new Date(`${b.fecha}T00:00:00`) - new Date(`${a.fecha}T00:00:00`)
     );
-  }, [eventos]);
+  }, [eventosTemporadaVigente]);
 
   // `corrida` es un flag manual que no siempre queda prendido (ver
   // marcarArchivo() en la Edge Function) -- una fecha pasada entra igual,
@@ -105,10 +118,10 @@ export default function TouringRCApp() {
   const eventosCorridos = useMemo(() => {
     const hoyResultados = new Date();
     hoyResultados.setHours(0, 0, 0, 0);
-    return [...eventos]
+    return [...eventosTemporadaVigente]
       .filter((e) => e.corrida || new Date(`${e.fecha}T00:00:00`) < hoyResultados)
       .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-  }, [eventos]);
+  }, [eventosTemporadaVigente]);
   const [eventoResultadosId, setEventoResultadosId] = useState(null);
   const eventoResultadosIdActivo =
     eventoResultadosId && eventosCorridos.some((e) => e.id === eventoResultadosId)
@@ -130,7 +143,7 @@ export default function TouringRCApp() {
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const proximo = [...eventos]
+  const proximo = [...eventosTemporadaVigente]
     .filter((e) => new Date(`${e.fecha}T00:00:00`) >= hoy)
     .sort((a, b) => new Date(`${a.fecha}T00:00:00`) - new Date(`${b.fecha}T00:00:00`))[0];
   const horasRestantes = proximo
@@ -241,6 +254,7 @@ export default function TouringRCApp() {
             <NavTab icon={Flag} label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
             <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
             <NavTab icon={Map} label="Circuitos" active={tab === "circuitos"} onClick={() => setTab("circuitos")} />
+            <NavTab icon={History} label="Resultados históricos" active={tab === "historicos"} onClick={() => setTab("historicos")} />
             {logueado && puedeVerOficinaTecnica && (
               <NavTab icon={Wrench} label="Oficina técnica" active={tab === "tecnica"} onClick={() => setTab("tecnica")} />
             )}
@@ -498,6 +512,8 @@ export default function TouringRCApp() {
         )}
 
         {tab === "circuitos" && <CircuitosView esAdmin={esAdminReal} />}
+
+        {tab === "historicos" && <ResultadosHistoricos pilotoId={piloto?.id} />}
 
         {tab === "tecnica" && puedeVerOficinaTecnica && <OficinaTecnica esAdmin={esAdminReal} />}
 

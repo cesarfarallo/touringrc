@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { CalendarCog, Users, ShieldCheck } from "lucide-react";
+import { CalendarCog, Users, ShieldCheck, Trophy } from "lucide-react";
 import { T } from "../theme";
 import GestionEventos from "./GestionEventos";
 import PilotosAdmin from "./PilotosAdmin";
 import RolesAdmin from "./RolesAdmin";
+import CampeonatosAdmin from "./CampeonatosAdmin";
 
 const TABS = [
   { id: "eventos", label: "Gestión de eventos", icon: CalendarCog, Componente: GestionEventos },
+  { id: "campeonatos", label: "Campeonatos", icon: Trophy, Componente: CampeonatosAdmin },
   { id: "pilotos", label: "Pilotos", icon: Users, Componente: PilotosAdmin },
   { id: "roles", label: "Roles", icon: ShieldCheck, Componente: RolesAdmin },
 ];

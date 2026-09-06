@@ -290,26 +290,42 @@ export function useClasificacionEvento(eventoId) {
   return { porClase, loading, error };
 }
 
-// Campeonato vigente (el de fecha_inicio más reciente) + standings por clase.
-export function useCampeonato() {
+// Campeonato + standings por clase. Sin argumento, trae el vigente (el de
+// fecha_inicio más reciente) -- mismo criterio que campeonatoVigenteId() en
+// GestionEventos.jsx. Con un `campeonatoId` explícito, trae ese campeonato
+// puntual en cambio -- usado por "Resultados históricos" para mostrar el
+// acumulado de una temporada anterior sin duplicar esta lógica. Pasar un
+// string vacío (a diferencia de no pasar nada) significa "todavía no se
+// eligió ninguno" -- no dispara ninguna consulta, para el estado inicial
+// del selector de "Resultados históricos".
+export function useCampeonato(campeonatoId) {
   const [campeonato, setCampeonato] = useState(null);
   const [porClase, setPorClase] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(campeonatoId !== "");
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (campeonatoId === "") {
+      setCampeonato(null);
+      setPorClase({});
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let activo = true;
     setLoading(true);
 
     async function cargar() {
-      const { data: campeonatos, error: errCampeonato } = await supabase
-        .from("campeonatos")
-        .select("*")
-        .order("fecha_inicio", { ascending: false })
-        .limit(1);
+      const consulta = campeonatoId
+        ? supabase.from("campeonatos").select("*").eq("id", campeonatoId).limit(1)
+        : supabase.from("campeonatos").select("*").order("fecha_inicio", { ascending: false }).limit(1);
+      const { data: campeonatos, error: errCampeonato } = await consulta;
 
       if (!activo) return;
       if (errCampeonato || !campeonatos?.length) {
+        setCampeonato(null);
+        setPorClase({});
         setError(errCampeonato ?? null);
         setLoading(false);
         return;
@@ -351,9 +367,41 @@ export function useCampeonato() {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [campeonatoId]);
 
   return { campeonato, porClase, loading, error };
+}
+
+// Todos los campeonatos (temporadas), ordenados de más reciente a más
+// antiguo -- para el CRUD admin (CampeonatosAdmin.jsx) y el selector de
+// "Resultados históricos".
+export function useCampeonatos() {
+  const [campeonatos, setCampeonatos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("campeonatos")
+      .select("*")
+      .order("fecha_inicio", { ascending: false })
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setCampeonatos(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [version]);
+
+  return { campeonatos, loading, error, recargar };
 }
 
 // Catálogo completo de circuitos (para el selector de "Circuito" al editar

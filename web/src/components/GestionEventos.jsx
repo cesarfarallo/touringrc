@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Upload, Pencil, Download, UserPlus, Search, Users, Trash2 } from "lucide-react";
 import { T } from "../theme";
-import { useEventos, useCircuitos, useClases, usePilotos, useInscriptosEvento } from "../hooks";
+import { useEventos, useCircuitos, useClases, usePilotos, useInscriptosEvento, useCampeonatos } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
@@ -57,12 +57,24 @@ async function campeonatoVigenteId() {
 }
 
 function NuevaFecha({ onCreado }) {
+  const { campeonatos, loading: cargandoCampeonatos } = useCampeonatos();
+  const vigenteId = campeonatos[0]?.id ?? "";
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [diasAntes, setDiasAntes] = useState("");
+  const [campeonatoId, setCampeonatoId] = useState("");
+  const [campeonatoTocado, setCampeonatoTocado] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
+
+  // Precarga la temporada vigente apenas termina de cargar -- mismo patrón
+  // que categoriaPreferida en EventoCard.jsx (useEffect + flag "tocado"),
+  // para no pisar una elección explícita del admin (incluido elegir "Sin
+  // temporada" a propósito).
+  useEffect(() => {
+    if (!campeonatoTocado && vigenteId) setCampeonatoId(vigenteId);
+  }, [vigenteId, campeonatoTocado]);
 
   async function crear(e) {
     e.preventDefault();
@@ -73,6 +85,7 @@ function NuevaFecha({ onCreado }) {
       nombre: nombre.trim(),
       fecha,
       inscripcion_dias_antes: diasAntes === "" ? null : Number(diasAntes),
+      campeonato_id: campeonatoId || null,
     });
     setGuardando(false);
     if (error) {
@@ -82,6 +95,8 @@ function NuevaFecha({ onCreado }) {
     setNombre("");
     setFecha("");
     setDiasAntes("");
+    setCampeonatoId("");
+    setCampeonatoTocado(false);
     setAbierto(false);
     onCreado();
   }
@@ -180,6 +195,32 @@ function NuevaFecha({ onCreado }) {
             width: 90,
           }}
         />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ fontSize: 11, color: T.muted }}>Temporada</label>
+        <select
+          value={campeonatoId}
+          onChange={(e) => {
+            setCampeonatoId(e.target.value);
+            setCampeonatoTocado(true);
+          }}
+          disabled={cargandoCampeonatos}
+          style={{
+            background: T.surfaceRaised,
+            border: `1px solid ${T.line}`,
+            borderRadius: 8,
+            padding: "8px 12px",
+            color: T.text,
+            fontSize: 13,
+          }}
+        >
+          <option value="">Sin temporada</option>
+          {campeonatos.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
       </div>
       <button
         type="submit"
@@ -372,6 +413,88 @@ function CircuitoEditable({ evento, onGuardado }) {
       >
         <option value="normal">Normal</option>
         <option value="invertido">Invertido</option>
+      </select>
+      <button onClick={guardar} disabled={guardando} style={{ border: "none", background: "transparent", color: T.amber, fontSize: 12, cursor: "pointer" }}>
+        {guardando ? "..." : "Guardar"}
+      </button>
+      <button onClick={() => setEditando(false)} style={{ border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer" }}>
+        Cancelar
+      </button>
+      {error && <span style={{ color: T.red, fontSize: 11 }}>{error}</span>}
+    </div>
+  );
+}
+
+// Asocia la fecha a una temporada (campeonato) -- de esto depende que el
+// Calendario público muestre este evento por defecto (solo se ve la
+// temporada vigente, la de fecha_inicio más reciente) y que aparezca
+// listado dentro de "Resultados históricos" una vez que deje de ser la
+// vigente. Migración 0022.
+function CampeonatoEditable({ evento, onGuardado }) {
+  const { campeonatos, loading: cargandoCampeonatos } = useCampeonatos();
+  const [editando, setEditando] = useState(false);
+  const [campeonatoId, setCampeonatoId] = useState(evento.campeonato_id ?? "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  const nombreActual = campeonatos.find((c) => c.id === evento.campeonato_id)?.nombre;
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    const { error } = await supabase
+      .from("eventos")
+      .update({ campeonato_id: campeonatoId || null })
+      .eq("id", evento.id);
+    setGuardando(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEditando(false);
+    onGuardado();
+  }
+
+  if (!editando) {
+    return (
+      <button
+        onClick={() => {
+          setCampeonatoId(evento.campeonato_id ?? "");
+          setEditando(true);
+        }}
+        title="Editar temporada"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          color: T.muted,
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 12,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {nombreActual ? `Temporada: ${nombreActual}` : "Sin temporada asignada"} <Pencil size={11} />
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <select
+        value={campeonatoId}
+        onChange={(e) => setCampeonatoId(e.target.value)}
+        disabled={cargandoCampeonatos}
+        style={{ background: T.surfaceRaised, border: `1px solid ${T.line}`, borderRadius: 6, padding: "4px 8px", color: T.text, fontSize: 12 }}
+      >
+        <option value="">Sin temporada</option>
+        {campeonatos.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.nombre}
+          </option>
+        ))}
       </select>
       <button onClick={guardar} disabled={guardando} style={{ border: "none", background: "transparent", color: T.amber, fontSize: 12, cursor: "pointer" }}>
         {guardando ? "..." : "Guardar"}
@@ -788,6 +911,9 @@ function FilaEvento({ evento, onSubido, pilotos }) {
           </div>
           <div style={{ marginTop: 6 }}>
             <CircuitoEditable evento={evento} onGuardado={onSubido} />
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <CampeonatoEditable evento={evento} onGuardado={onSubido} />
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
