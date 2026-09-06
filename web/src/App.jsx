@@ -537,7 +537,7 @@ export default function TouringRCApp() {
                     cursor: "pointer",
                   }}
                 >
-                  {c.replace("Touring Eco 1:10 ", "")}
+                  {c.replace("Touring Eco ", "")}
                 </button>
               ))}
             </div>
@@ -608,7 +608,7 @@ export default function TouringRCApp() {
                     ) : (
                       !cargandoResultados && (
                         <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>
-                          No hay resultados de {claseActiva?.replace("Touring Eco 1:10 ", "") ?? "esta clase"} en esta fecha.
+                          No hay resultados de {claseActiva?.replace("Touring Eco ", "") ?? "esta clase"} en esta fecha.
                         </div>
                       )
                     )}
@@ -621,7 +621,7 @@ export default function TouringRCApp() {
                     ) : (
                       !cargandoClasificacion && (
                         <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>
-                          No hay clasificación de {claseActiva?.replace("Touring Eco 1:10 ", "") ?? "esta clase"} en esta
+                          No hay clasificación de {claseActiva?.replace("Touring Eco ", "") ?? "esta clase"} en esta
                           fecha.
                         </div>
                       )

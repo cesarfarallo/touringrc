@@ -23,7 +23,7 @@ function SelectorClase({ clases, activa, onChange }) {
             cursor: "pointer",
           }}
         >
-          {c.replace("Touring Eco 1:10 ", "")}
+          {c.replace("Touring Eco ", "")}
         </button>
       ))}
     </div>

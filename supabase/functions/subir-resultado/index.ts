@@ -35,7 +35,22 @@ const TIPOS_VALIDOS = ["resultadosFinales", "detalleRondas", "vueltaRapida", "cl
 // y antes de este filtro getOrCreateClase() las creaba igual en `clases` y
 // les cargaba resultados. Si el club suma una categoría nueva, agregarla acá
 // (con el nombre EXACTO tal como lo exporta Live Timing).
-const CLASES_PERMITIDAS = new Set(["Touring Eco 1:10 Stock", "Touring Eco 1:10 Modified"]);
+const CLASES_PERMITIDAS = new Set(["Touring Eco Stock", "Touring Eco Modified"]);
+
+// Live Timing exportó estas dos categorías como "Touring Eco 1:10
+// Stock"/"Touring Eco 1:10 Modified" hasta 2025, y pasó a exportarlas sin
+// el "1:10" a partir de 2026 -- normalizamos a la forma corta (la vigente)
+// ANTES de chequear CLASES_PERMITIDAS, así un evento viejo con el nombre
+// largo no se ignora ni termina en una `clases` distinta de la del año
+// nuevo (rompería el histórico de campeonato/homologaciones por categoría).
+const SINONIMOS_CLASE: Record<string, string> = {
+  "Touring Eco 1:10 Stock": "Touring Eco Stock",
+  "Touring Eco 1:10 Modified": "Touring Eco Modified",
+};
+
+function normalizarClase(nombre: string): string {
+  return SINONIMOS_CLASE[nombre] ?? nombre;
+}
 
 Deno.serve(async (req: Request) => {
   const cors = {
@@ -165,7 +180,8 @@ function toFloat(v: string | null | undefined): number | null {
 // Devuelve null (en vez de crear la clase) si `nombre` no está en
 // CLASES_PERMITIDAS -- así una fila de una categoría ajena se salta en vez
 // de crear una `clases` nueva y cargarle resultados.
-async function getClasePermitida(sb: SupabaseClient, nombre: string): Promise<string | null> {
+async function getClasePermitida(sb: SupabaseClient, nombreCrudo: string): Promise<string | null> {
+  const nombre = normalizarClase(nombreCrudo);
   if (!CLASES_PERMITIDAS.has(nombre)) return null;
   const { data } = await sb.from("clases").select("id").eq("nombre", nombre).maybeSingle();
   if (data) return data.id;

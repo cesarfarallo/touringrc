@@ -934,7 +934,7 @@ trajera un reporte de Live Timing, sin filtrar. Si la pista se comparte con otro
 categoría el mismo día (el reporte trae todas las categorías que corrieron esa jornada, no solo
 las del club), esas categorías ajenas (ej. "Touring" a secas, "GT", "1/8 IC") y sus resultados
 terminaban cargados en la base igual que las dos que efectivamente corre este club: "Touring Eco
-1:10 Stock" y "Touring Eco 1:10 Modified".
+Stock" y "Touring Eco Modified".
 
 - **Código** (ambos lados, mismo criterio para no perder paridad): se agrega una constante
   `CLASES_PERMITIDAS` (`Set` en `index.ts`, `set` en `sync_evento.py`) con los dos nombres
@@ -955,6 +955,48 @@ terminaban cargados en la base igual que las dos que efectivamente corre este cl
   de correrla qué hay cargado hoy en `clases`, por si el nombre real de alguna categoría del
   club no coincidiera exacto con los dos hardcodeados (en ese caso, ajustar la lista en la
   migración y en el código antes de correrla).
+
+⚠️ **Incidente en producción — se borró TODO al correr la migración 0023**: el nombre exacto
+que se hardcodeó primero en `CLASES_PERMITIDAS` (y en la migración) fue `"Touring Eco 1:10
+Stock"`/`"Touring Eco 1:10 Modified"` — una suposición basada en el comentario de ejemplo de
+`schema.sql` (`nombre text unique not null -- ej 'Touring Eco 1:10 Modified'`) y en el
+`.replace("Touring Eco 1:10 ", "")` que ya usaba el frontend para acortar el nombre en las
+pestañas, **sin confirmarlo contra la base real** antes de correr la migración. El nombre real
+en producción (y en los reportes de Live Timing de 2026) es sin el "1:10": `"Touring Eco
+Stock"`/`"Touring Eco Modified"` — ninguna fila de `clases` matcheaba la lista hardcodeada, así
+que la migración interpretó **todas** las categorías (incluidas las dos reales del club) como
+"ajenas" y las borró junto con sus resultados, clasificación, campeonato e inscripciones (de
+todas las clases, pasadas y de la fecha próxima). `circuito_records`/`homologaciones_neumaticos`
+de las dos categorías reales también se perdieron por el `on delete cascade` en `clase_id`, sin
+que la migración los tocara directo.
+
+Reconstrucción, dado que el proyecto está en el plan Free (sin backups/PITR): el club conservaba
+las carpetas de exports de Live Timing de todas las fechas, así que `resultados_finales`/
+`resultados_ronda`/`clasificacion`/`campeonato_puntos` se reconstruyeron **re-subiendo esos
+mismos archivos por Gestión de eventos** (ya con el fix desplegado) — no se pudo recuperar,
+porque no hay archivo fuente que los reconstruya: las inscripciones online que hubiera para la
+próxima fecha (no corrida todavía, sin export posible) y cualquier homologación de neumáticos
+cargada a mano.
+
+**Segunda vuelta del mismo bug, al re-subir**: con `CLASES_PERMITIDAS` ya corregido al nombre
+real (`"Touring Eco Stock"`/`"Touring Eco Modified"`), re-subir una fecha de **2025** seguía
+devolviendo "0 resultados... se ignoraron: Touring Eco Modified, Touring Eco Stock" — Live
+Timing exportaba esas dos categorías con el nombre **largo** (`"Touring Eco 1:10 Modified"`/
+`"Touring Eco 1:10 Stock"`) hasta 2025, y pasó a exportarlas sin el "1:10" recién a partir de
+2026. `SINONIMOS_CLASE` (mismo diccionario en `index.ts` y `sync_evento.py`) normaliza el
+nombre crudo a la forma corta **antes** de chequear `CLASES_PERMITIDAS` y de buscar/crear la
+fila en `clases` — así un evento de cualquiera de los dos años cae en la misma fila de `clases`
+(necesario para que el acumulado de campeonato y la cuenta de eventos de
+`neumaticos_estado_clase()` por categoría no se partan en dos según el año). El frontend
+(`App.jsx`, `ResultadosHistoricos.jsx`) también se actualizó: el `.replace("Touring Eco 1:10 ",
+"")` que acortaba el nombre en las pestañas de categoría pasa a `.replace("Touring Eco ", "")`,
+acorde al nombre corto que ahora es el único que se guarda en `clases`.
+
+**Lección para la próxima vez que se hardcodee un nombre exacto de una fila de la base** (acá o
+en cualquier constante similar): confirmar el valor real contra la base (o contra un archivo de
+muestra real reciente) antes de escribir una migración destructiva que dependa de ese match —
+no alcanza con inferirlo de un comentario de ejemplo o de un patrón de UI que lo daba por
+sentado.
 
 ## Oficina técnica: homologación de neumáticos (migración 0017)
 

@@ -62,13 +62,26 @@ def get_client():
 # y les cargaba resultados. Si el club suma una categoría nueva, agregarla
 # acá (con el nombre EXACTO tal como lo exporta Live Timing) -- mismo
 # criterio que CLASES_PERMITIDAS en supabase/functions/subir-resultado/index.ts.
-CLASES_PERMITIDAS = {"Touring Eco 1:10 Stock", "Touring Eco 1:10 Modified"}
+CLASES_PERMITIDAS = {"Touring Eco Stock", "Touring Eco Modified"}
+
+# Live Timing exportó estas dos categorías como "Touring Eco 1:10
+# Stock"/"Touring Eco 1:10 Modified" hasta 2025, y pasó a exportarlas sin
+# el "1:10" a partir de 2026 -- normalizamos a la forma corta (la vigente)
+# ANTES de chequear CLASES_PERMITIDAS, así un evento viejo con el nombre
+# largo no se ignora ni termina en una `clases` distinta de la del año
+# nuevo (rompería el histórico de campeonato/homologaciones por categoría).
+SINONIMOS_CLASE = {
+    "Touring Eco 1:10 Stock": "Touring Eco Stock",
+    "Touring Eco 1:10 Modified": "Touring Eco Modified",
+}
 
 
-def get_clase_permitida(sb, nombre):
-    """Devuelve None (en vez de crear la clase) si `nombre` no está en
-    CLASES_PERMITIDAS -- así una fila de una categoría ajena se salta en
-    vez de crear una `clases` nueva y cargarle resultados."""
+def get_clase_permitida(sb, nombre_crudo):
+    """Devuelve None (en vez de crear la clase) si `nombre_crudo` (ya
+    normalizado vía SINONIMOS_CLASE) no está en CLASES_PERMITIDAS -- así
+    una fila de una categoría ajena se salta en vez de crear una `clases`
+    nueva y cargarle resultados."""
+    nombre = SINONIMOS_CLASE.get(nombre_crudo, nombre_crudo)
     if nombre not in CLASES_PERMITIDAS:
         return None
     r = sb.table("clases").select("id").eq("nombre", nombre).execute()
