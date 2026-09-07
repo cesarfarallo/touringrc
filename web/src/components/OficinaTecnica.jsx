@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2 } from "lucide-react";
 import { T } from "../theme";
-import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones } from "../hooks";
+import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones, useCampeonato } from "../hooks";
 import { supabase } from "../lib/supabase";
 import HomologacionesPendientes from "./HomologacionesPendientes";
 
@@ -561,10 +561,14 @@ export default function OficinaTecnica({ esAdmin }) {
   const { clases, loading: cargandoClases, recargar: recargarClases } = useClases();
   const { marcas, loading: cargandoMarcas, recargar: recargarMarcas } = useMarcasNeumaticos();
   const { eventos } = useEventos();
+  const { campeonato } = useCampeonato();
   const [claseId, setClaseId] = useState(null);
   const claseActiva = clases.find((c) => c.id === claseId) ?? clases[0];
 
-  const { estado, loading: cargandoEstado, recargar: recargarEstado } = useNeumaticosEstadoClase(claseActiva?.id);
+  // Solo pilotos de la temporada vigente (migración 0025) -- un piloto que
+  // corrió esta categoría en una temporada anterior (ej. Metro 2025) no
+  // tiene por qué aparecer mezclado acá.
+  const { estado, loading: cargandoEstado, recargar: recargarEstado } = useNeumaticosEstadoClase(claseActiva?.id, campeonato?.id);
   const { porPiloto: historialPorPiloto, recargar: recargarHistorial } = useHistorialHomologaciones(claseActiva?.id);
 
   function recargarTodo() {

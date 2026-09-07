@@ -873,7 +873,10 @@ export function useMarcasNeumaticos() {
 // categoría -- última marca homologada, eventos transcurridos desde
 // entonces, y si está apto para homologar un juego nuevo (ver
 // neumaticos_estado_clase() en la migración 0017 para la regla).
-export function useNeumaticosEstadoClase(claseId) {
+// `campeonatoId` acota el roster a la temporada vigente (migración 0025)
+// -- sin esto, un piloto que corrió esa categoría en cualquier temporada
+// pasada aparecía igual que uno de la vigente.
+export function useNeumaticosEstadoClase(claseId, campeonatoId) {
   const [estado, setEstado] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -882,14 +885,14 @@ export function useNeumaticosEstadoClase(claseId) {
   const recargar = () => setVersion((v) => v + 1);
 
   useEffect(() => {
-    if (!claseId) {
+    if (!claseId || !campeonatoId) {
       setEstado([]);
       return;
     }
     let activo = true;
     setLoading(true);
     supabase
-      .rpc("neumaticos_estado_clase", { p_clase_id: claseId })
+      .rpc("neumaticos_estado_clase", { p_clase_id: claseId, p_campeonato_id: campeonatoId })
       .then(({ data, error }) => {
         if (!activo) return;
         if (error) setError(error);
@@ -899,7 +902,7 @@ export function useNeumaticosEstadoClase(claseId) {
     return () => {
       activo = false;
     };
-  }, [claseId, version]);
+  }, [claseId, campeonatoId, version]);
 
   return { estado, loading, error, recargar };
 }

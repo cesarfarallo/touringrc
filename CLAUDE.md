@@ -1098,6 +1098,24 @@ de corregir fila por fila — `delete from homologaciones_neumaticos` (borra tod
 `homologaciones_pendientes` cascadea sola). `marcas_neumaticos` (el catálogo de marcas) no se
 tocó, no depende de pilotos. Corrida en staging y producción.
 
+⚠️ **Bug encontrado en producción — pilotos de distintas temporadas mezclados en una misma
+categoría** (migración 0025): `neumaticos_estado_clase(p_clase_id)` arma el roster de pilotos de
+una categoría a partir de `resultados_finales.clase_id`, sin mirar a qué evento/temporada
+pertenece cada resultado — tenía sentido cuando toda la base era una sola temporada, dejó de
+tenerlo en cuanto los eventos de años distintos (Metro 2025 y Metro 2026) empezaron a convivir
+con la misma `clases.nombre` (migración 0023 normaliza el nombre de categoría entre años, así
+que ambos años comparten el mismo `clase_id` — correcto para el acumulado de campeonato, pero
+significa que un piloto de Metro 2025 y uno de Metro 2026 aparecían mezclados en la misma lista
+de "pilotos que corrieron esta categoría"). La función se redefine con un parámetro
+`p_campeonato_id` nuevo, y filtra por `eventos.campeonato_id` en las tres partes de la consulta
+(última homologación, roster de pilotos, y conteo de eventos desde la última homologación) —
+`OficinaTecnica.jsx` le pasa el campeonato vigente (`useCampeonato()`, mismo criterio de
+siempre). `useNeumaticosEstadoClase(claseId, campeonatoId)` ahora requiere los dos parámetros
+para disparar la consulta. El historial completo de un piloto (`useHistorialHomologaciones`,
+botón "Historial" expandible) **no** se acotó a la temporada vigente a propósito — sigue
+mostrando todas las homologaciones de esa categoría sin importar el año, porque su función es
+justamente ser un registro histórico completo.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
