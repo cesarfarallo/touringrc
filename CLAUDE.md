@@ -1116,6 +1116,15 @@ botón "Historial" expandible) **no** se acotó a la temporada vigente a propós
 mostrando todas las homologaciones de esa categoría sin importar el año, porque su función es
 justamente ser un registro histórico completo.
 
+⚠️ **Segunda vuelta del mismo bug, en el selector de "Cargar histórico"**: `eventoHoy`/
+`eventosPasados` en `OficinaTecnica.jsx` salían de `useEventos()` sin filtrar — mismo problema
+que el roster de pilotos, ahora en el `<select>` de fecha del formulario "Cargar histórico":
+listaba fechas de **todas** las temporadas cargadas, no solo la vigente. `eventosVigentes`
+(nueva variable derivada, mismo criterio de respaldo que `eventosTemporadaVigente` en `App.jsx`:
+mientras el campeonato vigente todavía está cargando, no filtra nada) acota `eventoHoy`/
+`eventosOrdenados`/`eventosPasados` a `evento.campeonato_id === campeonato.id` — no tiene
+sentido ofrecer regularizar una homologación de una temporada ya cerrada.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

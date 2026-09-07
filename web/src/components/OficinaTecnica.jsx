@@ -561,7 +561,11 @@ export default function OficinaTecnica({ esAdmin }) {
   const { clases, loading: cargandoClases, recargar: recargarClases } = useClases();
   const { marcas, loading: cargandoMarcas, recargar: recargarMarcas } = useMarcasNeumaticos();
   const { eventos } = useEventos();
-  const { campeonato } = useCampeonato();
+  const { campeonato, loading: cargandoCampeonato } = useCampeonato();
+  // Mientras el campeonato vigente todavía está cargando, no se filtra
+  // nada (mismo criterio de respaldo que App.jsx) para no parpadear una
+  // lista vacía en el primer render.
+  const eventosVigentes = cargandoCampeonato || !campeonato ? eventos : eventos.filter((e) => e.campeonato_id === campeonato.id);
   const [claseId, setClaseId] = useState(null);
   const claseActiva = clases.find((c) => c.id === claseId) ?? clases[0];
 
@@ -576,16 +580,18 @@ export default function OficinaTecnica({ esAdmin }) {
     recargarHistorial();
   }
 
-  const eventosOrdenados = [...eventos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const eventosOrdenados = [...eventosVigentes].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   // El flujo en vivo ("Homologar") solo se habilita el día de una fecha
   // vigente -- se supone que se carga en pista, ese mismo día. El
   // histórico ("Cargar histórico") queda restringido a fechas ya
-  // pasadas, para regularizar homologaciones que ocurrieron pero nunca
-  // se cargaron en su momento.
+  // pasadas de la temporada vigente (no tiene sentido ofrecer regularizar
+  // homologaciones de una temporada anterior, ya cerrada), para
+  // regularizar homologaciones que ocurrieron pero nunca se cargaron en
+  // su momento.
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const eventoHoy = eventos.find((e) => new Date(`${e.fecha}T00:00:00`).getTime() === hoy.getTime());
+  const eventoHoy = eventosVigentes.find((e) => new Date(`${e.fecha}T00:00:00`).getTime() === hoy.getTime());
   const eventosPasados = eventosOrdenados.filter((e) => new Date(`${e.fecha}T00:00:00`).getTime() < hoy.getTime());
 
   return (
