@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AlertTriangle, Check, Search } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
+import CampoBusqueda from "./CampoBusqueda";
 import { T } from "../theme";
 import { useVinculosPendientes } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -135,23 +136,12 @@ function Fila({ vinculo, pilotosPorId, pilotos, onResuelto }) {
 
       <div style={{ fontSize: 13 }}>
         <span style={{ color: T.muted }}>¿No es ninguno de estos? Buscá al piloto correcto:</span>
-        <div style={{ position: "relative", marginTop: 6, maxWidth: 260 }}>
-          <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre o apellido..."
-            style={{
-              background: T.surfaceRaised,
-              border: `1px solid ${T.line}`,
-              borderRadius: 8,
-              padding: "7px 12px 7px 30px",
-              color: T.text,
-              fontSize: 13,
-              width: "100%",
-            }}
-          />
-        </div>
+        <CampoBusqueda
+          value={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar por nombre o apellido..."
+          wrapperStyle={{ marginTop: 6, maxWidth: 260 }}
+        />
         {resultadosBusqueda.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
             {resultadosBusqueda.map((p) => (

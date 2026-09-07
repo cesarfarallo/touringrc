@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, X, Pencil, Search, UserPlus, Trash2, Link2, Merge } from "lucide-react";
+import { Check, X, Pencil, UserPlus, Trash2, Link2, Merge } from "lucide-react";
+import CampoBusqueda from "./CampoBusqueda";
 import { T } from "../theme";
 import { usePilotos, useRolesYModulos, usePilotoRoles } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -487,24 +488,14 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
               Buscá el piloto correcto -- se va a borrar <strong>{nombreCompleto}</strong> y pasarle su historial
               (resultados, inscripciones, alias).
             </div>
-            <div style={{ position: "relative", maxWidth: 260 }}>
-              <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-              <input
-                value={busquedaFusion}
-                onChange={(e) => setBusquedaFusion(e.target.value)}
-                placeholder="Buscar por nombre o apellido..."
-                autoFocus
-                style={{
-                  background: T.surface,
-                  border: `1px solid ${T.line}`,
-                  borderRadius: 8,
-                  padding: "7px 12px 7px 30px",
-                  color: T.text,
-                  fontSize: 13,
-                  width: "100%",
-                }}
-              />
-            </div>
+            <CampoBusqueda
+              value={busquedaFusion}
+              onChange={setBusquedaFusion}
+              placeholder="Buscar por nombre o apellido..."
+              autoFocus
+              wrapperStyle={{ maxWidth: 260 }}
+              inputStyle={{ background: T.surface }}
+            />
             {resultadosFusion.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                 {resultadosFusion.map((p) => {
@@ -628,24 +619,12 @@ export default function PilotosAdmin() {
       />
 
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
-        <div style={{ position: "relative" }}>
-          <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre, apellido o email..."
-            style={{
-              background: T.surfaceRaised,
-              border: `1px solid ${T.line}`,
-              borderRadius: 8,
-              padding: "7px 12px 7px 30px",
-              color: T.text,
-              fontSize: 13,
-              width: 220,
-              maxWidth: "100%",
-            }}
-          />
-        </div>
+        <CampoBusqueda
+          value={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar por nombre, apellido o email..."
+          wrapperStyle={{ width: 220, maxWidth: "100%" }}
+        />
 
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, cursor: "pointer" }}>
           <input type="checkbox" checked={soloSinVincular} onChange={(e) => setSoloSinVincular(e.target.checked)} />

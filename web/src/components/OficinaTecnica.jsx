@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2, Search } from "lucide-react";
+import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2 } from "lucide-react";
+import CampoBusqueda from "./CampoBusqueda";
 import { T } from "../theme";
 import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones, useCampeonato } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -637,23 +638,12 @@ export default function OficinaTecnica({ esAdmin }) {
             <EventosMinimosEditable clase={claseActiva} onGuardado={recargarClases} />
           </div>
 
-          <div style={{ position: "relative", marginBottom: 12, maxWidth: 260 }}>
-            <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-            <input
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar piloto..."
-              style={{
-                background: T.surfaceRaised,
-                border: `1px solid ${T.line}`,
-                borderRadius: 8,
-                padding: "7px 12px 7px 30px",
-                color: T.text,
-                fontSize: 13,
-                width: "100%",
-              }}
-            />
-          </div>
+          <CampoBusqueda
+            value={busqueda}
+            onChange={setBusqueda}
+            placeholder="Buscar piloto..."
+            wrapperStyle={{ marginBottom: 12, maxWidth: 260 }}
+          />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
             {cargandoEstado && <div style={{ color: T.muted, fontSize: 13 }}>Cargando pilotos...</div>}

@@ -1149,6 +1149,20 @@ cual. Define:
   modelados 1:1 con las tablas reales — el propio archivo lo anota: *"En producción esto sale
   de la tabla `resultados_finales` filtrada por evento_id"*.
 
+## Buscadores (`web/src/components/CampoBusqueda.jsx`)
+
+Componente compartido: input con lupa a la izquierda y una cruz a la derecha para vaciarlo
+(visible solo con contenido cargado) — antes cada pantalla tenía su propia copia de este mismo
+bloque de JSX (lupa + input, sin cruz), repetida en `PilotosAdmin.jsx` (dos veces: búsqueda
+principal y buscador de fusión), `VinculosPendientes.jsx`, `GestionEventos.jsx`
+(`InscribirPiloto`) y `OficinaTecnica.jsx`; se unificó en un solo componente para que la cruz de
+borrar se vea y funcione igual en todos lados, en vez de agregarla a mano cinco veces. `onChange`
+recibe el string directo (no el evento, a diferencia de un `<input>` nativo) para que "borrar"
+sea simplemente `onChange("")` — los callers pasan el setter de estado tal cual
+(`onChange={setBusqueda}`). `wrapperStyle`/`inputStyle` (opcionales) se mergean sobre los estilos
+default para poder ajustar ancho/fondo caso por caso, mismo criterio que el resto de la app
+(objetos de estilo inline, sin una librería de CSS).
+
 ## Convenciones
 
 - Nombres de tablas/columnas de dominio en **español** (`pilotos`, `resultados_finales`,

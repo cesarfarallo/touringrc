@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Upload, Pencil, Download, UserPlus, Search, Users, Trash2 } from "lucide-react";
+import { Plus, Upload, Pencil, Download, UserPlus, Users, Trash2 } from "lucide-react";
+import CampoBusqueda from "./CampoBusqueda";
 import { T } from "../theme";
 import { useEventos, useCircuitos, useClases, usePilotos, useInscriptosEvento, useCampeonatos } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -745,13 +746,12 @@ function InscribirPiloto({ evento, pilotos, onInscripto }) {
     <div style={{ marginTop: 10, padding: 12, borderRadius: 10, border: `1px solid ${T.line}`, background: T.surfaceRaised, display: "flex", flexDirection: "column", gap: 8 }}>
       {!pilotoElegido ? (
         <div style={{ position: "relative", maxWidth: 260 }}>
-          <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-          <input
+          <CampoBusqueda
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={setBusqueda}
             placeholder="Buscar piloto por nombre o apellido..."
             autoFocus
-            style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 8, padding: "7px 12px 7px 30px", color: T.text, fontSize: 13, width: "100%" }}
+            inputStyle={{ background: T.surface }}
           />
           {resultados.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
