@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2 } from "lucide-react";
+import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2, Search } from "lucide-react";
 import { T } from "../theme";
 import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones, useCampeonato } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -574,6 +574,11 @@ export default function OficinaTecnica({ esAdmin }) {
   // tiene por qué aparecer mezclado acá.
   const { estado, loading: cargandoEstado, recargar: recargarEstado } = useNeumaticosEstadoClase(claseActiva?.id, campeonato?.id);
   const { porPiloto: historialPorPiloto, recargar: recargarHistorial } = useHistorialHomologaciones(claseActiva?.id);
+  const [busqueda, setBusqueda] = useState("");
+  const textoBusqueda = busqueda.trim().toLowerCase();
+  const estadoFiltrado = textoBusqueda
+    ? estado.filter((fila) => fila.piloto_nombre.toLowerCase().includes(textoBusqueda))
+    : estado;
 
   function recargarTodo() {
     recargarEstado();
@@ -632,13 +637,34 @@ export default function OficinaTecnica({ esAdmin }) {
             <EventosMinimosEditable clase={claseActiva} onGuardado={recargarClases} />
           </div>
 
+          <div style={{ position: "relative", marginBottom: 12, maxWidth: 260 }}>
+            <Search size={13} color={T.muted} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar piloto..."
+              style={{
+                background: T.surfaceRaised,
+                border: `1px solid ${T.line}`,
+                borderRadius: 8,
+                padding: "7px 12px 7px 30px",
+                color: T.text,
+                fontSize: 13,
+                width: "100%",
+              }}
+            />
+          </div>
+
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
             {cargandoEstado && <div style={{ color: T.muted, fontSize: 13 }}>Cargando pilotos...</div>}
             {!cargandoEstado && estado.length === 0 && (
               <div style={{ color: T.muted, fontSize: 13 }}>Todavía no hay pilotos con resultados en esta categoría.</div>
             )}
+            {!cargandoEstado && estado.length > 0 && estadoFiltrado.length === 0 && (
+              <div style={{ color: T.muted, fontSize: 13 }}>Ningún piloto coincide con "{busqueda}".</div>
+            )}
             {!cargandoEstado &&
-              estado.map((fila) => (
+              estadoFiltrado.map((fila) => (
                 <FilaPiloto
                   key={fila.piloto_id}
                   fila={fila}

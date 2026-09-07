@@ -1125,6 +1125,11 @@ mientras el campeonato vigente todavía está cargando, no filtra nada) acota `e
 `eventosOrdenados`/`eventosPasados` a `evento.campeonato_id === campeonato.id` — no tiene
 sentido ofrecer regularizar una homologación de una temporada ya cerrada.
 
+**Buscador de pilotos**: arriba del listado de la categoría activa, un input filtra `estado`
+(el roster que devuelve `neumaticos_estado_clase()`) por `piloto_nombre`, substring
+case-insensitive — mismo patrón que el buscador de `PilotosAdmin.jsx`. Filtra en el cliente
+sobre la lista ya traída (acotada a la temporada vigente), no agrega una consulta nueva.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
