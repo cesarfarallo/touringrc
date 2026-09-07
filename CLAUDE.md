@@ -1092,6 +1092,12 @@ en ese evento (corrió de verdad), no por estar inscripto (esa es solo la intenc
     `FormularioHomologar` solo los que le quedan disponibles -- el botón "Cargar histórico" se
     deshabilita del todo (con tooltip) si no le queda ninguno.
 
+**Migración 0024 — se vació el historial**: el historial cargado en Oficina técnica quedó con
+pilotos mal asignados (arrastre de logins/fusiones previas) y se decidió arrancar de cero en vez
+de corregir fila por fila — `delete from homologaciones_neumaticos` (borra todo el historial;
+`homologaciones_pendientes` cascadea sola). `marcas_neumaticos` (el catálogo de marcas) no se
+tocó, no depende de pilotos. Corrida en staging y producción.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
