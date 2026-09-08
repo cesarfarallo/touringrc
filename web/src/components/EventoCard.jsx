@@ -297,18 +297,58 @@ export default function EventoCard({
       </div>
 
       {resultadosDisponibles && ganadores && Object.keys(ganadores).length > 0 && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.line}`, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.line}`, display: "flex", flexDirection: "column", gap: 8 }}>
           {Object.entries(ganadores).map(([clase, { A, B } = {}]) => (
-            <div key={clase} style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
-              <span style={{ color: T.muted, fontFamily: "Inter, sans-serif" }}>{clase}:</span>
+            <div key={clase} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+              <span
+                style={{
+                  background: T.surfaceRaised,
+                  color: T.muted,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                {clase.replace("Touring Eco ", "")}
+              </span>
               {A && (
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "Inter, sans-serif" }}>
-                  <Trophy size={13} color="#FFD700" fill="#FFD700" /> {A}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12.5,
+                    whiteSpace: "nowrap",
+                    background: "rgba(255,215,0,0.10)",
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  <Trophy size={12} color="#FFD700" fill="#FFD700" /> {A}
                 </span>
               )}
               {B && (
-                <span style={{ display: "flex", alignItems: "center", gap: 5, color: T.muted, fontFamily: "Inter, sans-serif" }}>
-                  <Medal size={13} color="#C0C0C0" /> {B}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12.5,
+                    color: T.muted,
+                    whiteSpace: "nowrap",
+                    background: T.surfaceRaised,
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  <Medal size={12} color="#C0C0C0" /> {B}
                 </span>
               )}
             </div>

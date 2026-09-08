@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History, Menu, X, ChevronDown } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -60,6 +60,7 @@ const ES_DEV = import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "staging"
 
 export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
+  const [menuMobileAbierto, setMenuMobileAbierto] = useState(false);
   const [inscripcionVersion, setInscripcionVersion] = useState(0);
   const [formularioDestacadoAbierto, setFormularioDestacadoAbierto] = useState(false);
   const [compartiendoInscriptos, setCompartiendoInscriptos] = useState(false);
@@ -85,6 +86,20 @@ export default function TouringRCApp() {
   const { modulos: misModulos } = useMisModulos(session);
   const puedeInscribirse = misModulos.has("inscripcion");
   const puedeVerOficinaTecnica = misModulos.has("homologacion");
+
+  // Un solo array para el nav de tabs (desktop, horizontal) y el menú
+  // desplegable (mobile, hamburguesa) -- misma lista, dos formas de
+  // mostrarla, en vez de duplicar las condiciones de "quién ve qué tab".
+  const navItems = [
+    { id: "calendario", icon: Calendar, label: "Calendario" },
+    { id: "resultados", icon: Flag, label: "Resultados" },
+    { id: "campeonato", icon: Trophy, label: "Campeonato" },
+    { id: "circuitos", icon: Map, label: "Circuitos" },
+    { id: "historicos", icon: History, label: "Resultados históricos" },
+    logueado && puedeVerOficinaTecnica && { id: "tecnica", icon: Wrench, label: "Oficina técnica" },
+    logueado && esAdminReal && { id: "admin", icon: ShieldCheck, label: "Admin" },
+  ].filter(Boolean);
+  const tabActivo = navItems.find((item) => item.id === tab) ?? navItems[0];
 
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
   const { porEvento: ganadoresPorEvento } = useGanadoresPorEvento();
@@ -244,23 +259,16 @@ export default function TouringRCApp() {
         >
           <div style={{ display: "flex", alignItems: "center" }} title="Touring 1:10 Arg">
             <img
+              className="header-logo"
               src="/logo.png"
               alt="Touring 1:10 Arg"
               style={{ height: 152, maxWidth: "min(340px, 30vw)", width: "auto", display: "block" }}
             />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
-            <NavTab icon={Calendar} label="Calendario" active={tab === "calendario"} onClick={() => setTab("calendario")} />
-            <NavTab icon={Flag} label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
-            <NavTab icon={Trophy} label="Campeonato" active={tab === "campeonato"} onClick={() => setTab("campeonato")} />
-            <NavTab icon={Map} label="Circuitos" active={tab === "circuitos"} onClick={() => setTab("circuitos")} />
-            <NavTab icon={History} label="Resultados históricos" active={tab === "historicos"} onClick={() => setTab("historicos")} />
-            {logueado && puedeVerOficinaTecnica && (
-              <NavTab icon={Wrench} label="Oficina técnica" active={tab === "tecnica"} onClick={() => setTab("tecnica")} />
-            )}
-            {logueado && esAdminReal && (
-              <NavTab icon={ShieldCheck} label="Admin" active={tab === "admin"} onClick={() => setTab("admin")} />
-            )}
+            {navItems.map((item) => (
+              <NavTab key={item.id} icon={item.icon} label={item.label} active={tab === item.id} onClick={() => setTab(item.id)} />
+            ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
@@ -283,8 +291,95 @@ export default function TouringRCApp() {
               <User size={14} />
               {logueado ? nombreParaMostrar(piloto, session) : "Ingresar con Google"}
             </button>
+            <button
+              className="mobile-nav-toggle"
+              onClick={() => setMenuMobileAbierto((v) => !v)}
+              title={menuMobileAbierto ? "Cerrar menú" : "Abrir menú"}
+              style={{
+                display: "none",
+                width: 38,
+                height: 38,
+                borderRadius: 8,
+                border: `1px solid ${T.line}`,
+                background: menuMobileAbierto ? T.amber : T.surfaceRaised,
+                color: menuMobileAbierto ? "#1A1300" : T.text,
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              {menuMobileAbierto ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </div>
+
+        {/* Franja de "sección actual", solo mobile -- da contexto sin abrir el
+            menú, y tocarla también lo abre/cierra. */}
+        <div
+          className="mobile-nav-current"
+          onClick={() => setMenuMobileAbierto((v) => !v)}
+          style={{
+            display: "none",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "11px 14px",
+            borderTop: `1px solid ${T.line}`,
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: T.amber, fontWeight: 600, fontSize: 14 }}>
+            {tabActivo && <tabActivo.icon size={16} />}
+            {tabActivo?.label}
+          </div>
+          <ChevronDown
+            size={16}
+            color={T.muted}
+            style={{ transform: menuMobileAbierto ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
+          />
+        </div>
+
+        {/* Menú desplegable (mobile) -- lista vertical de tabs, sin scroll
+            horizontal. Solo puede abrirse tocando la hamburguesa o la franja
+            de arriba, ambas ocultas en desktop, así que en desktop nunca se
+            renderiza. */}
+        {menuMobileAbierto && (
+          <div style={{ borderTop: `1px solid ${T.line}`, background: T.surface, boxShadow: "0 12px 24px rgba(0,0,0,0.35)" }}>
+            {navItems.map((item) => {
+              const activo = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setTab(item.id);
+                    setMenuMobileAbierto(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                    height: 48,
+                    padding: "0 16px",
+                    boxSizing: "border-box",
+                    border: "none",
+                    borderLeft: `3px solid ${activo ? T.amber : "transparent"}`,
+                    background: activo ? `${T.amber}18` : "transparent",
+                    color: activo ? T.amber : T.muted,
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 600,
+                    fontSize: 14,
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <item.icon size={16} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="page-content" style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
@@ -324,166 +419,162 @@ export default function TouringRCApp() {
                   background: T.surface,
                   border: `1px solid ${T.line}`,
                   borderRadius: 12,
-                  padding: 28,
+                  padding: 16,
                   marginBottom: 28,
                   display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 16,
+                  flexDirection: "column",
+                  gap: 12,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <div>
-                  <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8 }}>
-                    Próxima fecha
-                  </div>
-                  <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 32, fontWeight: 700 }}>{proximo.nombre}</div>
-                  <div style={{ color: T.muted, fontSize: 14, marginTop: 4 }}>
-                    {(() => {
-                      const fechaCompleta = new Date(`${proximo.fecha}T00:00:00`).toLocaleDateString("es-AR", {
-                        weekday: "long",
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      });
-                      return fechaCompleta.charAt(0).toUpperCase() + fechaCompleta.slice(1);
-                    })()}
-                  </div>
-                  <button
-                  onClick={() => {
-                    if (!puedeAbrirInscripcionDestacada) return;
-                    if (!logueado) {
-                      ingresar();
-                      return;
-                    }
-                    setFormularioDestacadoAbierto((abierto) => !abierto);
-                  }}
-                  disabled={!puedeAbrirInscripcionDestacada}
-                  title={
-                    logueado && piloto && !puedeInscribirse
-                      ? "Tu cuenta todavía no fue aprobada por un admin"
-                      : !inscripcionDestacada && !inscripcionDestacadaAbierta
-                        ? "La inscripción todavía no está abierta para esta fecha"
-                        : undefined
-                  }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginTop: 14,
-                    padding: "8px 14px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: puedeAbrirInscripcionDestacada ? T.amber : T.surfaceRaised,
-                    color: puedeAbrirInscripcionDestacada ? "#1A1300" : T.muted,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: puedeAbrirInscripcionDestacada ? "pointer" : "default",
-                  }}
-                  >
-                  <UserPlus size={14} />
-                  {inscripcionDestacada
-                    ? "Ya estás inscripto"
-                    : logueado && piloto && !puedeInscribirse
-                      ? "Pendiente de aprobación"
-                      : !inscripcionDestacadaAbierta
-                        ? "Inscripción no habilitada"
-                        : formularioDestacadoAbierto
-                          ? "Cerrar inscripción"
-                          : "Inscribirme"}
-                  </button>
-                  {formularioDestacadoAbierto && logueado && piloto && puedeInscribirse && !inscripcionDestacada && inscripcionDestacadaAbierta && (
-                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.line}` }}>
-                      <FormularioInscripcion
-                        evento={proximo}
-                        piloto={piloto}
-                        onInscripto={() => {
-                          setFormularioDestacadoAbierto(false);
-                          setInscripcionVersion((version) => version + 1);
-                          recargarInscripcionDestacada();
-                        }}
-                      />
-                    </div>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  {proximo.circuitos && (
+                    <img
+                      src={rutaImagenCircuito(proximo.circuitos, proximo.circuito_sentido)}
+                      alt={proximo.circuitos.nombre}
+                      title={proximo.circuitos.nombre}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        objectFit: "contain",
+                        borderRadius: 8,
+                        background: "#FFFFFF",
+                        border: `1px solid ${T.line}`,
+                        padding: 4,
+                        flexShrink: 0,
+                      }}
+                    />
                   )}
-                  <div style={{ marginTop: 10, display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5 }}>
+                      Próxima fecha
+                    </div>
+                    <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 22, fontWeight: 700, marginTop: 2 }}>
+                      {proximo.nombre}
+                    </div>
+                    <div style={{ color: T.muted, fontSize: 13, marginTop: 4 }}>
+                      {(() => {
+                        const fechaCompleta = new Date(`${proximo.fecha}T00:00:00`).toLocaleDateString("es-AR", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        });
+                        return fechaCompleta.charAt(0).toUpperCase() + fechaCompleta.slice(1);
+                      })()}
+                    </div>
+                    {proximo.circuitos && (
+                      <div style={{ color: T.muted, fontSize: 12, marginTop: 2 }}>
+                        {proximo.circuitos.nombre} ({proximo.circuito_sentido === "invertido" ? "Invertido" : "Normal"})
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ background: T.surfaceRaised, borderRadius: 10, padding: "10px 14px" }}>
+                  <StartLights compact diasRestantes={dias} horasRestantes={horasRestantes} />
+                </div>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <button
+                    onClick={() => {
+                      if (!puedeAbrirInscripcionDestacada) return;
+                      if (!logueado) {
+                        ingresar();
+                        return;
+                      }
+                      setFormularioDestacadoAbierto((abierto) => !abierto);
+                    }}
+                    disabled={!puedeAbrirInscripcionDestacada}
+                    title={
+                      logueado && piloto && !puedeInscribirse
+                        ? "Tu cuenta todavía no fue aprobada por un admin"
+                        : !inscripcionDestacada && !inscripcionDestacadaAbierta
+                          ? "La inscripción todavía no está abierta para esta fecha"
+                          : undefined
+                    }
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: puedeAbrirInscripcionDestacada ? T.amber : T.surfaceRaised,
+                      color: puedeAbrirInscripcionDestacada ? "#1A1300" : T.muted,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: puedeAbrirInscripcionDestacada ? "pointer" : "default",
+                    }}
+                  >
+                    <UserPlus size={14} />
+                    {inscripcionDestacada
+                      ? "Ya estás inscripto"
+                      : logueado && piloto && !puedeInscribirse
+                        ? "Pendiente de aprobación"
+                        : !inscripcionDestacadaAbierta
+                          ? "Inscripción no habilitada"
+                          : formularioDestacadoAbierto
+                            ? "Cerrar inscripción"
+                            : "Inscribirme"}
+                  </button>
+                  <button
+                    onClick={verInscriptos}
+                    title="Ver quién está anotado en esta fecha"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.line}`,
+                      background: "transparent",
+                      color: T.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Eye size={13} /> Ver inscriptos
+                  </button>
+                  {esAdminReal && (
                     <button
-                      onClick={verInscriptos}
-                      title="Ver quién está anotado en esta fecha"
+                      onClick={compartirInscriptos}
+                      disabled={compartiendoInscriptos}
+                      title="Copia al portapapeles la lista de inscriptos de esta fecha, lista para pegar en redes"
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
-                        padding: "7px 12px",
+                        padding: "8px 12px",
                         borderRadius: 8,
                         border: `1px solid ${T.line}`,
                         background: "transparent",
                         color: T.text,
                         fontSize: 12,
                         fontWeight: 600,
-                        cursor: "pointer",
+                        cursor: compartiendoInscriptos ? "default" : "pointer",
                       }}
                     >
-                      <Eye size={13} /> Ver inscriptos
+                      <Share2 size={13} />
+                      {compartiendoInscriptos ? "Generando..." : copiadoInscriptos ? "¡Copiado!" : "Compartir inscriptos"}
                     </button>
-                    {esAdminReal && (
-                      <div>
-                        <button
-                          onClick={compartirInscriptos}
-                          disabled={compartiendoInscriptos}
-                          title="Copia al portapapeles la lista de inscriptos de esta fecha, lista para pegar en redes"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            padding: "7px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${T.line}`,
-                            background: "transparent",
-                            color: T.text,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: compartiendoInscriptos ? "default" : "pointer",
-                          }}
-                        >
-                          <Share2 size={13} />
-                          {compartiendoInscriptos ? "Generando..." : copiadoInscriptos ? "¡Copiado!" : "Compartir inscriptos"}
-                        </button>
-                        {errorCompartir && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{errorCompartir}</div>}
-                      </div>
-                    )}
-                  </div>
-                  </div>
+                  )}
                 </div>
-                {proximo.circuitos && (
-                  <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flex: "1 1 160px" }}>
-                    <img
-                      src={rutaImagenCircuito(proximo.circuitos, proximo.circuito_sentido)}
-                      alt={proximo.circuitos.nombre}
-                      title={proximo.circuitos.nombre}
-                      style={{
-                        width: 160,
-                        height: 160,
-                        objectFit: "contain",
-                        borderRadius: 8,
-                        background: "#FFFFFF",
-                        border: `1px solid ${T.line}`,
-                        padding: 8,
+                {esAdminReal && errorCompartir && <div style={{ color: T.red, fontSize: 11 }}>{errorCompartir}</div>}
+
+                {formularioDestacadoAbierto && logueado && piloto && puedeInscribirse && !inscripcionDestacada && inscripcionDestacadaAbierta && (
+                  <div style={{ paddingTop: 4, borderTop: `1px solid ${T.line}` }}>
+                    <FormularioInscripcion
+                      evento={proximo}
+                      piloto={piloto}
+                      onInscripto={() => {
+                        setFormularioDestacadoAbierto(false);
+                        setInscripcionVersion((version) => version + 1);
+                        recargarInscripcionDestacada();
                       }}
                     />
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 17, fontWeight: 600, color: T.text }}>
-                        {proximo.circuitos.nombre}
-                      </div>
-                      <div style={{ color: T.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
-                        {proximo.circuito_sentido === "invertido" ? "Invertido" : "Normal"}
-                      </div>
-                    </div>
                   </div>
                 )}
-                <div style={{ flexShrink: 0 }}>
-                  <StartLights diasRestantes={dias} horasRestantes={horasRestantes} />
-                </div>
               </div>
             )}
 

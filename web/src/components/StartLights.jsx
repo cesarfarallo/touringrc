@@ -61,17 +61,17 @@ const COLORES = {
   },
 };
 
-function Bulb({ color, on, blink }) {
+function Bulb({ color, on, blink, size = 18 }) {
   const c = COLORES[color][on ? "on" : "off"];
   return (
     <div
       style={{
-        width: 18,
-        height: 18,
+        width: size,
+        height: size,
         borderRadius: "50%",
         background: c.bg,
-        border: `2px solid ${c.border}`,
-        boxShadow: on ? `0 0 12px 2px ${c.glow}` : "none",
+        border: `${size >= 18 ? 2 : 1}px solid ${c.border}`,
+        boxShadow: on ? `0 0 ${size >= 18 ? "12px 2px" : "6px 1px"} ${c.glow}` : "none",
         animation: blink ? "start-lights-blink 1s ease-in-out infinite" : "none",
         transition: "all 0.3s ease",
       }}
@@ -79,11 +79,55 @@ function Bulb({ color, on, blink }) {
   );
 }
 
-export default function StartLights({ diasRestantes, horasRestantes }) {
+// Versión compacta: tira horizontal de puntitos en vez de la torre vertical
+// -- para la tarjeta destacada del Calendario, que en mobile quedaba
+// estirada por la torre completa apilada debajo de todo lo demás. Comparte
+// el mismo cálculo de progreso/titileo que la versión de torre, solo
+// cambia cómo se dibuja.
+function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%" }}>
+      <div>
+        <div style={{ color: T.muted, fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2 }}>
+          Próxima largada
+        </div>
+        <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 18, fontWeight: 600, color: T.text, marginTop: 2 }}>
+          {diasRestantes === 0
+            ? todasTitilan
+              ? "¡SE LARGA!"
+              : "HOY"
+            : `FALTAN ${diasRestantes} ${diasRestantes === 1 ? "DÍA" : "DÍAS"}`}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+        {ETAPAS.map((color, i) => {
+          const on = i < stagesLit;
+          const esUltimaPrendida = on && !greenOn && i === stagesLit - 1;
+          const blink = on && (todasTitilan || esUltimaPrendida);
+          return <Bulb key={i} color={color} on={on} blink={blink} size={10} />;
+        })}
+        <Bulb color="green" on={greenOn} blink={greenOn} size={10} />
+      </div>
+    </div>
+  );
+}
+
+export default function StartLights({ diasRestantes, horasRestantes, compact = false }) {
   const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasRestantes / 24)));
   const greenOn = progreso === 7;
   const stagesLit = Math.min(ETAPAS.length, progreso);
   const todasTitilan = greenOn && horasRestantes <= 12;
+
+  if (compact) {
+    return (
+      <StartLightsCompacto
+        diasRestantes={diasRestantes}
+        stagesLit={stagesLit}
+        greenOn={greenOn}
+        todasTitilan={todasTitilan}
+      />
+    );
+  }
 
   return (
     <div

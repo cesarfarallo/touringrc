@@ -17,22 +17,19 @@ export const FONTS = `
 `;
 
 // Ajustes que no se pueden resolver con estilos inline (necesitan media
-// queries): en mobile, el nav de tabs pasa a su propia fila con scroll
-// horizontal en vez de apretarse junto al logo y el botón de login, y se
-// reduce el padding lateral del contenido. Todo lo demás (tablas con
-// scroll horizontal, formularios que wrappean) ya se resuelve con
-// estilos inline (`overflowX: "auto"`, `flexWrap: "wrap"`).
+// queries): en mobile, el nav de tabs horizontal se reemplaza por un menú
+// desplegable (hamburguesa) -- el header baja a una franja compacta de una
+// sola fila (logo + usuario + hamburguesa) en vez del banner de 172px con
+// el nav apretado al lado, y se reduce el padding lateral del contenido.
+// Todo lo demás (tablas con scroll horizontal, formularios que wrappean)
+// ya se resuelve con estilos inline (`overflowX: "auto"`, `flexWrap: "wrap"`).
 export const RESPONSIVE_CSS = `
 @media (max-width: 640px) {
-  .header-inner { flex-wrap: wrap; row-gap: 10px; }
-  .nav-tabs {
-    order: 3;
-    flex-basis: 100%;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
-  .nav-tabs::-webkit-scrollbar { display: none; }
+  .header-inner { height: 56px !important; padding: 0 14px !important; }
+  .header-logo { height: 38px !important; }
+  .nav-tabs { display: none !important; }
+  .mobile-nav-toggle { display: flex !important; }
+  .mobile-nav-current { display: flex !important; }
   .page-content { padding-left: 14px !important; padding-right: 14px !important; }
 }
 `;

@@ -707,17 +707,86 @@ cada `<table>` (con un `minWidth` en el propio `<table>` para forzar el scroll h
 vez de apretar las columnas) en `TablaResultados.jsx`, `TablaClasificacion.jsx`,
 `TablaCampeonato.jsx`, la tabla de `PilotosAdmin.jsx` y la matriz de `RolesAdmin.jsx`.
 
-Lo único que necesitó una media query real (no se puede con estilos inline) es el **header**
-de `App.jsx`: en pantallas ≤640px el nav de tabs (Calendario/Resultados/Campeonato/Admin) pasa
-a su propia fila con scroll horizontal en vez de apretarse junto al logo y el botón de login,
-que también pasan a apilarse. Eso vive en `RESPONSIVE_CSS` (`theme.js`), inyectado igual que
-`FONTS` vía `<style>` en `App.jsx`, con las clases `.header-inner`/`.nav-tabs`/`.page-content`.
+Lo único que necesita una media query real (no se puede con estilos inline) es el **header**
+de `App.jsx`. Eso vive en `RESPONSIVE_CSS` (`theme.js`), inyectado igual que `FONTS` vía
+`<style>` en `App.jsx`, con las clases `.header-inner`/`.header-logo`/`.nav-tabs`/
+`.mobile-nav-toggle`/`.mobile-nav-current`/`.page-content`.
 
 Verificado con Playwright en un viewport de 320px (iPhone SE) desde este entorno de
 desarrollo (sin datos reales, por la falta de acceso de red a Supabase, pero sí la estructura
-del layout): sin overflow horizontal de la página en Calendario ni Resultados, y el nav de
-tabs scrollea para llegar a las pestañas que no entran. Falta verificar con datos reales en un
-celular de verdad (tablas largas, formularios con teclado on-screen, etc.).
+del layout): sin overflow horizontal de la página en Calendario ni Resultados. Falta verificar
+con datos reales en un celular de verdad (tablas largas, formularios con teclado on-screen,
+etc.).
+
+## Restyling mobile (menú desplegable, tarjeta destacada compacta, ganadores en chips)
+
+El diseño original (nav de tabs horizontal que en mobile pasaba a su propia fila con scroll, y
+la tarjeta destacada de "Próxima fecha" con la imagen del circuito grande centrada + el
+semáforo (`StartLights.jsx`) como torre vertical debajo de todo) se sentía amontonado en
+mobile: la tarjeta destacada quedaba muy larga (semáforo estirándola por debajo del todo) y los
+ganadores de cada categoría en `EventoCard.jsx` se apilaban/cortaban mal al wrappear. Antes de
+tocar código se armaron 4 mockups con la skill de diseño de Claude (paleta/tipografía reales
+del sitio, no visitables desde el repo) para elegir dirección con el club — aprobados, se
+llevaron al código tal cual:
+
+- **Header con menú desplegable** (`App.jsx`, `theme.js`): en vez de un nav de tabs horizontal
+  que en mobile pasaba a su propia fila con scroll, el header ahora es una franja compacta de
+  una sola fila (logo + botón de usuario + hamburguesa) en **todos** los tamaños de pantalla —
+  el nav de tabs horizontal (`.nav-tabs`, con `NavTab.jsx`) sigue siendo lo que se ve en
+  desktop, pero queda oculto en mobile (`display:none` en la media query) y se reemplaza por:
+  - una franja "sección actual" (`.mobile-nav-current`, ícono + nombre del tab activo en
+    ámbar + chevron) debajo del header, que también abre/cierra el menú al tocarla;
+  - un botón hamburguesa (`.mobile-nav-toggle`, ícono `Menu`/`X` según el estado) al lado del
+    botón de login;
+  - un menú desplegable (lista vertical, un botón por tab, ítem activo con barra ámbar a la
+    izquierda y fondo tintado) que se renderiza solo cuando `menuMobileAbierto` es `true` —
+    como ese estado solo se puede activar tocando la hamburguesa o la franja (ambas ocultas en
+    desktop vía CSS, no solo invisibles: `display:none` no recibe clicks), en desktop el menú
+    nunca llega a montarse.
+
+  Tanto el nav de tabs de desktop como el menú de mobile recorren el mismo array `navItems`
+  (`App.jsx`) en vez de tener la lista de tabs duplicada en dos JSX distintos — agregar o sacar
+  un tab (ej. condicionar "Oficina técnica"/"Admin" por rol) es un solo lugar para los dos.
+  `.header-inner`/`.header-logo` también se achican en mobile (56px de alto, logo a 38px) —
+  antes el banner de 172px con el logo a 152px, pensado para que el nav horizontal entrara al
+  lado, se mantenía igual de alto en mobile aunque ya no tuviera nada al lado.
+
+- **Tarjeta destacada de "Próxima fecha" compacta** (`App.jsx`): reemplaza el layout anterior
+  (columna de texto + botones a la izquierda, imagen del circuito de 160px centrada, y
+  `StartLights` como torre vertical completa a la derecha — todo eso se apilaba en mobile,
+  terminando en una tarjeta muy larga) por tres bloques apilados pero compactos:
+  1. fila superior: miniatura del circuito (56px, mismo tamaño que usa `EventoCard.jsx` para
+     las tarjetas normales) + bloque de texto (eyebrow, nombre, fecha completa, circuito+sentido);
+  2. una barra horizontal (fondo `T.surfaceRaised`) con el countdown ("FALTAN N DÍAS") y el
+     semáforo en su variante compacta (ver `StartLights.jsx` abajo) a la derecha, en la misma
+     línea — reemplaza la torre vertical que estiraba la tarjeta hacia abajo;
+  3. los botones ("Inscribirme"/"Ver inscriptos"/"Compartir inscriptos") como chips que
+     wrappean con `flexWrap`, en vez de bloques de ancho completo apilados uno debajo del otro.
+
+  Toda la lógica de habilitación/estado (ventana de inscripción, "Ya estás inscripto",
+  "Pendiente de aprobación", el formulario inline, compartir/ver inscriptos) es la misma de
+  antes — solo cambió el layout, ningún comportamiento.
+
+- **`StartLights.jsx` — variante compacta** (`compact` prop, default `false`): la lógica de
+  progreso/titileo (`progreso`, `greenOn`, `stagesLit`, `todasTitilan`) se calcula una sola vez
+  en el componente principal y se le pasa a `StartLightsCompacto` cuando `compact` es `true` —
+  en vez de la torre vertical de `Bulb`s de 18px apilados sobre un poste, dibuja una tira
+  horizontal de puntitos de 10px (mismo componente `Bulb`, que ahora acepta un `size` para
+  poder reusarse en los dos tamaños) al lado del texto del countdown, sin la frase alusiva
+  (se sacrifica para que la barra compacta entre en una sola línea). La torre vertical
+  (`compact={false}`, el default) sigue existiendo tal cual para quien la use sin el prop.
+
+- **Ganadores en `EventoCard.jsx` como chips**: antes, cada categoría mostraba
+  `"Categoría: 🏆 nombre 🥈 nombre"` como texto corrido con `flexWrap` a nivel de toda la fila
+  — en pantallas angostas eso wrappeaba en cualquier punto, a veces separando un ícono de su
+  nombre o cortando la fila de categoría del resultado. Ahora cada elemento (el nombre de la
+  categoría, el ganador de la A, el ganador de la B) es un chip atómico con su propio fondo y
+  `whiteSpace: "nowrap"` — el wrap ahora salta de chip en chip (`flexWrap` sigue en la fila
+  contenedora), nunca corta un nombre a la mitad ni separa un ícono de su texto.
+
+Todo este restyling se hizo y verificó en `dev` (Playwright a 375px, con las respuestas de
+Supabase mockeadas ya que este entorno no tiene acceso de red real) — pendiente llevarlo a
+`main` cuando se confirme visualmente en el Preview de staging.
 
 ## Branding
 
