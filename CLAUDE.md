@@ -708,17 +708,21 @@ vez de apretar las columnas) en `TablaResultados.jsx`, `TablaClasificacion.jsx`,
 `TablaCampeonato.jsx` y la matriz de `RolesAdmin.jsx` -- esas sí tienen datos suficientes
 (muchas columnas numéricas) como para que apretarlas deje de ser legible.
 
-**Excepción: la tabla de `PilotosAdmin.jsx`** no sigue ese patrón -- a diferencia de las de
+**Excepción: `PilotosAdmin.jsx` no usa `<table>`, usa tarjetas** -- a diferencia de las de
 arriba, tiene pocas columnas y datos cortos (nombre, email, un par de chips de rol, un ícono),
-así que forzar scroll horizontal ahí era innecesario. Usa `table-layout: "fixed"` con un
-`<colgroup>` de anchos en **porcentaje** (26/26/26/12/10) en vez de un `minWidth` fijo en el
-`<table>` -- así la tabla siempre entra en el ancho del contenedor sin scroll, dejando que el
-contenido de cada celda wrappee (el nombre, el email, los chips de rol con `flexWrap`) en vez
-de desbordar. El `overflowX: "auto"` del wrapper queda solo como red de seguridad para un
-viewport extremo, no como mecanismo principal. Los inputs de edición inline (`NombreEditable`,
-`EmailEditable`) tienen `flexWrap: "wrap"` en su fila y anchos relativos/acotados (`maxWidth`
-en vez de `width` fijo) para no romper este layout cuando el admin abre el modo edición dentro
-de una columna angosta.
+así que ni el patrón de scroll horizontal ni achicar una tabla con `table-layout: fixed`
+(probado primero, descartado por pedido explícito -- "no me gusta tanto como quedó") quedaban
+bien. `FilaPiloto` pasa a ser una tarjeta (mismo idioma visual que `EventoCard.jsx`/
+`CircuitoCard`: `background: T.surface`, borde, `borderRadius`, `padding`, todo apilado en
+columna con `flexDirection: "column"`) en vez de una fila de `<tr>`/`<td>` -- nombre+email
+arriba con los íconos de acción a la derecha, chips de rol debajo, estado de vinculación al
+final, y el panel de fusión (cuando está abierto) como bloque propio dentro de la misma
+tarjeta. El contenedor de `PilotosAdmin` pasa de `<table>` a un simple
+`display: "flex", flexDirection: "column", gap: 10` con una tarjeta por piloto -- mismo patrón
+que la lista de `EventoCard`s del Calendario (`App.jsx`), sin wrapper de fondo/borde alrededor
+de toda la lista porque cada tarjeta ya tiene el suyo. Al ser una columna en vez de una grilla
+de columnas fijas, entra en cualquier ancho sin necesitar `overflowX` ni acotar anchos por
+columna -- el nombre, el email y los chips simplemente wrappean dentro de la tarjeta.
 
 Lo único que necesita una media query real (no se puede con estilos inline) es el **header**
 de `App.jsx`. Eso vive en `RESPONSIVE_CSS` (`theme.js`), inyectado igual que `FONTS` vía

@@ -408,136 +408,131 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
   }
 
   return (
-    <>
-      <tr style={{ borderBottom: fusionando ? "none" : `1px solid ${T.line}` }}>
-        <td style={{ padding: "8px 8px", wordBreak: "break-word" }}>
+    <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
           <NombreEditable piloto={piloto} onGuardado={onGuardado} />
-        </td>
-        <td style={{ padding: "8px 8px", wordBreak: "break-word" }}>
           <EmailEditable piloto={piloto} onGuardado={onGuardado} />
-        </td>
-        <td style={{ padding: "8px 8px" }}>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {roles.map((r) => (
-              <RolChip
-                key={r.id}
-                nombre={r.nombre}
-                marcado={!!rolesDelPiloto?.has(r.id)}
-                disabled={trabajandoRol === `${piloto.id}:${r.id}`}
-                onToggle={() => onToggleRol(piloto.id, r.id)}
-              />
-            ))}
+        </div>
+        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+          <button
+            onClick={borrar}
+            disabled={borrando}
+            title="Borrar piloto"
+            style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: borrando ? "default" : "pointer", padding: 0 }}
+          >
+            <Trash2 size={15} />
+          </button>
+          <button
+            onClick={() => setFusionando((v) => !v)}
+            title="Fusionar con otro piloto (duplicado)"
+            style={{ display: "flex", background: "transparent", border: "none", color: fusionando ? T.amber : T.muted, cursor: "pointer", padding: 0 }}
+          >
+            <Merge size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {roles.map((r) => (
+          <RolChip
+            key={r.id}
+            nombre={r.nombre}
+            marcado={!!rolesDelPiloto?.has(r.id)}
+            disabled={trabajandoRol === `${piloto.id}:${r.id}`}
+            onToggle={() => onToggleRol(piloto.id, r.id)}
+          />
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {piloto.auth_user_id ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted }}>
+            <Check size={13} color={T.teal} /> Cuenta vinculada
           </div>
-        </td>
-        <td style={{ padding: "8px 8px" }}>
-          {piloto.auth_user_id ? (
-            <Check size={14} color={T.teal} />
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <X size={14} color={T.red} />
-                {piloto.email && (
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, flexWrap: "wrap" }}>
+            <X size={13} color={T.red} /> Sin vincular
+            {piloto.email && (
+              <button
+                onClick={vincular}
+                disabled={vinculando}
+                title="Buscar una cuenta ya logueada con este email y vincularla a este piloto"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: "transparent",
+                  border: "none",
+                  color: T.amber,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: vinculando ? "default" : "pointer",
+                  padding: 0,
+                }}
+              >
+                <Link2 size={11} /> {vinculando ? "Vinculando..." : "Vincular"}
+              </button>
+            )}
+          </div>
+        )}
+        {errorVinculo && <div style={{ color: T.red, fontSize: 11 }}>{errorVinculo}</div>}
+        {error && <div style={{ color: T.red, fontSize: 11 }}>{error}</div>}
+      </div>
+
+      {fusionando && (
+        <div style={{ padding: 12, borderRadius: 8, background: T.surfaceRaised }}>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
+            Buscá el piloto correcto -- se va a borrar <strong>{nombreCompleto}</strong> y pasarle su historial
+            (resultados, inscripciones, alias).
+          </div>
+          <CampoBusqueda
+            value={busquedaFusion}
+            onChange={setBusquedaFusion}
+            placeholder="Buscar por nombre o apellido..."
+            autoFocus
+            wrapperStyle={{ maxWidth: 260 }}
+            inputStyle={{ background: T.surface }}
+          />
+          {resultadosFusion.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+              {resultadosFusion.map((p) => {
+                const nombreCandidato = [p.first_name, p.last_name].filter(Boolean).join(" ") || "(sin nombre)";
+                return (
                   <button
-                    onClick={vincular}
-                    disabled={vinculando}
-                    title="Buscar una cuenta ya logueada con este email y vincularla a este piloto"
+                    key={p.id}
+                    disabled={trabajandoFusion}
+                    onClick={() => fusionarCon(p.id, nombreCandidato)}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.line}`,
                       background: "transparent",
-                      border: "none",
-                      color: T.amber,
-                      fontSize: 11,
+                      color: T.text,
+                      fontSize: 12,
                       fontWeight: 600,
-                      cursor: vinculando ? "default" : "pointer",
-                      padding: 0,
+                      cursor: trabajandoFusion ? "default" : "pointer",
                     }}
                   >
-                    <Link2 size={11} /> {vinculando ? "Vinculando..." : "Vincular"}
+                    Fusionar con {nombreCandidato}
                   </button>
-                )}
-              </div>
-              {errorVinculo && <div style={{ color: T.red, fontSize: 11 }}>{errorVinculo}</div>}
+                );
+              })}
             </div>
           )}
-        </td>
-        <td style={{ padding: "8px 8px" }}>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={borrar}
-              disabled={borrando}
-              title="Borrar piloto"
-              style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: borrando ? "default" : "pointer", padding: 0 }}
-            >
-              <Trash2 size={14} />
-            </button>
-            <button
-              onClick={() => setFusionando((v) => !v)}
-              title="Fusionar con otro piloto (duplicado)"
-              style={{ display: "flex", background: "transparent", border: "none", color: fusionando ? T.amber : T.muted, cursor: "pointer", padding: 0 }}
-            >
-              <Merge size={14} />
-            </button>
-          </div>
-          {error && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{error}</div>}
-        </td>
-      </tr>
-      {fusionando && (
-        <tr style={{ borderBottom: `1px solid ${T.line}` }}>
-          <td colSpan={5} style={{ padding: "12px 16px", background: T.surfaceRaised }}>
-            <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
-              Buscá el piloto correcto -- se va a borrar <strong>{nombreCompleto}</strong> y pasarle su historial
-              (resultados, inscripciones, alias).
-            </div>
-            <CampoBusqueda
-              value={busquedaFusion}
-              onChange={setBusquedaFusion}
-              placeholder="Buscar por nombre o apellido..."
-              autoFocus
-              wrapperStyle={{ maxWidth: 260 }}
-              inputStyle={{ background: T.surface }}
-            />
-            {resultadosFusion.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-                {resultadosFusion.map((p) => {
-                  const nombreCandidato = [p.first_name, p.last_name].filter(Boolean).join(" ") || "(sin nombre)";
-                  return (
-                    <button
-                      key={p.id}
-                      disabled={trabajandoFusion}
-                      onClick={() => fusionarCon(p.id, nombreCandidato)}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 8,
-                        border: `1px solid ${T.line}`,
-                        background: "transparent",
-                        color: T.text,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: trabajandoFusion ? "default" : "pointer",
-                      }}
-                    >
-                      Fusionar con {nombreCandidato}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {textoFusion.length >= 2 && resultadosFusion.length === 0 && (
-              <div style={{ color: T.muted, fontSize: 12, marginTop: 6 }}>Ningún piloto coincide.</div>
-            )}
-            <button
-              onClick={() => setFusionando(false)}
-              style={{ display: "block", marginTop: 8, border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer", padding: 0 }}
-            >
-              Cancelar
-            </button>
-            {errorFusion && <div style={{ color: T.red, fontSize: 12, marginTop: 6 }}>{errorFusion}</div>}
-          </td>
-        </tr>
+          {textoFusion.length >= 2 && resultadosFusion.length === 0 && (
+            <div style={{ color: T.muted, fontSize: 12, marginTop: 6 }}>Ningún piloto coincide.</div>
+          )}
+          <button
+            onClick={() => setFusionando(false)}
+            style={{ display: "block", marginTop: 8, border: "none", background: "transparent", color: T.muted, fontSize: 12, cursor: "pointer", padding: 0 }}
+          >
+            Cancelar
+          </button>
+          {errorFusion && <div style={{ color: T.red, fontSize: 12, marginTop: 6 }}>{errorFusion}</div>}
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -655,70 +650,29 @@ export default function PilotosAdmin() {
       {error && <div style={{ color: T.red, fontSize: 13 }}>Error: {error.message}</div>}
 
       {!loading && !error && (
-        <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto" }}>
-          {/* table-layout: fixed + colgroup en % en vez de un minWidth fijo
-              (patrón de las tablas de resultados) -- acá la info por fila es
-              poca (nombre, email, un par de chips, un ícono), así que entra
-              achicada sin forzar scroll horizontal en mobile; overflowX
-              queda solo como red de seguridad para pantallas muy angostas. */}
-          <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
-            <colgroup>
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "10%" }} />
-            </colgroup>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${T.line}` }}>
-                {["Nombre", "Email", "Roles", "Vinc.", ""].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: "left",
-                      padding: "8px 8px",
-                      fontFamily: "Inter, sans-serif",
-                      fontSize: 11,
-                      letterSpacing: 1,
-                      textTransform: "uppercase",
-                      color: T.muted,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visibles.map((p) => (
-                <FilaPiloto
-                  key={p.id}
-                  piloto={p}
-                  pilotos={pilotos}
-                  roles={roles}
-                  rolesDelPiloto={porPiloto[p.id]}
-                  trabajandoRol={trabajandoRol}
-                  onToggleRol={toggleRol}
-                  onGuardado={() => {
-                    recargar();
-                    recargarRoles();
-                  }}
-                />
-              ))}
-              {visibles.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ padding: "16px", color: T.muted, fontSize: 13 }}>
-                    {pilotos.length === 0
-                      ? "Todavía no hay pilotos cargados."
-                      : "Ningún piloto coincide con la búsqueda/filtros."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {visibles.map((p) => (
+            <FilaPiloto
+              key={p.id}
+              piloto={p}
+              pilotos={pilotos}
+              roles={roles}
+              rolesDelPiloto={porPiloto[p.id]}
+              trabajandoRol={trabajandoRol}
+              onToggleRol={toggleRol}
+              onGuardado={() => {
+                recargar();
+                recargarRoles();
+              }}
+            />
+          ))}
+          {visibles.length === 0 && (
+            <div style={{ color: T.muted, fontSize: 13, padding: "16px 0" }}>
+              {pilotos.length === 0
+                ? "Todavía no hay pilotos cargados."
+                : "Ningún piloto coincide con la búsqueda/filtros."}
+            </div>
+          )}
         </div>
       )}
     </div>
