@@ -57,7 +57,7 @@ function EmailEditable({ piloto, onGuardado }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         <input
           type="email"
           value={valor}
@@ -75,7 +75,9 @@ function EmailEditable({ piloto, onGuardado }) {
             color: T.text,
             fontFamily: "JetBrains Mono, monospace",
             fontSize: 12,
-            width: 180,
+            width: "100%",
+            maxWidth: 180,
+            boxSizing: "border-box",
           }}
         />
         <button
@@ -408,14 +410,14 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
   return (
     <>
       <tr style={{ borderBottom: fusionando ? "none" : `1px solid ${T.line}` }}>
-        <td style={{ padding: "10px 16px" }}>
+        <td style={{ padding: "8px 8px", wordBreak: "break-word" }}>
           <NombreEditable piloto={piloto} onGuardado={onGuardado} />
         </td>
-        <td style={{ padding: "10px 16px" }}>
+        <td style={{ padding: "8px 8px", wordBreak: "break-word" }}>
           <EmailEditable piloto={piloto} onGuardado={onGuardado} />
         </td>
-        <td style={{ padding: "10px 16px" }}>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxWidth: 260 }}>
+        <td style={{ padding: "8px 8px" }}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {roles.map((r) => (
               <RolChip
                 key={r.id}
@@ -427,7 +429,7 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
             ))}
           </div>
         </td>
-        <td style={{ padding: "10px 16px" }}>
+        <td style={{ padding: "8px 8px" }}>
           {piloto.auth_user_id ? (
             <Check size={14} color={T.teal} />
           ) : (
@@ -456,11 +458,11 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
                   </button>
                 )}
               </div>
-              {errorVinculo && <div style={{ color: T.red, fontSize: 11, maxWidth: 200 }}>{errorVinculo}</div>}
+              {errorVinculo && <div style={{ color: T.red, fontSize: 11 }}>{errorVinculo}</div>}
             </div>
           )}
         </td>
-        <td style={{ padding: "10px 16px" }}>
+        <td style={{ padding: "8px 8px" }}>
           <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={borrar}
@@ -478,7 +480,7 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
               <Merge size={14} />
             </button>
           </div>
-          {error && <div style={{ color: T.red, fontSize: 11, maxWidth: 200, marginTop: 4 }}>{error}</div>}
+          {error && <div style={{ color: T.red, fontSize: 11, marginTop: 4 }}>{error}</div>}
         </td>
       </tr>
       {fusionando && (
@@ -655,15 +657,27 @@ export default function PilotosAdmin() {
       {!loading && !error && (
         <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
+          {/* table-layout: fixed + colgroup en % en vez de un minWidth fijo
+              (patrón de las tablas de resultados) -- acá la info por fila es
+              poca (nombre, email, un par de chips, un ícono), así que entra
+              achicada sin forzar scroll horizontal en mobile; overflowX
+              queda solo como red de seguridad para pantallas muy angostas. */}
+          <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }}>
+            <colgroup>
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "10%" }} />
+            </colgroup>
             <thead>
               <tr style={{ borderBottom: `1px solid ${T.line}` }}>
-                {["Nombre", "Email", "Roles", "Vinculado", ""].map((h) => (
+                {["Nombre", "Email", "Roles", "Vinc.", ""].map((h) => (
                   <th
                     key={h}
                     style={{
                       textAlign: "left",
-                      padding: "10px 16px",
+                      padding: "8px 8px",
                       fontFamily: "Inter, sans-serif",
                       fontSize: 11,
                       letterSpacing: 1,

@@ -705,7 +705,20 @@ responsive se resuelve directo en los `style={{...}}` de cada componente — `fl
 en las filas que pueden no entrar en una pantalla angosta, y `overflowX: "auto"` envolviendo
 cada `<table>` (con un `minWidth` en el propio `<table>` para forzar el scroll horizontal en
 vez de apretar las columnas) en `TablaResultados.jsx`, `TablaClasificacion.jsx`,
-`TablaCampeonato.jsx`, la tabla de `PilotosAdmin.jsx` y la matriz de `RolesAdmin.jsx`.
+`TablaCampeonato.jsx` y la matriz de `RolesAdmin.jsx` -- esas sí tienen datos suficientes
+(muchas columnas numéricas) como para que apretarlas deje de ser legible.
+
+**Excepción: la tabla de `PilotosAdmin.jsx`** no sigue ese patrón -- a diferencia de las de
+arriba, tiene pocas columnas y datos cortos (nombre, email, un par de chips de rol, un ícono),
+así que forzar scroll horizontal ahí era innecesario. Usa `table-layout: "fixed"` con un
+`<colgroup>` de anchos en **porcentaje** (26/26/26/12/10) en vez de un `minWidth` fijo en el
+`<table>` -- así la tabla siempre entra en el ancho del contenedor sin scroll, dejando que el
+contenido de cada celda wrappee (el nombre, el email, los chips de rol con `flexWrap`) en vez
+de desbordar. El `overflowX: "auto"` del wrapper queda solo como red de seguridad para un
+viewport extremo, no como mecanismo principal. Los inputs de edición inline (`NombreEditable`,
+`EmailEditable`) tienen `flexWrap: "wrap"` en su fila y anchos relativos/acotados (`maxWidth`
+en vez de `width` fijo) para no romper este layout cuando el admin abre el modo edición dentro
+de una columna angosta.
 
 Lo único que necesita una media query real (no se puede con estilos inline) es el **header**
 de `App.jsx`. Eso vive en `RESPONSIVE_CSS` (`theme.js`), inyectado igual que `FONTS` vía
