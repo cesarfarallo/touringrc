@@ -76,7 +76,7 @@ export default function TouringRCApp() {
   }, []);
 
   const { session } = useSession();
-  const { piloto, loading: cargandoPiloto } = usePilotoActual(session);
+  const { piloto, loading: cargandoPiloto, recargar: recargarPiloto } = usePilotoActual(session);
   const logueado = !!session;
   const { esAdmin: esAdminReal } = useEsAdmin(session);
   // El rol 'piloto' (módulo 'inscripcion') es el "visto bueno" del
@@ -406,7 +406,13 @@ export default function TouringRCApp() {
 
         {!logueado && tab === "calendario" && <LoginCard />}
         {logueado && tab === "calendario" && (
-          <MiPerfil session={session} piloto={piloto} loading={cargandoPiloto} esAdmin={esAdminReal} />
+          <MiPerfil
+            session={session}
+            piloto={piloto}
+            loading={cargandoPiloto}
+            esAdmin={esAdminReal}
+            onCambioPiloto={recargarPiloto}
+          />
         )}
 
         {tab === "calendario" && (

@@ -1216,6 +1216,58 @@ sentido ofrecer regularizar una homologación de una temporada ya cerrada.
 case-insensitive — mismo patrón que el buscador de `PilotosAdmin.jsx`. Filtra en el cliente
 sobre la lista ya traída (acotada a la temporada vigente), no agrega una consulta nueva.
 
+## Aviso por email cuando abre la inscripción (migración 0026)
+
+Pedido del club: cuando se habilita la inscripción online de una fecha (la ventana calculada
+por `inscripcionAbierta()`, migración 0007), avisar por email a los pilotos con email cargado.
+Dos decisiones tomadas antes de escribir código: **opt-in explícito** (no opt-out) — nadie
+recibe nada hasta que activa el aviso a mano, default apagado — y **Resend** como proveedor de
+email (free tier, se integra fácil vía HTTP directo desde una Edge Function, sin agregar una
+librería npm).
+
+- **`pilotos.acepta_notificaciones`** (boolean, default `false`) — el opt-in en sí.
+  **`eventos.notificacion_inscripcion_enviada`** (boolean, default `false`) — evita mandar el
+  mismo aviso más de una vez por evento (el job que lo dispara corre una vez por día mientras
+  la ventana esté abierta, así que sin este flag reenviaría a diario).
+- **`actualizar_mis_notificaciones(p_acepta boolean)`** (función SQL `security definer`, mismo
+  patrón que `actualizar_mi_transponder()` de la migración 0008): `pilotos` no tiene policy de
+  `update` para el propio piloto más allá de funciones acotadas como esta — evita abrir una
+  policy genérica que dejaría editar cualquier columna (nombre, apellido, etc.) desde el
+  cliente.
+- **Frontend** (`MiPerfil.jsx`, `TogglePreferenciaEmail`): un checkbox "Avisarme por email
+  cuando abra la inscripción de una fecha" debajo del cartel de estado de vinculación, visible
+  para cualquier piloto vinculado (con o sin rol asignado todavía — no hace falta esperar la
+  aprobación del admin para poder optar por el aviso). Llama al RPC de arriba y refresca
+  `usePilotoActual()` vía un `recargar()` nuevo en ese hook (mismo patrón `version`/`setVersion`
+  que ya usaban `useEventos()` y el resto de los hooks con refetch manual) — sin esto el
+  checkbox no reflejaría el cambio hasta un refresh de página entero.
+- **Edge Function `avisar-inscripcion`** (`supabase/functions/avisar-inscripcion/`, nueva,
+  README propio con el paso a paso de deploy/secrets/prueba manual/cron): pensada para correr
+  **una vez por día**, no para un usuario logueado — a diferencia de `subir-resultado`, no hay
+  ningún JWT de sesión de por medio, así que se protege con un secreto compartido (`CRON_SECRET`
+  en el header `x-cron-secret`) en vez de `Authorization: Bearer`. Lógica: busca eventos con
+  `inscripcion_dias_antes` configurado y `notificacion_inscripcion_enviada = false`, filtra los
+  que están dentro de la ventana (mismo cálculo que `inscripcionAbierta()`, pero comparado en
+  UTC servidor en vez de horario local del navegador — corriendo una vez por día esa diferencia
+  no cambia qué día se manda el aviso), y para cada uno manda un email individual (Resend
+  `/emails/batch`, cada entrada es un mensaje separado — nadie ve el email de otro piloto) a
+  los pilotos con `acepta_notificaciones = true`, y recién ahí marca el evento como avisado.
+  Se marca avisado aunque haya 0 destinatarios opt-in en ese momento (es un aviso de "se abrió
+  esta fecha", no algo que tenga sentido reintentar a diario esperando que alguien se suscriba).
+- **Disparo diario**: no hay un trigger de Postgres ni un cron dentro de este repo — se
+  programa a mano en el SQL Editor de cada proyecto con `pg_cron` + `pg_net`
+  (`select cron.schedule(...)`, instrucciones exactas en el README de la función) **después**
+  de probar la función a mano con `curl` y confirmar que manda bien. No se versiona ese SQL de
+  `cron.schedule` en `sql/migrations/` porque llevaría el `CRON_SECRET` en texto plano al repo.
+
+⚠️ **No verificable end-to-end desde este entorno de desarrollo** (mismo motivo que
+`subir-resultado`: sandbox sin acceso de red a `supabase.co` ni a `resend.com`) — el código se
+escribió siguiendo el mismo patrón ya probado de `subir-resultado`/`actualizar_mi_transponder()`,
+pero hay que probarlo en `dev`/staging antes de asumir que anda: correr la migración 0026,
+crear la cuenta de Resend (con un dominio verificado para `RESEND_FROM`), deployar la función
+con `--no-verify-jwt`, cargar los secrets, activar el opt-in en un piloto de prueba con email
+propio, y disparar la función a mano con el `curl` del README antes de programar el `pg_cron`.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

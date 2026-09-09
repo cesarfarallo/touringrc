@@ -38,6 +38,9 @@ export function useSession() {
 export function usePilotoActual(session) {
   const [piloto, setPiloto] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -60,9 +63,9 @@ export function usePilotoActual(session) {
     return () => {
       activo = false;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, version]);
 
-  return { piloto, loading };
+  return { piloto, loading, recargar };
 }
 
 // Todos los pilotos, con el email y si tienen o no una cuenta vinculada
