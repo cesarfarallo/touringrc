@@ -1259,14 +1259,28 @@ librería npm).
   (`select cron.schedule(...)`, instrucciones exactas en el README de la función) **después**
   de probar la función a mano con `curl` y confirmar que manda bien. No se versiona ese SQL de
   `cron.schedule` en `sql/migrations/` porque llevaría el `CRON_SECRET` en texto plano al repo.
+- **Dominio del club para el remitente**: `touring.com.ar` (registrado en nic.ar). El DNS de
+  ese dominio está delegado a los nameservers de Vercel (`ns1`/`ns2.vercel-dns.com` — se ve en
+  "Delegaciones" del panel de nic.ar), porque ya estaba agregado como dominio custom del
+  proyecto de Vercel (`www.touring.com.ar`, con `touring.com.ar` a secas redirigiendo ahí) —
+  así que los registros de verificación de Resend (DKIM, SPF/MX, DMARC) se cargan como DNS
+  Records **en Vercel** (Domains → `touring.com.ar` → DNS Records), no en nic.ar. Dominio
+  verificado y `RESEND_FROM` funcionando en staging y producción.
+- **Logo y link dentro del mail** (`enviarLote()`): el HTML del aviso incluye el logo del club
+  arriba (`<img src="${SITE_URL}/logo.png">`, la misma imagen que sirve `web/public/logo.png`
+  en el sitio real — no se sube una copia aparte a ningún lado) y un link "Inscribite acá" al
+  final, ambos armados a partir de la secret `SITE_URL`. `width`/`height` van como atributos
+  HTML del `<img>`, no solo en `style`, porque Outlook de escritorio ignora bastante CSS pero sí
+  respeta esos atributos. `SITE_URL` es **requerida** (a diferencia de la primera versión, que
+  la trataba como opcional y mandaba el aviso sin logo ni link si faltaba) — mejor fallar fuerte
+  con "Falta configurar SITE_URL" que mandar en silencio un aviso sin forma de llegar a la web.
 
-⚠️ **No verificable end-to-end desde este entorno de desarrollo** (mismo motivo que
-`subir-resultado`: sandbox sin acceso de red a `supabase.co` ni a `resend.com`) — el código se
-escribió siguiendo el mismo patrón ya probado de `subir-resultado`/`actualizar_mi_transponder()`,
-pero hay que probarlo en `dev`/staging antes de asumir que anda: correr la migración 0026,
-crear la cuenta de Resend (con un dominio verificado para `RESEND_FROM`), deployar la función
-con `--no-verify-jwt`, cargar los secrets, activar el opt-in en un piloto de prueba con email
-propio, y disparar la función a mano con el `curl` del README antes de programar el `pg_cron`.
+✅ **Verificado end-to-end en staging y en producción** (a diferencia de `subir-resultado`, acá
+sí se pudo probar de punta a punta con el club): migración 0026 corrida en los dos proyectos,
+dominio `touring.com.ar` verificado en Resend, función deployada con `--no-verify-jwt`, secrets
+cargados, y el `curl` de prueba del README devolvió `{"ok":true,...}` en los dos entornos. En
+producción falta todavía programar el `pg_cron` diario (paso 4 del README) para que corra solo
+sin necesidad de dispararlo a mano.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

@@ -16,8 +16,13 @@
 //   RESEND_API_KEY -- API key de la cuenta de Resend del club.
 //   RESEND_FROM    -- remitente verificado en Resend, ej.
 //                    "Touring 1:10 Arg <avisos@tudominio.com>".
-//   SITE_URL       -- opcional, ej. "https://touringrc.vercel.app" -- si no
-//                    está seteada, el mail no incluye un link directo.
+//   SITE_URL       -- ej. "https://www.touring.com.ar" (producción) o la URL
+//                    del Preview de Vercel (staging) -- se usa para las dos
+//                    cosas que lleva el mail: el logo (`${SITE_URL}/logo.png`,
+//                    la misma imagen que sirve `web/public/logo.png`) y el
+//                    link "Inscribite acá". Requerida (igual que las de
+//                    Resend) para no mandar un aviso sin forma de llegar a
+//                    la web.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -25,7 +30,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_SECRET = Deno.env.get("CRON_SECRET");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const RESEND_FROM = Deno.env.get("RESEND_FROM");
-const SITE_URL = Deno.env.get("SITE_URL");
+const SITE_URL = Deno.env.get("SITE_URL")?.replace(/\/$/, "");
 
 Deno.serve(async (req: Request) => {
   try {
@@ -35,6 +40,7 @@ Deno.serve(async (req: Request) => {
     if (!RESEND_API_KEY || !RESEND_FROM) {
       return json({ error: "Falta configurar RESEND_API_KEY / RESEND_FROM" }, 500);
     }
+    if (!SITE_URL) return json({ error: "Falta configurar SITE_URL" }, 500);
 
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
     const resultados = await avisarEventosQueAbrieron(sb);
@@ -116,15 +122,22 @@ async function enviarLote(evento: { nombre: string; fecha: string }, destinatari
     year: "numeric",
     timeZone: "UTC",
   });
-  const link = SITE_URL ? `<p><a href="${SITE_URL}">Inscribite acá</a></p>` : "";
+  // El logo se sirve desde el mismo SITE_URL (`web/public/logo.png` tal
+  // cual lo publica Vercel) -- `width`/`height` puestos como atributos
+  // HTML, no solo en `style`, porque Outlook de escritorio ignora bastante
+  // CSS pero sí respeta esos atributos.
+  const logo = `<img src="${SITE_URL}/logo.png" alt="Touring 1:10 Arg" width="120" height="120" style="display:block;width:120px;height:120px;margin:0 auto 16px;" />`;
   const html = `
-    <p>¡Se abrió la inscripción para <strong>${evento.nombre}</strong> (${fechaStr})!</p>
-    <p>Entrá a la web del club para anotarte.</p>
-    ${link}
-    <p style="color:#8B9296;font-size:12px;">
-      Recibís este aviso porque activaste la opción "Avisarme cuando abra inscripción" en tu perfil.
-      Podés desactivarla en cualquier momento desde ahí.
-    </p>
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;">
+      ${logo}
+      <p>¡Se abrió la inscripción para <strong>${evento.nombre}</strong> (${fechaStr})!</p>
+      <p>Entrá a la web del club para anotarte.</p>
+      <p style="text-align:center;"><a href="${SITE_URL}">Inscribite acá</a></p>
+      <p style="color:#8B9296;font-size:12px;">
+        Recibís este aviso porque activaste la opción "Avisarme cuando abra inscripción" en tu perfil.
+        Podés desactivarla en cualquier momento desde ahí.
+      </p>
+    </div>
   `;
 
   // Batch de Resend: cada entrada es un email individual e independiente

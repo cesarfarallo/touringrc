@@ -25,8 +25,11 @@ antes de dejar correr la función, pero acá no hay ningún usuario logueado de 
 - `RESEND_FROM` — remitente **verificado** en Resend, ej.
   `"Touring 1:10 Arg <avisos@tudominio.com>"` (Resend exige verificar el dominio antes de
   poder mandar desde esa dirección).
-- `SITE_URL` (opcional) — ej. `"https://touringrc.vercel.app"`. Si no se configura, el mail
-  sale sin link directo (solo el texto "entrá a la web del club").
+- `SITE_URL` — requerida (la función devuelve error si falta). En producción,
+  `"https://www.touring.com.ar"`; en staging, la URL del Preview de Vercel que estés usando (o
+  cualquier URL estable que sirva el sitio). Se usa para dos cosas dentro del mail: el logo
+  del club (se arma como `${SITE_URL}/logo.png`, la misma imagen que sirve `web/public/logo.png`
+  en el sitio real) y el botón/link "Inscribite acá".
 
 `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` los inyecta Supabase automáticamente, no hace falta
 configurarlos.
