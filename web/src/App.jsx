@@ -477,7 +477,12 @@ export default function TouringRCApp() {
                 </div>
 
                 <div style={{ background: T.surfaceRaised, borderRadius: 10, padding: "10px 14px" }}>
-                  <StartLights compact diasRestantes={dias} horasRestantes={horasRestantes} />
+                  <StartLights
+                    compact
+                    diasRestantes={dias}
+                    horasRestantes={horasRestantes}
+                    inscripcionDiasAntes={proximo?.inscripcion_dias_antes ?? null}
+                  />
                 </div>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

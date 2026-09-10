@@ -112,8 +112,22 @@ function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan }
   );
 }
 
-export default function StartLights({ diasRestantes, horasRestantes, compact = false }) {
-  const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasRestantes / 24)));
+// Duración (en días) que asumía originalmente la escala fija de progreso
+// (2 rojas + 3 ámbar, una por día, verde recién el día de la fecha).
+const VENTANA_PROGRESO_DIAS = 7;
+
+export default function StartLights({ diasRestantes, horasRestantes, inscripcionDiasAntes, compact = false }) {
+  // Si la fecha tiene inscripción online configurada, el semáforo se
+  // reescala para que la primera luz roja se prenda el mismo día que abre
+  // esa ventana (fecha - inscripcionDiasAntes) en vez de siempre "7 días
+  // antes" fijo -- así una fecha con inscripción a 3 días vs. una a 15 días
+  // arrancan a encender sus luces cuando corresponde en cada caso, llegando
+  // las dos a la verde el día de la carrera. Sin inscripción configurada
+  // (`inscripcionDiasAntes` null), se mantiene la escala fija de siempre.
+  const horasParaProgreso = inscripcionDiasAntes
+    ? horasRestantes * (VENTANA_PROGRESO_DIAS / inscripcionDiasAntes)
+    : horasRestantes;
+  const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasParaProgreso / 24)));
   const greenOn = progreso === 7;
   const stagesLit = Math.min(ETAPAS.length, progreso);
   const todasTitilan = greenOn && horasRestantes <= 12;

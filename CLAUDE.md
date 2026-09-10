@@ -833,15 +833,26 @@ se calcula como la fecha futura más cercana, independientemente del valor de `c
 seguir mostrando una fecha pasada si el flag quedó desactualizado.
 
 `StartLights.jsx` muestra un árbol de largada estilo drag strip: dos etapas rojas, tres ámbar y
-una verde, cada una con dos luces, apiladas verticalmente sobre un poste. Las etapas se van
-prendiendo progresivamente durante la última semana (misma fórmula de `progreso` de siempre,
-en base a `horasRestantes`); la verde recién se prende el día de la fecha. La última etapa que
-se prendió titila siempre, para marcar "esto es lo nuevo" — una vez que la verde está prendida,
-el titileo pasa a ella; durante las últimas 12 horas, titilan todas juntas (`todasTitilan`).
-Arriba se muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva que cambia
-diariamente durante los últimos 30 días. Diseño elegido entre varias propuestas comparadas en
-un artifact aparte (no versionado en el repo) antes de implementarlo acá — reemplaza el semáforo
-horizontal de siete columnas estilo F1 de la versión anterior.
+una verde, cada una con dos luces, apiladas verticalmente sobre un poste. La verde recién se
+prende el día de la fecha (siempre, sin importar lo de abajo). La última etapa que se prendió
+titila siempre, para marcar "esto es lo nuevo" — una vez que la verde está prendida, el titileo
+pasa a ella; durante las últimas 12 horas, titilan todas juntas (`todasTitilan`). Arriba se
+muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva que cambia diariamente
+durante los últimos 30 días. Diseño elegido entre varias propuestas comparadas en un artifact
+aparte (no versionado en el repo) antes de implementarlo acá — reemplaza el semáforo horizontal
+de siete columnas estilo F1 de la versión anterior.
+
+**Progreso de las etapas sincronizado con la ventana de inscripción**: originalmente las etapas
+rojas/ámbar se prendían con una escala fija (una cada ~24hs durante los últimos 7 días antes de
+la fecha), sin relación con cuándo abría la inscripción online de esa fecha en particular. Si el
+evento tiene `inscripcion_dias_antes` configurado, la fórmula de `progreso` (`StartLights.jsx`)
+reescala `horasRestantes` por `7 / inscripcionDiasAntes` antes de aplicar la escala fija de
+siempre — así la primera luz roja se prende el mismo día que abre la ventana de inscripción de
+esa fecha (`fecha - inscripcion_dias_antes`), sea esa ventana de 3, 7 o 15 días, y las etapas
+llegan igual a la verde el día de la carrera. Sin `inscripcion_dias_antes` (fecha sin
+inscripción online), se mantiene la escala fija de 7 días de siempre — no hay ventana con la
+cual sincronizar. `App.jsx` le pasa `inscripcionDiasAntes={proximo?.inscripcion_dias_antes ?? null}`
+a la instancia `compact` de la tarjeta destacada (la única que se usa hoy).
 
 En `EventoCard.jsx`, una fecha pasada habilita `Ver resultados` aunque `corrida` sea falso. Para
 una inscripción abierta, el usuario no autenticado también ve un botón `Inscribirme` que inicia
