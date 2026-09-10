@@ -75,21 +75,49 @@ versionado -- llevaría el `CRON_SECRET` en texto plano al repo.
 ## Qué detecta
 
 Para cada categoría (`clases`) del campeonato vigente (el de `fecha_inicio` más reciente, mismo
-criterio que el resto de la web):
+criterio que el resto de la web). Cada detector devuelve como mucho una frase por categoría, para
+no saturar el set con variantes muy parecidas entre sí. Si una categoría no tiene suficientes
+datos para ninguna historia (ej. recién arranca la temporada), simplemente no aporta ninguna
+frase ese ciclo -- no es un error.
 
-- **Campeonato ajustado**: punteo y escolta separados por menos que el promedio de puntos que
+**Sobre el campeonato acumulado** (`campeonato_puntos`):
+- **Campeonato ajustado**: puntero y escolta separados por menos que el promedio de puntos que
   el puntero se lleva por fecha (`puntos_del_puntero / eventos_registrados`) -- una heurística
   simple para no depender de conocer la tabla de puntos exacta de Live Timing.
+- **Dominancia** (opuesto al de arriba, mismos dos primeros -- se resuelven en un solo detector
+  para no consultar la tabla dos veces): la diferencia es más del doble de ese promedio por
+  fecha -- "X domina el campeonato con N puntos de ventaja sobre Y".
 - **Ex-campeón sin ganar**: el campeón de la temporada INMEDIATA anterior (no todo el
   historial) para esa categoría, si corre esta temporada y todavía no ganó ninguna fecha
   (`wins_1ro = 0` en `campeonato_puntos` del campeonato vigente).
 - **Nunca ganó una fecha**: un piloto con al menos 3 eventos corridos esta temporada, con algún
   podio (`wins_2do` o `wins_3ro` > 0) pero ninguna victoria (`wins_1ro = 0`).
-- **Racha del último evento**: el mismo piloto ganó las dos fechas corridas más recientes de la
-  temporada (heat de la A Final, posición 1 -- la B numera continuando después de la A, nunca
-  vuelve a 1, así que "posición 1 en un heat que empieza con A" identifica al ganador real sin
-  ambigüedad).
+- **Vuelta más rápida sin convertir**: el piloto con más vueltas más rápidas
+  (`resultados_finales.vuelta_rapida`) esta temporada (mínimo 2), si ganó menos fechas
+  (`wins_1ro`) que vueltas rápidas se llevó -- le sobra ritmo, no lo convierte en victorias.
+- **TQs sin convertir**: mismo patrón pero con `campeonato_puntos.tqs` (poles de clasificación)
+  en vez de vuelta más rápida en carrera -- domina los sábados, no los domingos.
+- **Abandonos**: el piloto con más DNF esta temporada (mínimo 2) -- se identifica por el texto
+  crudo de `resultados_finales.resultado` trayendo literal `(DNF)` (mismo formato que parsea
+  `RESULTADO_RE` en `livetime_parsers.py`/`parsers.ts`: `"7/2:59.944 (DNF)"`). A propósito NO
+  cuenta DNS (no largó) ni DQ (descalificado) -- son historias distintas a "abandonó".
 
-Cada detector devuelve como mucho una frase por categoría, para no saturar el set con variantes
-muy parecidas entre sí. Si una categoría no tiene suficientes datos para ninguna historia (ej.
-recién arranca la temporada), simplemente no aporta ninguna frase ese ciclo -- no es un error.
+**Sobre las últimas fechas corridas** (`eventos.corrida = true`, ordenadas por `fecha` desc --
+"ganador"/"podio" se identifica siempre por `resultados_finales` con `heat ilike 'a%'`, ya que la
+B numera continuando después de la A y nunca vuelve a 1, así que "posición 1/2/3 en un heat que
+empieza con A" identifica al resultado real sin ambigüedad):
+- **Racha de victorias**: el mismo piloto ganó las dos fechas corridas más recientes.
+- **Racha de podio**: el mismo piloto subió al podio (top 3) en las tres fechas corridas más
+  recientes.
+- **Sin podio**: un piloto que subió al podio en algún momento de la temporada, pero no en
+  ninguna de las últimas dos fechas corridas.
+- **Victoria alternada**: entre las últimas 3 o 4 fechas corridas (las que haya), exactamente dos
+  pilotos se repartieron todas las victorias -- una rivalidad de dos.
+- **Autos apretados en clasificación**: en la fecha corrida más reciente, al menos 3 autos
+  quedaron a un segundo o menos de la vuelta de clasificación más rápida (mínimo `fastest_lap`
+  por piloto en `resultados_ronda`, excluyendo DNF/DNS/DQ de esa tabla).
+
+**Sobre la próxima fecha**:
+- **Récord del circuito en juego**: si la próxima fecha (no la última corrida) tiene un
+  circuito+sentido asociado y ya hay un récord vigente cargado en `circuito_records` para esa
+  categoría en ese circuito y sentido.

@@ -1332,11 +1332,20 @@ proyecto (sin backend propio, sin costos por llamada) y evita depender de una AP
   README propio con deploy/secrets/prueba manual/cron): arma un set nuevo completo para el
   campeonato vigente cada vez que corre. Protegida con el mismo tipo de secreto compartido que
   `avisar-inscripcion` (`CRON_SECRET` en el header `x-cron-secret`) — tampoco hay sesión de
-  usuario de por medio. Cuatro detectores (uno por "historia"), cada uno devuelve como mucho una
-  frase por categoría para no saturar el set con variantes parecidas entre sí:
+  usuario de por medio. Doce detectores (agregados en dos tandas — los primeros cuatro al
+  escribir la función, el resto a pedido enseguida después de ver los primeros funcionando),
+  cada uno devuelve como mucho una frase por categoría para no saturar el set con variantes
+  parecidas entre sí. `eventoIdsVigente` (todos los eventos del campeonato vigente),
+  `eventosCorridos` (las últimas 4 fechas con `corrida = true`, desc por fecha) y `proximaFecha`
+  (la próxima fecha con circuito asociado) se calculan **una sola vez** en `generarFrases()` y se
+  pasan a los detectores que los necesitan, en vez de repetir esas consultas por cada categoría:
   - **Campeonato ajustado**: puntero y escolta de `campeonato_puntos` separados por menos que el
     promedio de puntos que el puntero se lleva por fecha (`puntos / eventos_registrados`) — una
     heurística simple para no depender de conocer la tabla de puntos exacta de Live Timing.
+  - **Dominancia** (mismo detector que el de arriba, `detectarSituacionCampeonato` — un único
+    query a los dos primeros de `campeonato_puntos` resuelve las dos historias en vez de
+    consultar la tabla dos veces): la diferencia es más del doble de ese promedio por fecha —
+    "X domina el campeonato con N puntos de ventaja sobre Y".
   - **Ex-campeón sin ganar**: el campeón de la temporada **inmediata anterior** (no todo el
     historial, `campeonatos` ordenado por `fecha_inicio` desc, el segundo de la lista) para esa
     categoría, si corre esta temporada (tiene fila en `campeonato_puntos` del campeonato
@@ -1344,12 +1353,35 @@ proyecto (sin backend propio, sin costos por llamada) y evita depender de una AP
   - **Nunca ganó una fecha**: un piloto con al menos 3 eventos corridos esta temporada
     (`eventos_registrados >= 3`), con algún podio (`wins_2do` o `wins_3ro` > 0) pero ninguna
     victoria (`wins_1ro = 0`).
-  - **Racha del último evento**: el mismo piloto ganó las dos fechas **corridas** más recientes
-    de la temporada (`eventos.corrida = true`, ordenadas por `fecha` desc) — "ganador" se
-    identifica por `resultados_finales` con `heat ilike 'a%'` y `posicion = 1`, mismo criterio
-    que `useGanadoresPorEvento()` del frontend: como la B numera continuando después de la A (ej.
-    A: 1-10, B: 11-20), "posición 1 en un heat que empieza con A" identifica al ganador real de
-    la fecha sin ambigüedad.
+  - **Vuelta más rápida sin convertir**: el piloto con más `resultados_finales.vuelta_rapida`
+    esta temporada (mínimo 2), si ganó menos fechas (`wins_1ro`) que vueltas rápidas se llevó.
+  - **TQs sin convertir**: mismo patrón que la de arriba pero con `campeonato_puntos.tqs`
+    (dominio en clasificación) en vez de vuelta más rápida en carrera.
+  - **Abandonos**: el piloto con más DNF esta temporada (mínimo 2) — se identifica por
+    `resultados_finales.resultado ilike '%(DNF)%'`, el texto crudo que arma
+    `parse_resultado_crudo`/`RESULTADO_RE` (`livetime_parsers.py`/`parsers.ts`) tipo
+    `"7/2:59.944 (DNF)"`. A propósito **no** cuenta DNS (no largó) ni DQ (descalificado) — son
+    historias distintas a "abandonó" aunque compartan el mismo patrón de texto crudo.
+  - **Racha de victorias**: el mismo piloto ganó las dos fechas **corridas** más recientes de la
+    temporada — "ganador" se identifica por `resultados_finales` con `heat ilike 'a%'` y
+    `posicion = 1`, mismo criterio que `useGanadoresPorEvento()` del frontend: como la B numera
+    continuando después de la A (ej. A: 1-10, B: 11-20), "posición 1 en un heat que empieza con
+    A" identifica al ganador real sin ambigüedad. Mismo criterio de heat para "podio" en los dos
+    detectores siguientes, pero con `posicion <= 3`.
+  - **Racha de podio**: el mismo piloto subió al podio en las tres fechas corridas más recientes
+    (intersección de los tres podios, uno por evento).
+  - **Sin podio**: un piloto que subió al podio en algún momento de la temporada (en cualquier
+    evento de `eventoIdsVigente`) pero no en ninguna de las últimas dos fechas corridas.
+  - **Victoria alternada**: entre las últimas 3 o 4 fechas corridas (las que haya, `Math.min(4,
+    eventosCorridos.length)`), exactamente dos pilotos distintos se repartieron todas las
+    victorias.
+  - **Autos apretados en clasificación**: en la fecha corrida más reciente, al menos 3 autos
+    quedaron a un segundo o menos de la vuelta de clasificación más rápida — mínimo
+    `resultados_ronda.fastest_lap` por piloto (excluyendo filas con `status` no nulo, es decir
+    DNF/DNS/DQ de esa ronda), comparado contra el mínimo global de esa fecha+categoría.
+  - **Récord del circuito en juego**: si la **próxima** fecha (no la última corrida,
+    `proximaFecha`) tiene un circuito+sentido asociado y ya hay un récord vigente cargado en
+    `circuito_records` para esa categoría en ese circuito y sentido puntual.
 - **"Cada 3 días" resuelto adentro de la función, no en el cron**: programar el cron cada 3 días
   directo (`cron.schedule` con un patrón de calendario) reinicia el conteo en cada mes, dejando
   intervalos reales irregulares (ver la nota de `hourly starting now` que ya aplica a los cron de
