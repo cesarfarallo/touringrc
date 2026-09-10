@@ -487,7 +487,7 @@ export default function TouringRCApp() {
                     horasRestantes={horasRestantes}
                     inscripcionDiasAntes={proximo?.inscripcion_dias_antes ?? null}
                     frasesDestacadas={frasesDestacadas}
-                    cargandoFrases={cargandoFrasesDestacadas}
+                    cargandoFrases={cargandoCampeonato || cargandoFrasesDestacadas}
                   />
                 </div>
 

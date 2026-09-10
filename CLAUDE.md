@@ -1403,6 +1403,20 @@ proyecto (sin backend propio, sin costos por llamada) y evita depender de una AP
   frases con datos reales lleguen a tiempo de entrar en el sorteo) — reemplaza a la selección
   determinística por día restante (`fraseParaDias`) que existía antes de sumar esto.
 
+⚠️ **Bug encontrado al probarlo**: `cargandoFrases` se le pasaba a `StartLights` como
+`cargandoFrasesDestacadas` a secas (el `loading` propio de `useFrasesDestacadas`) — ese hook
+arranca en `loading=false` mientras `campeonatoId` todavía es `""` (esperando a que
+`useCampeonato()` resuelva cuál es el vigente, ver el criterio de arriba), porque en ese estado
+ni siquiera dispara la consulta todavía. `false` ahí significa "no estoy buscando" (porque
+todavía no sé qué buscar), no "ya terminé de buscar" — pero el `useEffect` de `StartLights` los
+trataba igual, así que sorteaba la frase en el primerísimo render (con `frasesDestacadas` en su
+default `[]`) y nunca la volvía a mirar, aunque un instante después llegaran las reales. Con esto
+el pool de datos reales **nunca** llegaba a tiempo de entrar en el sorteo — siempre se veía una
+genérica, indistinguible de "no está leyendo la base". `App.jsx` ahora le pasa
+`cargandoCampeonato || cargandoFrasesDestacadas` en vez del segundo solo, así `StartLights`
+espera a que las dos etapas (saber el campeonato vigente, y recién ahí traer sus frases) hayan
+terminado antes de sortear.
+
 ⚠️ Igual que toda migración/Edge Function nueva: falta correr la 0027 y deployar
 `generar-frases-destacadas` en staging y producción, y programar su `pg_cron` diario (paso 4 del
 README de la función) — no verificable end-to-end desde este entorno de desarrollo por la misma
