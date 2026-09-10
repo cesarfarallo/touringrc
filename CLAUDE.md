@@ -833,27 +833,30 @@ se calcula como la fecha futura más cercana, independientemente del valor de `c
 seguir mostrando una fecha pasada si el flag quedó desactualizado.
 
 `StartLights.jsx` muestra un árbol de largada estilo drag strip: dos etapas rojas, tres ámbar y
-una verde, cada una con dos luces, apiladas verticalmente sobre un poste. La verde recién se
-prende el día de la fecha (siempre, sin importar lo de abajo). Mientras van prendiendo, solo la
-última etapa prendida titila (marca "esto es lo nuevo"); las anteriores quedan fijas, prendidas
-sin titilar. Apenas se prende la verde (`todasTitilan = greenOn`, sin depender de cuántas horas
-falten), titilan **todas** las luces prendidas juntas de una — la verde reemplaza al indicador de
-progreso individual como señal de "ya está". Arriba se muestra "FALTAN N DÍAS" (o "HOY"/"¡SE
-LARGA!") y una frase alusiva que cambia diariamente durante los últimos 30 días. Diseño elegido
-entre varias propuestas comparadas en un artifact aparte (no versionado en el repo) antes de
-implementarlo acá — reemplaza el semáforo horizontal de siete columnas estilo F1 de la versión
-anterior.
+una verde, cada una con dos luces, apiladas verticalmente sobre un poste. Mientras van
+prendiendo las rojas/ámbar, solo la última etapa prendida titila (marca "esto es lo nuevo"); las
+anteriores quedan fijas, prendidas sin titilar. La verde es una señal aparte de cuenta regresiva
+final: se prende a las **12 horas reales** antes de la fecha (`greenOn = horasRestantes <= 12`,
+sin reescalar por la ventana de inscripción — a diferencia del progreso de las etapas rojas/ámbar,
+ver abajo) y ahí **todas** las luces prendidas titilan juntas de una (`todasTitilan = greenOn`) —
+la verde reemplaza al indicador de progreso individual como señal de "ya está". Arriba se
+muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva que cambia diariamente
+durante los últimos 30 días. Diseño elegido entre varias propuestas comparadas en un artifact
+aparte (no versionado en el repo) antes de implementarlo acá — reemplaza el semáforo horizontal
+de siete columnas estilo F1 de la versión anterior.
 
-**Progreso de las etapas sincronizado con la ventana de inscripción**: originalmente las etapas
-rojas/ámbar se prendían con una escala fija (una cada ~24hs durante los últimos 7 días antes de
-la fecha), sin relación con cuándo abría la inscripción online de esa fecha en particular. Si el
-evento tiene `inscripcion_dias_antes` configurado, la fórmula de `progreso` (`StartLights.jsx`)
-reescala `horasRestantes` por `7 / inscripcionDiasAntes` antes de aplicar la escala fija de
-siempre — así la primera luz roja se prende el mismo día que abre la ventana de inscripción de
-esa fecha (`fecha - inscripcion_dias_antes`), sea esa ventana de 3, 7 o 15 días, y las etapas
-llegan igual a la verde el día de la carrera. Sin `inscripcion_dias_antes` (fecha sin
-inscripción online), se mantiene la escala fija de 7 días de siempre — no hay ventana con la
-cual sincronizar. `App.jsx` le pasa `inscripcionDiasAntes={proximo?.inscripcion_dias_antes ?? null}`
+**Progreso de las etapas rojas/ámbar sincronizado con la ventana de inscripción**: originalmente
+se prendían con una escala fija (una cada ~24hs durante los últimos 7 días antes de la fecha),
+sin relación con cuándo abría la inscripción online de esa fecha en particular. Si el evento
+tiene `inscripcion_dias_antes` configurado, la fórmula de `progreso` (`StartLights.jsx`) reescala
+`horasRestantes` por `7 / inscripcionDiasAntes` antes de aplicar la escala fija de siempre — así
+la primera luz roja se prende el mismo día que abre la ventana de inscripción de esa fecha
+(`fecha - inscripcion_dias_antes`), sea esa ventana de 3, 7 o 15 días. Sin `inscripcion_dias_antes`
+(fecha sin inscripción online), se mantiene la escala fija de 7 días de siempre — no hay ventana
+con la cual sincronizar. Este reescalado **no** afecta a la verde (siempre a horas reales, ver
+arriba) — puede pasar que con una ventana de inscripción muy corta la verde se prenda antes de
+que las 5 etapas rojas/ámbar hayan terminado de encenderse, y es lo esperado: son dos señales
+independientes. `App.jsx` le pasa `inscripcionDiasAntes={proximo?.inscripcion_dias_antes ?? null}`
 a la instancia `compact` de la tarjeta destacada (la única que se usa hoy).
 
 En `EventoCard.jsx`, una fecha pasada habilita `Ver resultados` aunque `corrida` sea falso. Para

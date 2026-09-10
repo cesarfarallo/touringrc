@@ -128,9 +128,13 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
   const horasParaProgreso = inscripcionDiasAntes
     ? horasRestantes * (VENTANA_PROGRESO_DIAS / inscripcionDiasAntes)
     : horasRestantes;
-  const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasParaProgreso / 24)));
-  const greenOn = progreso === 7;
-  const stagesLit = Math.min(ETAPAS.length, progreso);
+  const progreso = Math.min(ETAPAS.length, Math.max(0, 8 - Math.ceil(horasParaProgreso / 24)));
+  const stagesLit = progreso;
+  // La verde es una señal aparte, de cuenta regresiva final: se prende a
+  // las 12 horas reales antes de la fecha (sin reescalar por la ventana de
+  // inscripción, a diferencia del progreso de arriba) y ahí titilan todas
+  // las luces juntas.
+  const greenOn = horasRestantes <= 12;
   const todasTitilan = greenOn;
 
   if (compact) {
