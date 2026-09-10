@@ -834,13 +834,15 @@ seguir mostrando una fecha pasada si el flag quedó desactualizado.
 
 `StartLights.jsx` muestra un árbol de largada estilo drag strip: dos etapas rojas, tres ámbar y
 una verde, cada una con dos luces, apiladas verticalmente sobre un poste. La verde recién se
-prende el día de la fecha (siempre, sin importar lo de abajo). La última etapa que se prendió
-titila siempre, para marcar "esto es lo nuevo" — una vez que la verde está prendida, el titileo
-pasa a ella; durante las últimas 12 horas, titilan todas juntas (`todasTitilan`). Arriba se
-muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva que cambia diariamente
-durante los últimos 30 días. Diseño elegido entre varias propuestas comparadas en un artifact
-aparte (no versionado en el repo) antes de implementarlo acá — reemplaza el semáforo horizontal
-de siete columnas estilo F1 de la versión anterior.
+prende el día de la fecha (siempre, sin importar lo de abajo). Mientras van prendiendo, solo la
+última etapa prendida titila (marca "esto es lo nuevo"); las anteriores quedan fijas, prendidas
+sin titilar. Apenas se prende la verde (`todasTitilan = greenOn`, sin depender de cuántas horas
+falten), titilan **todas** las luces prendidas juntas de una — la verde reemplaza al indicador de
+progreso individual como señal de "ya está". Arriba se muestra "FALTAN N DÍAS" (o "HOY"/"¡SE
+LARGA!") y una frase alusiva que cambia diariamente durante los últimos 30 días. Diseño elegido
+entre varias propuestas comparadas en un artifact aparte (no versionado en el repo) antes de
+implementarlo acá — reemplaza el semáforo horizontal de siete columnas estilo F1 de la versión
+anterior.
 
 **Progreso de las etapas sincronizado con la ventana de inscripción**: originalmente las etapas
 rojas/ámbar se prendían con una escala fija (una cada ~24hs durante los últimos 7 días antes de

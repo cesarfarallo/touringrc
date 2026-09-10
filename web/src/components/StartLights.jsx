@@ -40,10 +40,11 @@ function fraseParaDias(diasRestantes) {
 
 // Árbol de largada estilo drag strip: dos etapas rojas, tres ámbar, y la
 // verde recién el día de la fecha -- en vez del semáforo horizontal de F1
-// de siete columnas que tenía antes. La última etapa que se prende titila
-// siempre (marca "esto es lo nuevo"); una vez que la verde está prendida,
-// el protagonismo del titileo pasa a ella. Con `todasTitilan` (últimas 12
-// horas) titilan todas juntas, el estado de máxima urgencia.
+// de siete columnas que tenía antes. Mientras van prendiendo, solo la
+// última etapa que se prendió titila (marca "esto es lo nuevo"); las
+// anteriores quedan fijas. Apenas se prende la verde (`todasTitilan`),
+// titilan todas juntas de una -- la verde reemplaza al progreso individual
+// como señal de "ya está".
 const ETAPAS = ["red", "red", "amber", "amber", "amber"];
 
 const COLORES = {
@@ -130,7 +131,7 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
   const progreso = Math.min(7, Math.max(0, 8 - Math.ceil(horasParaProgreso / 24)));
   const greenOn = progreso === 7;
   const stagesLit = Math.min(ETAPAS.length, progreso);
-  const todasTitilan = greenOn && horasRestantes <= 12;
+  const todasTitilan = greenOn;
 
   if (compact) {
     return (
