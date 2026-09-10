@@ -137,14 +137,32 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
   const greenOn = horasRestantes <= 12;
   const todasTitilan = greenOn;
 
+  // El keyframe de titileo lo usan los Bulb de las dos variantes (torre y
+  // compacta) -- tiene que quedar declarado sin importar cuál se renderice,
+  // así que va antes del if en vez de vivir solo dentro del branch de la
+  // torre (ahí quedaba sin declarar para la variante compacta, la única que
+  // usa la app hoy, y el titileo no hacía nada: `animation` apuntaba a un
+  // @keyframes inexistente).
+  const keyframes = (
+    <style>{`
+      @keyframes start-lights-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+    `}</style>
+  );
+
   if (compact) {
     return (
-      <StartLightsCompacto
-        diasRestantes={diasRestantes}
-        stagesLit={stagesLit}
-        greenOn={greenOn}
-        todasTitilan={todasTitilan}
-      />
+      <>
+        {keyframes}
+        <StartLightsCompacto
+          diasRestantes={diasRestantes}
+          stagesLit={stagesLit}
+          greenOn={greenOn}
+          todasTitilan={todasTitilan}
+        />
+      </>
     );
   }
 
@@ -154,12 +172,7 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
       aria-label={`Faltan ${diasRestantes} días. ${stagesLit} de ${ETAPAS.length} etapas encendidas${greenOn ? " y verde encendida" : ""}.`}
       style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}
     >
-      <style>{`
-        @keyframes start-lights-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
+      {keyframes}
 
       <div style={{ textAlign: "center" }}>
         <div style={{ color: T.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>
