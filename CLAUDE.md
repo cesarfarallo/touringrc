@@ -788,10 +788,12 @@ llevaron al código tal cual:
   progreso/titileo (`progreso`, `greenOn`, `stagesLit`, `todasTitilan`) se calcula una sola vez
   en el componente principal y se le pasa a `StartLightsCompacto` cuando `compact` es `true` —
   en vez de la torre vertical de `Bulb`s de 18px apilados sobre un poste, dibuja una tira
-  horizontal de puntitos de 10px (mismo componente `Bulb`, que ahora acepta un `size` para
-  poder reusarse en los dos tamaños) al lado del texto del countdown, sin la frase alusiva
-  (se sacrifica para que la barra compacta entre en una sola línea). La torre vertical
-  (`compact={false}`, el default) sigue existiendo tal cual para quien la use sin el prop.
+  horizontal de puntitos (mismo componente `Bulb`, que acepta un `size` para poder reusarse en
+  los dos tamaños — 14px en la compacta, luego de agrandarlas a pedido) al lado del texto del
+  countdown. La torre vertical (`compact={false}`, el default) sigue existiendo tal cual para
+  quien la use sin el prop. Las dos variantes comparten la frase alusiva debajo del countdown
+  (ver más abajo) — la compacta la había perdido en este restyling para entrar en una sola línea,
+  pero se repuso a pedido (ver bug de abajo), aceptando que ahora puede ocupar dos líneas.
 
 - **Ganadores en `EventoCard.jsx` como chips**: antes, cada categoría mostraba
   `"Categoría: 🏆 nombre 🥈 nombre"` como texto corrido con `flexWrap` a nivel de toda la fila
@@ -840,10 +842,23 @@ final: se prende a las **12 horas reales** antes de la fecha (`greenOn = horasRe
 sin reescalar por la ventana de inscripción — a diferencia del progreso de las etapas rojas/ámbar,
 ver abajo) y ahí **todas** las luces prendidas titilan juntas de una (`todasTitilan = greenOn`) —
 la verde reemplaza al indicador de progreso individual como señal de "ya está". Arriba se
-muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva que cambia diariamente
-durante los últimos 30 días. Diseño elegido entre varias propuestas comparadas en un artifact
-aparte (no versionado en el repo) antes de implementarlo acá — reemplaza el semáforo horizontal
-de siete columnas estilo F1 de la versión anterior.
+muestra "FALTAN N DÍAS" (o "HOY"/"¡SE LARGA!") y una frase alusiva (`fraseAleatoria()`, elegida
+al azar del arreglo `FRASES` con `useState(fraseAleatoria)` — una sola vez por carga de la
+página, no en cada render; cambia sola si el piloto refresca). Antes la frase salía de
+`fraseParaDias(diasRestantes)`, determinística por día restante (siempre la misma frase para la
+misma cantidad de días) — se cambió a al azar sin relación con los días restantes, a pedido.
+Diseño elegido entre varias propuestas comparadas en un artifact aparte (no versionado en el
+repo) antes de implementarlo acá — reemplaza el semáforo horizontal de siete columnas estilo F1
+de la versión anterior.
+
+⚠️ **Bug encontrado al reponer la frase en la variante compacta**: el `<style>` con
+`@keyframes start-lights-blink` (el titileo) solo se renderizaba dentro del branch de la torre
+(`compact={false}`) — la compacta, la única que usa la app hoy en la tarjeta destacada, nunca
+llegaba a declarar ese keyframe en la página, así que `animation: start-lights-blink ...`
+apuntaba a una animación inexistente y el navegador la ignoraba en silencio: la luz quedaba
+prendida pero nunca titilaba, sin importar cuántas estuvieran encendidas. Se sacó el `<style>` a
+una variable compartida (`keyframes`) que se renderiza en las dos variantes. De paso, el
+titileo se aceleró un poco (`0.7s` en vez de `1s`) a pedido.
 
 **Progreso de las etapas rojas/ámbar sincronizado con la ventana de inscripción**: originalmente
 se prendían con una escala fija (una cada ~24hs durante los últimos 7 días antes de la fecha),

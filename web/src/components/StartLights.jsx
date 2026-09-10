@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { T } from "../theme";
 
 const FRASES = [
@@ -33,9 +34,8 @@ const FRASES = [
   "Preparados, listos..."
 ];
 
-function fraseParaDias(diasRestantes) {
-  if (diasRestantes <= 30) return FRASES[30 - Math.max(0, diasRestantes)];
-  return "La próxima fecha ya está en el horizonte.";
+function fraseAleatoria() {
+  return FRASES[Math.floor(Math.random() * FRASES.length)];
 }
 
 // Árbol de largada estilo drag strip: dos etapas rojas, tres ámbar, y la
@@ -73,7 +73,7 @@ function Bulb({ color, on, blink, size = 18 }) {
         background: c.bg,
         border: `${size >= 18 ? 2 : 1}px solid ${c.border}`,
         boxShadow: on ? `0 0 ${size >= 18 ? "12px 2px" : "6px 1px"} ${c.glow}` : "none",
-        animation: blink ? "start-lights-blink 1s ease-in-out infinite" : "none",
+        animation: blink ? "start-lights-blink 0.7s ease-in-out infinite" : "none",
         transition: "all 0.3s ease",
       }}
     />
@@ -85,7 +85,7 @@ function Bulb({ color, on, blink, size = 18 }) {
 // estirada por la torre completa apilada debajo de todo lo demás. Comparte
 // el mismo cálculo de progreso/titileo que la versión de torre, solo
 // cambia cómo se dibuja.
-function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan }) {
+function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan, frase }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%" }}>
       <div>
@@ -99,6 +99,7 @@ function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan }
               : "HOY"
             : `FALTAN ${diasRestantes} ${diasRestantes === 1 ? "DÍA" : "DÍAS"}`}
         </div>
+        <div style={{ color: T.muted, fontSize: 10, fontStyle: "italic", marginTop: 2 }}>{frase}</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         {ETAPAS.map((color, i) => {
@@ -137,6 +138,11 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
   const greenOn = horasRestantes <= 12;
   const todasTitilan = greenOn;
 
+  // Elegida una sola vez por carga de página (no por render): cambia sola
+  // si el piloto refresca la web, sin depender de una fórmula por día como
+  // antes.
+  const [frase] = useState(fraseAleatoria);
+
   // El keyframe de titileo lo usan los Bulb de las dos variantes (torre y
   // compacta) -- tiene que quedar declarado sin importar cuál se renderice,
   // así que va antes del if en vez de vivir solo dentro del branch de la
@@ -161,6 +167,7 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
           stagesLit={stagesLit}
           greenOn={greenOn}
           todasTitilan={todasTitilan}
+          frase={frase}
         />
       </>
     );
@@ -186,7 +193,7 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
             : `FALTAN ${diasRestantes} ${diasRestantes === 1 ? "DÍA" : "DÍAS"}`}
         </div>
         <div style={{ color: T.muted, fontSize: 12, fontStyle: "italic", marginTop: 3, maxWidth: 220 }}>
-          {fraseParaDias(diasRestantes)}
+          {frase}
         </div>
       </div>
 
