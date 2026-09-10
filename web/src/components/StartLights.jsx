@@ -100,14 +100,14 @@ function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan }
             : `FALTAN ${diasRestantes} ${diasRestantes === 1 ? "DÍA" : "DÍAS"}`}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         {ETAPAS.map((color, i) => {
           const on = i < stagesLit;
           const esUltimaPrendida = on && !greenOn && i === stagesLit - 1;
           const blink = on && (todasTitilan || esUltimaPrendida);
-          return <Bulb key={i} color={color} on={on} blink={blink} size={10} />;
+          return <Bulb key={i} color={color} on={on} blink={blink} size={14} />;
         })}
-        <Bulb color="green" on={greenOn} blink={greenOn} size={10} />
+        <Bulb color="green" on={greenOn} blink={greenOn} size={14} />
       </div>
     </div>
   );
