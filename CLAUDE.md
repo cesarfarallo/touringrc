@@ -1403,19 +1403,30 @@ proyecto (sin backend propio, sin costos por llamada) y evita depender de una AP
   frases con datos reales lleguen a tiempo de entrar en el sorteo) — reemplaza a la selección
   determinística por día restante (`fraseParaDias`) que existía antes de sumar esto.
 
-⚠️ **Bug encontrado al probarlo**: `cargandoFrases` se le pasaba a `StartLights` como
-`cargandoFrasesDestacadas` a secas (el `loading` propio de `useFrasesDestacadas`) — ese hook
-arranca en `loading=false` mientras `campeonatoId` todavía es `""` (esperando a que
-`useCampeonato()` resuelva cuál es el vigente, ver el criterio de arriba), porque en ese estado
-ni siquiera dispara la consulta todavía. `false` ahí significa "no estoy buscando" (porque
-todavía no sé qué buscar), no "ya terminé de buscar" — pero el `useEffect` de `StartLights` los
-trataba igual, así que sorteaba la frase en el primerísimo render (con `frasesDestacadas` en su
-default `[]`) y nunca la volvía a mirar, aunque un instante después llegaran las reales. Con esto
-el pool de datos reales **nunca** llegaba a tiempo de entrar en el sorteo — siempre se veía una
-genérica, indistinguible de "no está leyendo la base". `App.jsx` ahora le pasa
-`cargandoCampeonato || cargandoFrasesDestacadas` en vez del segundo solo, así `StartLights`
-espera a que las dos etapas (saber el campeonato vigente, y recién ahí traer sus frases) hayan
-terminado antes de sortear.
+⚠️ **Bug encontrado al probarlo (dos vueltas)**: primero, `cargandoFrases` se le pasaba a
+`StartLights` como `cargandoFrasesDestacadas` a secas — ese hook arranca en `loading=false`
+mientras `campeonatoId` todavía es `""` (esperando a que `useCampeonato()` resuelva cuál es el
+vigente), porque en ese estado ni siquiera dispara la consulta todavía. `false` ahí significaba
+"no estoy buscando" (porque todavía no sé qué buscar), no "ya terminé de buscar" — pero el
+`useEffect` de `StartLights` los trataba igual, así que sorteaba la frase en el primerísimo
+render (con `frasesDestacadas` en su default `[]`) y nunca la volvía a mirar. Primer fix:
+`App.jsx` pasa `cargandoCampeonato || cargandoFrasesDestacadas` en vez del segundo solo.
+
+Ese fix no alcanzó — verificado con la migración y la función ya corridas en staging, el sitio
+seguía mostrando solo genéricas. La causa real, más sutil: `useFrasesDestacadas` marcaba
+`loading` con un **estado separado** que un `useEffect` actualiza recién después de que React
+confirma el render (`setLoading(true)` adentro del efecto) — en el mismísimo render donde
+`campeonatoId` pasa de `""` al id real (el mismo render donde `App.jsx` ya ve
+`cargandoCampeonato=false`), ese estado todavía conserva su valor viejo (`false`, seteado por el
+efecto de la corrida anterior, cuando `campeonatoId` todavía era `""`) hasta que el efecto de
+*esta* corrida llega a poner `true` un render más tarde. En esa ventana de un render,
+`cargandoFrases` daba `false` con `frasesDestacadas` todavía vacío, y `StartLights` sorteaba ahí
+mismo — el fix de arriba cerraba la ventana ANTES de saber el campeonato, pero no esta, que pasa
+DESPUÉS. Fix real: `loading` pasa a ser un valor **derivado** en el propio render (comparando
+`campeonatoId` contra `idResuelto`, el id para el que `frases` ya está al día) en vez de un
+estado separado actualizado a destiempo por un efecto — así cambia a `true` en el instante mismo
+en que cambia `campeonatoId`, sin esperar a que corra ningún efecto, cerrando la ventana por
+completo.
 
 ⚠️ Igual que toda migración/Edge Function nueva: falta correr la 0027 y deployar
 `generar-frases-destacadas` en staging y producción, y programar su `pg_cron` diario (paso 4 del

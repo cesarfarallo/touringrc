@@ -382,24 +382,33 @@ export function useCampeonato(campeonatoId) {
 // por carga de página. `campeonatoId` en "" (no null/undefined) significa
 // "todavía no sé cuál es el campeonato vigente" -- no dispara la consulta,
 // mismo criterio que useCampeonato().
+//
+// `loading` se deriva comparando `campeonatoId` contra `idResuelto` (el id
+// para el que `frases` ya está al día) en vez de un flag separado que un
+// useEffect actualiza a destiempo -- con un flag aparte, en el mismísimo
+// render donde `campeonatoId` pasa de "" al id real, `loading` todavía
+// mostraba su valor viejo (`false`, seteado por el efecto de la corrida
+// anterior) hasta que el efecto de ESTA corrida llegaba a poner `true`, un
+// render más tarde. Ese hueco de un render alcanzaba para que StartLights
+// (que solo mira `loading` para decidir si ya puede sortear la frase) la
+// eligiera con `frases` todavía vacío y nunca la reconsiderara. Al ser
+// `loading` un valor derivado en el mismo render (no un estado separado),
+// no hay ventana: cambia a `true` en el instante mismo en que cambia
+// `campeonatoId`, sin esperar a que corra ningún efecto.
 export function useFrasesDestacadas(campeonatoId) {
   const [frases, setFrases] = useState([]);
-  const [loading, setLoading] = useState(campeonatoId !== "");
+  const [idResuelto, setIdResuelto] = useState(undefined);
+
+  const loading = campeonatoId !== "" && campeonatoId != null && idResuelto !== campeonatoId;
 
   useEffect(() => {
-    if (campeonatoId === "") {
+    if (campeonatoId === "" || campeonatoId == null) {
       setFrases([]);
-      setLoading(false);
-      return;
-    }
-    if (!campeonatoId) {
-      setFrases([]);
-      setLoading(false);
+      setIdResuelto(campeonatoId);
       return;
     }
 
     let activo = true;
-    setLoading(true);
     supabase
       .from("frases_destacadas")
       .select("texto")
@@ -411,7 +420,7 @@ export function useFrasesDestacadas(campeonatoId) {
         // simplemente no hay frases con datos reales ese ciclo (StartLights
         // igual tiene las genéricas de respaldo).
         setFrases(error ? [] : (data ?? []).map((f) => f.texto));
-        setLoading(false);
+        setIdResuelto(campeonatoId);
       });
     return () => {
       activo = false;
