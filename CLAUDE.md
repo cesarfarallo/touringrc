@@ -1313,6 +1313,69 @@ cargados, y el `curl` de prueba del README devolvió `{"ok":true,...}` en los do
 producción falta todavía programar el `pg_cron` diario (paso 4 del README) para que corra solo
 sin necesidad de dispararlo a mano.
 
+## Frases destacadas armadas con datos reales (migración 0027)
+
+La frase alusiva de la tarjeta destacada del Calendario (`StartLights.jsx`, debajo del
+countdown) sumó frases armadas con los resultados/campeonato reales, además de las genéricas de
+siempre ("Se viene una fecha imperdible", etc.) — ej. "El campeonato de Modified está al rojo
+vivo, ¿podrá X mantener la punta o Y lo alcanzará?", "¿Podrá X volver a ganar este año?". Decisión
+tomada antes de escribir código (mismo criterio que la migración 0026): **lógica propia con
+plantillas + datos reales, sin ningún servicio de IA externo** — coherente con el resto del
+proyecto (sin backend propio, sin costos por llamada) y evita depender de una API key nueva.
+
+- **`frases_destacadas`** (tabla nueva, `touringrc-sync/sql/migrations/0027_frases_destacadas.sql`):
+  `texto`, `categoria` (qué detector la armó, para debug), `campeonato_id`, `clase_id`,
+  `generado_en`. Select público (la consume el Calendario sin login), **sin** policy de
+  insert/update/delete — la única escritura la hace la Edge Function de abajo con la
+  `service_role key`, que bypasea RLS; no hace falta abrirle escritura a la `anon key`.
+- **Edge Function `generar-frases-destacadas`** (`supabase/functions/generar-frases-destacadas/`,
+  README propio con deploy/secrets/prueba manual/cron): arma un set nuevo completo para el
+  campeonato vigente cada vez que corre. Protegida con el mismo tipo de secreto compartido que
+  `avisar-inscripcion` (`CRON_SECRET` en el header `x-cron-secret`) — tampoco hay sesión de
+  usuario de por medio. Cuatro detectores (uno por "historia"), cada uno devuelve como mucho una
+  frase por categoría para no saturar el set con variantes parecidas entre sí:
+  - **Campeonato ajustado**: puntero y escolta de `campeonato_puntos` separados por menos que el
+    promedio de puntos que el puntero se lleva por fecha (`puntos / eventos_registrados`) — una
+    heurística simple para no depender de conocer la tabla de puntos exacta de Live Timing.
+  - **Ex-campeón sin ganar**: el campeón de la temporada **inmediata anterior** (no todo el
+    historial, `campeonatos` ordenado por `fecha_inicio` desc, el segundo de la lista) para esa
+    categoría, si corre esta temporada (tiene fila en `campeonato_puntos` del campeonato
+    vigente) y todavía no ganó ninguna fecha (`wins_1ro = 0`).
+  - **Nunca ganó una fecha**: un piloto con al menos 3 eventos corridos esta temporada
+    (`eventos_registrados >= 3`), con algún podio (`wins_2do` o `wins_3ro` > 0) pero ninguna
+    victoria (`wins_1ro = 0`).
+  - **Racha del último evento**: el mismo piloto ganó las dos fechas **corridas** más recientes
+    de la temporada (`eventos.corrida = true`, ordenadas por `fecha` desc) — "ganador" se
+    identifica por `resultados_finales` con `heat ilike 'a%'` y `posicion = 1`, mismo criterio
+    que `useGanadoresPorEvento()` del frontend: como la B numera continuando después de la A (ej.
+    A: 1-10, B: 11-20), "posición 1 en un heat que empieza con A" identifica al ganador real de
+    la fecha sin ambigüedad.
+- **"Cada 3 días" resuelto adentro de la función, no en el cron**: programar el cron cada 3 días
+  directo (`cron.schedule` con un patrón de calendario) reinicia el conteo en cada mes, dejando
+  intervalos reales irregulares (ver la nota de `hourly starting now` que ya aplica a los cron de
+  una hora — acá el problema es peor, a nivel de días). En cambio, el cron de afuera se programa
+  simplemente **diario** (igual que `avisar-inscripcion`) y la función mira cuándo se generó el
+  último set para el campeonato vigente (`max(generado_en)` en `frases_destacadas`); si todavía
+  no pasaron 3 días, no hace nada (`{ok:true, generadas:0, motivo:"..."}`) — así el intervalo real
+  entre regeneraciones es siempre de 3 días, sin importar cuándo cae el corte de mes. Se puede
+  forzar una regeneración inmediata mandando `{"forzar": true}` en el body, útil para probar.
+- **Frontend**: `useFrasesDestacadas(campeonatoId)` (`hooks.js`) trae los `texto` de
+  `frases_destacadas` del campeonato vigente — mismo criterio `campeonatoId === ""` de
+  `useCampeonato()` para "todavía no sé cuál es el vigente, no dispares la consulta". `App.jsx`
+  se la pasa a la instancia `compact` de `StartLights` (la tarjeta destacada). Adentro,
+  `elegirFrase()` arma un pool con esas frases **más** las genéricas de siempre (`FRASES`) y
+  elige una al azar — así el pool nunca queda vacío (arranque de temporada, sin datos todavía) y,
+  si hay pocas frases con datos reales, se completan con las genéricas hasta un pool razonable,
+  en vez de mostrar siempre las mismas 2 o 3 reales sin variedad. Se elige una sola vez por carga
+  de página (`useEffect` que espera a que `cargandoFrases` termine antes de sortear, para que las
+  frases con datos reales lleguen a tiempo de entrar en el sorteo) — reemplaza a la selección
+  determinística por día restante (`fraseParaDias`) que existía antes de sumar esto.
+
+⚠️ Igual que toda migración/Edge Function nueva: falta correr la 0027 y deployar
+`generar-frases-destacadas` en staging y producción, y programar su `pg_cron` diario (paso 4 del
+README de la función) — no verificable end-to-end desde este entorno de desarrollo por la misma
+razón de siempre (sin acceso de red a un proyecto de Supabase real).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

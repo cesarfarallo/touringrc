@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { T } from "../theme";
 
 const FRASES = [
@@ -34,8 +34,13 @@ const FRASES = [
   "Preparados, listos..."
 ];
 
-function fraseAleatoria() {
-  return FRASES[Math.floor(Math.random() * FRASES.length)];
+// `frasesDestacadas` (armadas con datos reales, ver useFrasesDestacadas en
+// hooks.js) se mezclan con las genéricas de siempre -- así, si todavía no
+// hay ninguna historia real que contar (arranca la temporada, poca data
+// cargada), el pool nunca queda vacío.
+function elegirFrase(frasesDestacadas) {
+  const pool = [...frasesDestacadas, ...FRASES];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Árbol de largada estilo drag strip: dos etapas rojas, tres ámbar, y la
@@ -118,7 +123,14 @@ function StartLightsCompacto({ diasRestantes, stagesLit, greenOn, todasTitilan, 
 // (2 rojas + 3 ámbar, una por día, verde recién el día de la fecha).
 const VENTANA_PROGRESO_DIAS = 7;
 
-export default function StartLights({ diasRestantes, horasRestantes, inscripcionDiasAntes, compact = false }) {
+export default function StartLights({
+  diasRestantes,
+  horasRestantes,
+  inscripcionDiasAntes,
+  frasesDestacadas = [],
+  cargandoFrases = false,
+  compact = false,
+}) {
   // Si la fecha tiene inscripción online configurada, el semáforo se
   // reescala para que la primera luz roja se prenda el mismo día que abre
   // esa ventana (fecha - inscripcionDiasAntes) en vez de siempre "7 días
@@ -139,9 +151,15 @@ export default function StartLights({ diasRestantes, horasRestantes, inscripcion
   const todasTitilan = greenOn;
 
   // Elegida una sola vez por carga de página (no por render): cambia sola
-  // si el piloto refresca la web, sin depender de una fórmula por día como
-  // antes.
-  const [frase] = useState(fraseAleatoria);
+  // si el piloto refresca la web. Se espera a que terminen de cargar las
+  // frases con datos reales (`cargandoFrases`) antes de elegir, para que
+  // entren en el sorteo esta vez también -- si tardan, no pasa nada, el
+  // pool de genéricas ya cubre el instante inicial en el `useState(null)`.
+  const [frase, setFrase] = useState(null);
+  useEffect(() => {
+    if (frase !== null || cargandoFrases) return;
+    setFrase(elegirFrase(frasesDestacadas));
+  }, [cargandoFrases, frase, frasesDestacadas]);
 
   // El keyframe de titileo lo usan los Bulb de las dos variantes (torre y
   // compacta) -- tiene que quedar declarado sin importar cuál se renderice,

@@ -12,6 +12,7 @@ import {
   useInscripcionPiloto,
   useMisModulos,
   useGanadoresPorEvento,
+  useFrasesDestacadas,
 } from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
@@ -104,6 +105,9 @@ export default function TouringRCApp() {
   const { eventos, loading: cargandoEventos, error: errorEventos } = useEventos();
   const { porEvento: ganadoresPorEvento } = useGanadoresPorEvento();
   const { campeonato, porClase: campeonatoPorClase, loading: cargandoCampeonato, error: errorCampeonato } = useCampeonato();
+  const { frases: frasesDestacadas, loading: cargandoFrasesDestacadas } = useFrasesDestacadas(
+    cargandoCampeonato ? "" : campeonato?.id ?? null
+  );
 
   const clases = Object.keys(campeonatoPorClase);
   const [clase, setClase] = useState(null);
@@ -482,6 +486,8 @@ export default function TouringRCApp() {
                     diasRestantes={dias}
                     horasRestantes={horasRestantes}
                     inscripcionDiasAntes={proximo?.inscripcion_dias_antes ?? null}
+                    frasesDestacadas={frasesDestacadas}
+                    cargandoFrases={cargandoFrasesDestacadas}
                   />
                 </div>
 

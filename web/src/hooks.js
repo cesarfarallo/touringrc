@@ -375,6 +375,52 @@ export function useCampeonato(campeonatoId) {
   return { campeonato, porClase, loading, error };
 }
 
+// Frases armadas con datos reales del campeonato vigente (migración 0027,
+// tabla frases_destacadas) -- las genera una Edge Function aparte
+// (generar-frases-destacadas) cada ~3 días, esto solo las lee. StartLights
+// las mezcla con el set de frases genéricas de siempre y elige una al azar
+// por carga de página. `campeonatoId` en "" (no null/undefined) significa
+// "todavía no sé cuál es el campeonato vigente" -- no dispara la consulta,
+// mismo criterio que useCampeonato().
+export function useFrasesDestacadas(campeonatoId) {
+  const [frases, setFrases] = useState([]);
+  const [loading, setLoading] = useState(campeonatoId !== "");
+
+  useEffect(() => {
+    if (campeonatoId === "") {
+      setFrases([]);
+      setLoading(false);
+      return;
+    }
+    if (!campeonatoId) {
+      setFrases([]);
+      setLoading(false);
+      return;
+    }
+
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("frases_destacadas")
+      .select("texto")
+      .eq("campeonato_id", campeonatoId)
+      .then(({ data, error }) => {
+        if (!activo) return;
+        // Sin RLS de insert/update para la anon key, así que un error acá
+        // sería de red/config, no de permisos -- se ignora en silencio y
+        // simplemente no hay frases con datos reales ese ciclo (StartLights
+        // igual tiene las genéricas de respaldo).
+        setFrases(error ? [] : (data ?? []).map((f) => f.texto));
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [campeonatoId]);
+
+  return { frases, loading };
+}
+
 // Todos los campeonatos (temporadas), ordenados de más reciente a más
 // antiguo -- para el CRUD admin (CampeonatosAdmin.jsx) y el selector de
 // "Resultados históricos".
