@@ -549,7 +549,11 @@ export default function PilotosAdmin() {
   const { roles } = useRolesYModulos(true);
   const { porPiloto, recargar: recargarRoles } = usePilotoRoles(true);
   const [trabajandoRol, setTrabajandoRol] = useState(null);
-  const [soloSinVincular, setSoloSinVincular] = useState(false);
+  // "todos" | "vinculados" | "sin_vincular" -- antes era un solo checkbox
+  // "Solo sin vincular"; se suma el filtro opuesto ("Vinculados") como
+  // chips mutuamente excluyentes en vez de dos checkboxes independientes
+  // que podrían tildarse los dos a la vez y no mostrar nada.
+  const [filtroVinculo, setFiltroVinculo] = useState("todos");
   const [soloSinRol, setSoloSinRol] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [rolesFiltro, setRolesFiltro] = useState(new Set());
@@ -578,7 +582,8 @@ export default function PilotosAdmin() {
 
   const textoBusqueda = busqueda.trim().toLowerCase();
   const visibles = pilotos.filter((p) => {
-    if (soloSinVincular && p.auth_user_id) return false;
+    if (filtroVinculo === "vinculados" && !p.auth_user_id) return false;
+    if (filtroVinculo === "sin_vincular" && p.auth_user_id) return false;
     if (soloSinRol && porPiloto[p.id]?.size) return false;
     if (textoBusqueda) {
       const nombreCompleto = [p.first_name, p.last_name].filter(Boolean).join(" ").toLowerCase();
@@ -623,10 +628,20 @@ export default function PilotosAdmin() {
           wrapperStyle={{ width: 220, maxWidth: "100%" }}
         />
 
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, cursor: "pointer" }}>
-          <input type="checkbox" checked={soloSinVincular} onChange={(e) => setSoloSinVincular(e.target.checked)} />
-          Solo sin vincular
-        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: T.muted }}>Vínculo:</span>
+          <RolChip nombre="Todos" marcado={filtroVinculo === "todos"} onToggle={() => setFiltroVinculo("todos")} />
+          <RolChip
+            nombre="Vinculados"
+            marcado={filtroVinculo === "vinculados"}
+            onToggle={() => setFiltroVinculo("vinculados")}
+          />
+          <RolChip
+            nombre="Sin vincular"
+            marcado={filtroVinculo === "sin_vincular"}
+            onToggle={() => setFiltroVinculo("sin_vincular")}
+          />
+        </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.muted, cursor: "pointer" }}>
           <input type="checkbox" checked={soloSinRol} onChange={(e) => setSoloSinRol(e.target.checked)} />

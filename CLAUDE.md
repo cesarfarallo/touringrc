@@ -410,10 +410,14 @@ componente por tab en un array `TABS`):
   pendiente), la tabla de pilotos con email editable, y chips de rol tildables por piloto
   (reemplaza la tabla piloto×rol que antes vivía en `RolesAdmin.jsx`). Suma un buscador
   (nombre+apellido combinados), un filtro por uno o varios roles (chips, OR entre los
-  tildados), y un filtro "Solo sin vincular" (`auth_user_id is null`) para poder completarle
-  el email a mano a alguien que todavía no se logueó nunca, así el próximo login lo matchea
-  directo por email. También permite **dar de alta un piloto a mano** (nombre, apellido,
-  email opcional, roles) — requiere la policy de insert de la migración 0005 — útil para
+  tildados), y un filtro de vínculo — "Todos" / "Vinculados" / "Sin vincular"
+  (`filtroVinculo`, tres `RolChip` mutuamente excluyentes en vez de un checkbox suelto, para
+  no poder tildar "vinculados" y "sin vincular" a la vez y no mostrar nada) — "Sin vincular"
+  (`auth_user_id is null`) sirve para completarle el email a mano a alguien que todavía no se
+  logueó nunca, así el próximo login lo matchea directo por email; "Vinculados" es el opuesto,
+  sumado a pedido para auditar rápido quién ya tiene cuenta. También permite **dar de alta un
+  piloto a mano** (nombre, apellido, email opcional, roles) — requiere la policy de insert de
+  la migración 0005 — útil para
   cargar a alguien nuevo sin esperar a que se loguee o corra `cargar_roster.py`.
 - **Roles** (`RolesAdmin.jsx`): solo la matriz rol×módulo, sin la parte de pilotos.
 
