@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Pencil, Plus, Trash2, RefreshCcw, Upload } from "lucide-react";
+import { Pencil, Plus, Trash2, RefreshCcw, Upload, Share2 } from "lucide-react";
 import { T } from "../theme";
 import { useCircuitos, useCircuitoRecords, useClases } from "../hooks";
 import { supabase } from "../lib/supabase";
@@ -270,6 +270,40 @@ function ImportarRecords({ circuitoId, sentido, onImportado }) {
 function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
   const [sentido, setSentido] = useState("normal");
   const { porClase: records, loading: cargandoRecords, recargar } = useCircuitoRecords(circuito.id, sentido);
+  const [compartiendo, setCompartiendo] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const [errorCompartir, setErrorCompartir] = useState(null);
+
+  // Mismo criterio que "Compartir inscriptos" (App.jsx): arma un texto
+  // plano y lo copia al portapapeles, listo para pegar en redes -- sin
+  // pasar por ningún backend, los récords ya son de lectura pública. A
+  // diferencia de inscriptos, este botón es visible para cualquiera (no
+  // solo admin): no hay nada ahí que no se vea ya en la propia tarjeta.
+  async function compartirRecords() {
+    const clasesConRecord = clases.filter((c) => records[c.nombre]);
+    if (clasesConRecord.length === 0) {
+      setErrorCompartir("Todavía no hay récords cargados para este sentido");
+      return;
+    }
+    setCompartiendo(true);
+    setErrorCompartir(null);
+    try {
+      const sentidoTexto = sentido === "invertido" ? "Invertido" : "Normal";
+      let texto = `🏆 RÉCORDS — ${circuito.nombre} (${sentidoTexto})\n`;
+      for (const clase of clasesConRecord) {
+        const r = records[clase.nombre];
+        const fechaStr = r.fecha ? new Date(r.fecha + "T00:00:00").toLocaleDateString("es-AR") : null;
+        texto += `\n${clase.nombre}: ${r.pilotoNombre} — ${r.tiempo}${fechaStr ? ` (${fechaStr})` : ""}\n`;
+      }
+      await navigator.clipboard.writeText(texto.trim());
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch (err) {
+      setErrorCompartir(err.message ?? String(err));
+    } finally {
+      setCompartiendo(false);
+    }
+  }
 
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: 20 }}>
@@ -318,7 +352,27 @@ function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
             >
               <RefreshCcw size={12} />
             </button>
+            <button
+              onClick={compartirRecords}
+              disabled={compartiendo}
+              title="Copiar al portapapeles los récords de este circuito y sentido, listos para pegar en redes"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: "transparent",
+                border: "none",
+                color: T.muted,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: compartiendo ? "default" : "pointer",
+                padding: 0,
+              }}
+            >
+              <Share2 size={12} /> {copiado ? "¡Copiado!" : "Compartir"}
+            </button>
           </div>
+          {errorCompartir && <div style={{ color: T.red, fontSize: 11 }}>{errorCompartir}</div>}
           {esAdmin && <ImportarRecords circuitoId={circuito.id} sentido={sentido} onImportado={recargar} />}
         </div>
       </div>

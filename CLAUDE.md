@@ -975,6 +975,15 @@ tarjeta (ni en la grilla de dos columnas ni en el fallback a una columna en mobi
   fecha real, o ninguna si no vino. `archivoABase64`/`extraerMensajeError` se sacaron a
   `web/src/lib/edgeFunction.js` (antes vivían solo en `GestionEventos.jsx`) para no duplicarlos
   acá.
+- **Compartir récords** (botón "Compartir" al lado del de "Actualizar", en cada tarjeta):
+  mismo criterio que "Compartir inscriptos" (`App.jsx`) — arma un texto plano (récord por
+  categoría del circuito+sentido activos en ese momento) y lo copia al portapapeles con
+  `navigator.clipboard.writeText()`, sin pasar por ningún backend. A diferencia de "Compartir
+  inscriptos" (admin-only, porque antes de la migración 0015 un no-admin no podía leer las
+  inscripciones de otro piloto), este botón es visible para **cualquiera** — los récords ya son
+  de lectura pública desde siempre, no hay nada en el texto copiado que no se vea ya en la
+  propia tarjeta. Si el sentido activo no tiene ningún récord cargado todavía, muestra un aviso
+  en vez de copiar un texto vacío.
 
 ⚠️ No se pudo confirmar con el club el nombre real de cada uno de los 7 circuitos — el seed usa
 nombres genéricos como placeholder, pendiente que el admin los renombre desde la web.
