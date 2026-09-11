@@ -575,9 +575,15 @@ export function useClases() {
   return { clases, loading, recargar };
 }
 
-// Categoría de la última inscripción del piloto (si tiene alguna), para
-// preseleccionarla en el formulario de inscripción de la próxima fecha --
-// la mayoría de los pilotos corren siempre en la misma.
+// Categoría en la que el piloto CORRIÓ la última fecha (resultados_finales,
+// resultado real de Live Timing, ordenado por la fecha del evento) -- para
+// preseleccionarla en el formulario de inscripción de la próxima fecha, la
+// mayoría de los pilotos corren siempre en la misma. Antes se precargaba con
+// la clase de la última INSCRIPCIÓN (solo la intención de anotarse) en vez
+// de con la que realmente corrió -- pueden no coincidir si terminó
+// corriendo en otra categoría ese día. Si todavía no tiene ningún resultado
+// cargado (piloto nuevo, o resultados de la última fecha sin subir todavía)
+// cae a la última inscripción, igual que antes.
 export function useCategoriaPreferida(pilotoId) {
   const [claseId, setClaseId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -589,18 +595,35 @@ export function useCategoriaPreferida(pilotoId) {
     }
     let activo = true;
     setLoading(true);
-    supabase
-      .from("inscripciones")
-      .select("clase_id")
-      .eq("piloto_id", pilotoId)
-      .order("fecha_inscripcion", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!activo) return;
-        setClaseId(data?.clase_id ?? null);
+
+    async function cargar() {
+      const { data: resultado } = await supabase
+        .from("resultados_finales")
+        .select("clase_id, eventos ( fecha )")
+        .eq("piloto_id", pilotoId)
+        .order("fecha", { foreignTable: "eventos", ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!activo) return;
+      if (resultado) {
+        setClaseId(resultado.clase_id ?? null);
         setLoading(false);
-      });
+        return;
+      }
+
+      const { data: inscripcion } = await supabase
+        .from("inscripciones")
+        .select("clase_id")
+        .eq("piloto_id", pilotoId)
+        .order("fecha_inscripcion", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!activo) return;
+      setClaseId(inscripcion?.clase_id ?? null);
+      setLoading(false);
+    }
+
+    cargar();
     return () => {
       activo = false;
     };

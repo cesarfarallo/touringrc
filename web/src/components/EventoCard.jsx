@@ -30,9 +30,10 @@ export function FormularioInscripcion({ evento, piloto, onInscripto }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState(null);
 
-  // Precarga la categoría de la última inscripción del piloto (si tiene
-  // alguna) -- la mayoría corre siempre en la misma. Solo si todavía no
-  // tocó el selector a mano.
+  // Precarga la categoría en la que el piloto corrió la última fecha (o su
+  // última inscripción, si todavía no hay resultados cargados) -- la
+  // mayoría corre siempre en la misma. Solo si todavía no tocó el selector
+  // a mano.
   useEffect(() => {
     if (!claseTocada && categoriaPreferida && clases.some((c) => c.id === categoriaPreferida)) {
       setClaseId(categoriaPreferida);

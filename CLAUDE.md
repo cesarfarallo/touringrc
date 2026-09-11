@@ -577,10 +577,20 @@ tome efecto en los proyectos ya deployados.
   un `<select>` (`useClases()`) inserta en `inscripciones` — la policy RLS de insert/select ya
   existía (`piloto_id in (select id from pilotos where auth_user_id = auth.uid())`, ver
   `schema.sql`), no hizo falta ninguna migración de permisos nueva. El `<select>` se
-  precarga con la categoría de la última inscripción del piloto (`useCategoriaPreferida()` en
-  `hooks.js`, consulta `inscripciones` ordenado por `fecha_inscripcion`) — la mayoría corre
-  siempre en la misma; sigue siendo editable a mano, y una vez que el piloto lo toca no se
-  vuelve a pisar solo.
+  precarga con la categoría en la que el piloto **corrió** la última fecha
+  (`useCategoriaPreferida()` en `hooks.js`, consulta `resultados_finales` — resultado real de
+  Live Timing — joineado con `eventos` y ordenado por `eventos.fecha`, `.order("fecha", {
+  foreignTable: "eventos" })`) — la mayoría corre siempre en la misma; sigue siendo editable a
+  mano, y una vez que el piloto lo toca no se vuelve a pisar solo. Si todavía no tiene ningún
+  resultado cargado (piloto nuevo, o resultados de la última fecha sin subir todavía), cae a la
+  categoría de su última **inscripción** (`inscripciones` ordenado por `fecha_inscripcion`) —
+  criterio original de esta función antes del cambio de abajo.
+
+⚠️ **Cambiado a pedido**: originalmente `useCategoriaPreferida()` miraba solo la última
+inscripción (la intención de anotarse), no lo que el piloto realmente corrió — podían no
+coincidir si terminó corriendo en otra categoría ese día (cambio de última hora, o el admin lo
+anotó distinto a mano). Se cambió a `resultados_finales` como fuente primaria, con la
+inscripción como respaldo para cuando todavía no hay resultado cargado.
 - **Transponder al inscribirse** (migración 0008, `actualizar_mi_transponder()`): si el piloto
   ya tiene `transponder_number` cargado en `pilotos`, el formulario lo muestra como dato
   informativo, con un lápiz al lado para poder cambiarlo por otro con el que quiera correr esa
