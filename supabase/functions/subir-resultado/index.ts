@@ -444,7 +444,10 @@ async function syncCampeonato(
     }
   }
   let resumen = `${count} filas de campeonato sincronizadas${resumenIgnoradas(ignoradas)}`;
-  resumen += ` (${marcasResueltas} marca(s) de auto resueltas -- ${logoDiagnostico})`;
+  // Con 0 marcas resueltas se deja el diagnóstico completo (mismo que
+  // permitió detectar el bug de XLSX.CFB en Deno) para no volver a
+  // quedarse a ciegas si esto se rompe de nuevo con otro archivo.
+  resumen += marcasResueltas > 0 ? ` (${marcasResueltas} marca(s) de auto resueltas)` : ` (0 marcas de auto -- ${logoDiagnostico})`;
   return resumen;
 }
 
