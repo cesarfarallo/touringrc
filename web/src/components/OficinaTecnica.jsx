@@ -5,6 +5,7 @@ import { T } from "../theme";
 import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones, useCampeonato } from "../hooks";
 import { supabase } from "../lib/supabase";
 import HomologacionesPendientes from "./HomologacionesPendientes";
+import FotoPiloto from "./FotoPiloto";
 
 function fechaCorta(fecha) {
   if (!fecha) return null;
@@ -449,14 +450,17 @@ function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marca
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>{fila.piloto_nombre}</div>
-          <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
-            {fila.ultima_homologacion_fecha
-              ? `Última: ${fechaCorta(fila.ultima_homologacion_fecha)} — ${fila.ultima_homologacion_marca}`
-              : "Nunca homologó en esta categoría"}
-            {" · "}
-            {fila.eventos_desde_ultima}/{fila.eventos_requeridos} eventos
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <FotoPiloto />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{fila.piloto_nombre}</div>
+            <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
+              {fila.ultima_homologacion_fecha
+                ? `Última: ${fechaCorta(fila.ultima_homologacion_fecha)} — ${fila.ultima_homologacion_marca}`
+                : "Nunca homologó en esta categoría"}
+              {" · "}
+              {fila.eventos_desde_ultima}/{fila.eventos_requeridos} eventos
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

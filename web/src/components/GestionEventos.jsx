@@ -8,6 +8,7 @@ import { generarGenericImportCsv, descargarCsv } from "../lib/genericImport";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
 import ArchivosChecklist from "./ArchivosChecklist";
 import { inscripcionAbierta } from "./EventoCard";
+import FotoPiloto from "./FotoPiloto";
 
 // Infiere qué tipo de archivo de Live Timing es según el nombre, para no
 // tener que pedirle al admin que lo indique a mano (ver TIPOS_ARCHIVO en
@@ -649,7 +650,8 @@ function InscriptosLista({ evento, onCambio }) {
           {!loading &&
             inscriptos.map((i) => (
               <div key={i.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
-                <span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <FotoPiloto size={22} />
                   {[i.pilotos?.first_name, i.pilotos?.last_name].filter(Boolean).join(" ") || "(sin nombre)"}
                   <span style={{ color: T.muted }}> — {i.clases?.nombre ?? "Sin categoría"}</span>
                 </span>

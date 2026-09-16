@@ -1,6 +1,7 @@
 import { T } from "../theme";
 import { useMarcaVigentePorPiloto } from "../hooks";
 import LogoMarca from "./LogoMarca";
+import FotoPiloto from "./FotoPiloto";
 
 export default function TablaCampeonato({ data, pilotoId }) {
   const marcasPorPiloto = useMarcaVigentePorPiloto();
@@ -50,6 +51,7 @@ export default function TablaCampeonato({ data, pilotoId }) {
               </td>
               <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", fontWeight: 500, color: r.pilotoId === pilotoId ? T.amber : T.text }}>
                 <span style={{ display: "inline-flex", alignItems: "center" }}>
+                  <FotoPiloto style={{ marginRight: 8 }} />
                   {r.piloto}
                   <LogoMarca marca={marcasPorPiloto[r.pilotoId]} style={{ marginLeft: 6 }} />
                 </span>

@@ -1604,6 +1604,50 @@ import, nunca un admin escribiendo un nombre sin tener el logo real.
 ⚠️ Igual que toda migración/Storage nueva: falta correr la 0029 en **producción** (ya corrida y
 verificada en staging) y confirmar que el bucket `marcas-autos` se crea bien ahí también.
 
+## Foto de piloto (placeholder, `FotoPiloto.jsx`)
+
+Pedido del club: mostrar una foto tipo carnet a la izquierda del nombre de cada piloto, en
+todos lados donde aparece. Por ahora **solo el placeholder** — el upload de una foto real queda
+para más adelante, mismo criterio en dos pasos que se usó para la marca del auto (migración
+0029: primero la carga de datos, después mostrarla), pero acá arrancando por la UI porque
+todavía no hay ningún dato real que cargar ni una fuente de la que sacarlo (no viene en ningún
+reporte de Live Timing, a diferencia de la marca del auto).
+
+`FotoPiloto.jsx` (componente compartido, mismo criterio que `LogoMarca.jsx`): recibe un
+`fotoUrl` opcional — si no hay ninguno (el caso de hoy, siempre), muestra un placeholder
+(rectángulo tipo carnet, `T.surfaceRaised` con borde, ícono `User` de lucide-react centrado en
+`T.muted`); si en el futuro se le pasa una URL real, muestra la foto con `object-fit: cover`
+recortada al mismo rectángulo. Dejar el prop ya armado ahora evita tener que tocar los ocho
+lugares de abajo cuando se sume el upload — ese paso futuro solo necesita: una columna
+`pilotos.foto_url` (o una tabla `piloto_foto_evento` si en algún momento se pide que varíe por
+fecha, aunque a diferencia de la marca del auto no hay ningún indicio de que la cara de un
+piloto cambie de una fecha a otra) y pasarle ese dato a `FotoPiloto` en cada sitio.
+
+**Dónde se muestra**: `TablaResultados.jsx`, `TablaClasificacion.jsx`, `TablaCampeonato.jsx`
+(y por lo tanto también en Resultados históricos, que reusa las mismas tablas), `PilotosAdmin.jsx`
+(`FilaPiloto`), `OficinaTecnica.jsx` (`FilaPiloto`), `MiPerfil.jsx` (el propio piloto logueado)
+y `InscriptosLista` en `GestionEventos.jsx` (el listado de inscriptos de Gestión de eventos).
+
+**Dónde a propósito NO se muestra**:
+- **Récord de circuitos** (`CircuitosView.jsx`) — pedido explícito del club: ahí el piloto es
+  texto libre (`circuito_records.piloto_nombre`, sin FK a `pilotos`), records viejos pueden ser
+  de alguien que nunca se logueó a la web, así que no siempre hay ni piloto ni foto de la cual
+  tirar.
+- **`ModalInscriptos.jsx`** (popup público "Ver inscriptos") y el texto de "Compartir
+  inscriptos"/"Compartir récords" (`App.jsx`) — `obtenerInscriptosPorClase()` arma listas de
+  nombres en texto plano, sin el id del piloto a mano; sumarlo ahí requeriría replumbear ese
+  fetch solo para una lista pensada para copiarse como texto (compartir por redes) o leerse
+  como un `<ol>` numerado simple, no para navegar identidades.
+- **`VinculosPendientes.jsx`** y los buscadores de fusión (`PilotosAdmin.jsx`,
+  `GestionEventos.jsx` → `InscribirPiloto`) — son flujos de selección momentánea (botones tipo
+  "Usar X en cambio", resultados de búsqueda para elegir uno), no un listado de identidades que
+  se navega; una foto al lado de cada botón chico ensuciaría más de lo que ayuda.
+
+**Tamaño y forma**: rectángulo vertical (proporción ~1:1.2, `size` por default 28px de ancho)
+en vez de círculo, para que se lea como una foto carnet real y no como un logo/avatar circular
+genérico (ese lenguaje visual ya lo usa `LogoMarca.jsx` para las marcas). `InscriptosLista`
+usa `size={22}` (una fila más angosta y sin tanto texto alrededor que una tabla de resultados).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

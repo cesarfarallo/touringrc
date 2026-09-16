@@ -1,6 +1,7 @@
 import { Zap, Trophy, Medal } from "lucide-react";
 import { T } from "../theme";
 import LogoMarca from "./LogoMarca";
+import FotoPiloto from "./FotoPiloto";
 
 const COLOR_PODIO = { 1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32" };
 
@@ -91,6 +92,7 @@ export default function TablaResultados({ data, pilotoId, marcasPorPiloto = {} }
                   {r.pos}
                 </td>
                 <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center" }}>
+                  <FotoPiloto style={{ marginRight: 8 }} />
                   {podio && <IconoPodio tipo={podio.tipo} lugar={podio.lugar} />}
                   <span style={{ color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400 }}>
                     {r.piloto}

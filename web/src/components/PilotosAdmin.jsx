@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 import VinculosPendientes from "./VinculosPendientes";
 import NombreEditable from "./PilotoEditable";
 import LogoMarca from "./LogoMarca";
+import FotoPiloto from "./FotoPiloto";
 
 function EmailEditable({ piloto, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -411,12 +412,15 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NombreEditable piloto={piloto} onGuardado={onGuardado} />
-            <LogoMarca marca={marca} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <FotoPiloto />
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <NombreEditable piloto={piloto} onGuardado={onGuardado} />
+              <LogoMarca marca={marca} />
+            </div>
+            <EmailEditable piloto={piloto} onGuardado={onGuardado} />
           </div>
-          <EmailEditable piloto={piloto} onGuardado={onGuardado} />
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
           <button
