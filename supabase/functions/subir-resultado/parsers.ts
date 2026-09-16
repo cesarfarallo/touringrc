@@ -466,8 +466,13 @@ function parseHojaLeaderboard(filas: unknown[][]): FilaClasificacion[] {
 // columnas de cada bloque de categoría (para no leerle el tiempo/fecha
 // a la categoría de al lado).
 //
-// Solo nos interesa la PRIMERA fila de datos debajo de cada título (el
-// récord vigente, posición 1) -- no se listan los demás puestos.
+// El reporte en realidad trae varias filas debajo de cada título -- un
+// top N de vueltas, no solo la vigente -- pero originalmente solo se
+// leía la primera (posición 1, el récord). Ahora se leen todas las
+// filas de datos consecutivas debajo del título (hasta la próxima fila
+// vacía en esa columna o hasta pisar el título de la próxima categoría
+// apilada debajo, lo que venga primero), numerándolas 1..N según el
+// orden en que aparecen -- el archivo ya viene ordenado de mejor a peor.
 //
 // El reporte trae además una fila de "rango de fechas" del estilo
 // "1/1/0001 - 3/9/2026" (LiveTime usa 1/1/0001 como placeholder de
@@ -477,6 +482,7 @@ function parseHojaLeaderboard(filas: unknown[][]): FilaClasificacion[] {
 // ---------------------------------------------------------------
 export interface FilaRecordCircuito {
   clase: string;
+  posicion: number;
   pilotoNombre: string;
   tiempo: string;
   fechaIso: string | null;
@@ -531,33 +537,42 @@ export function parseRecordsCircuito(bytes: Uint8Array): FilaRecordCircuito[] {
   // bloque de categoría (puede haber más de dos, lado a lado).
   const columnasAncla = [...new Set(candidatos.map((c) => c.col))].sort((a, b) => a - b);
 
+  const MAX_POSICIONES = 10;
+  const esTitulo = new Set(candidatos.map((c) => `${c.fila}:${c.col}`));
+
   for (const { fila, col, texto } of candidatos) {
-    const siguiente = filas[fila + 1];
-    if (!siguiente) continue;
-
-    const nombre = limpiar(siguiente[col]);
-    if (!nombre) continue; // categoría sin ningún resultado cargado
-    const apellido = limpiar(siguiente[col + 1]);
-
     const siguienteAncla = columnasAncla.find((c) => c > col);
-    const bandaFin = siguienteAncla ?? siguiente.length;
 
-    let tiempo: string | null = null;
-    let fechaCruda: string | null = null;
-    for (let c = col + 2; c < bandaFin; c++) {
-      const v = limpiar(siguiente[c]);
-      if (!v) continue;
-      if (tiempo === null && TIEMPO_RE.test(v)) tiempo = v;
-      else if (fechaCruda === null && esFechaDdMmYyyy(v)) fechaCruda = v;
+    let posicion = 0;
+    for (let f = fila + 1; posicion < MAX_POSICIONES; f++) {
+      const filaDatos = filas[f];
+      if (!filaDatos) break;
+      if (esTitulo.has(`${f}:${col}`)) break; // arrancó el título de la próxima categoría apilada debajo
+
+      const nombre = limpiar(filaDatos[col]);
+      if (!nombre) break; // se acabaron las filas de esta categoría
+      const apellido = limpiar(filaDatos[col + 1]);
+      const bandaFin = siguienteAncla ?? filaDatos.length;
+
+      let tiempo: string | null = null;
+      let fechaCruda: string | null = null;
+      for (let c = col + 2; c < bandaFin; c++) {
+        const v = limpiar(filaDatos[c]);
+        if (!v) continue;
+        if (tiempo === null && TIEMPO_RE.test(v)) tiempo = v;
+        else if (fechaCruda === null && esFechaDdMmYyyy(v)) fechaCruda = v;
+      }
+      if (!tiempo) continue; // fila sin tiempo válido, no cuenta como puesto
+
+      posicion++;
+      out.push({
+        clase: texto,
+        posicion,
+        pilotoNombre: apellido ? `${nombre} ${apellido}` : nombre,
+        tiempo,
+        fechaIso: fechaCruda ? fechaIso(fechaCruda) : null,
+      });
     }
-    if (!tiempo) continue;
-
-    out.push({
-      clase: texto,
-      pilotoNombre: apellido ? `${nombre} ${apellido}` : nombre,
-      tiempo,
-      fechaIso: fechaCruda ? fechaIso(fechaCruda) : null,
-    });
   }
 
   return out;

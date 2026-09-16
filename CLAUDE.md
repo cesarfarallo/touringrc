@@ -975,6 +975,26 @@ tarjeta (ni en la grilla de dos columnas ni en el fallback a una columna en mobi
   fecha real, o ninguna si no vino. `archivoABase64`/`extraerMensajeError` se sacaron a
   `web/src/lib/edgeFunction.js` (antes vivían solo en `GestionEventos.jsx`) para no duplicarlos
   acá.
+- **Top 10 por categoría** (migración `0028_circuito_records_top10.sql`, tabla nueva
+  `circuito_records_top10`, a pedido): `RaceResultRecords*.xls` en realidad trae varias filas
+  debajo de cada título de categoría (un ranking, no solo la vigente) — hasta esta migración
+  `parseRecordsCircuito` (`parsers.ts`) las ignoraba a propósito, solo leía `filas[fila+1]`. Se
+  generalizó para leer todas las filas de datos consecutivas debajo de cada título (hasta la
+  próxima fila vacía en esa columna, o hasta pisar el título de la categoría apilada justo
+  debajo — mismo criterio de columnas-ancla que ya usaba para el layout tipo diario a dos
+  columnas — lo que venga primero), con un tope de 10 posiciones, devolviendo ahora también
+  `posicion` en cada fila. `syncRecordsCircuito` (`index.ts`) sigue pisando `circuito_records`
+  con la fila de posición 1 (sin cambios de comportamiento ahí), y además borra e inserta de
+  nuevo todas las filas de `circuito_records_top10` para esa categoría+sentido+circuito en cada
+  import (mismo criterio "el archivo siempre trae la verdad completa" que ya usaba el récord
+  vigente, ahora aplicado a las 10 posiciones). No hay carga manual de top10 desde la web — solo
+  llega por este import, a diferencia del récord vigente que sí se puede cargar/editar a mano
+  (`FormularioRecord`). En la tarjeta pública, `FilaRecord` (`CircuitosView.jsx`) suma un botón
+  "Top N" (visible para cualquiera, solo si hay más de una posición cargada) al lado de los
+  íconos de admin, que despliega/oculta la lista completa (`useCircuitoRecordsTop10`, mismo
+  patrón de agrupado-por-nombre-de-clase que `useCircuitoRecords` pero devolviendo un array por
+  categoría en vez de una sola fila) debajo del récord vigente, sin ocultar ese récord — sigue
+  siendo lo primero que se ve en la tarjeta.
 - **Compartir récords** (botón "Compartir" al lado del de "Actualizar", en cada tarjeta):
   mismo criterio que "Compartir inscriptos" (`App.jsx`) — arma un texto plano (récord por
   categoría del circuito+sentido activos en ese momento) y lo copia al portapapeles con

@@ -389,41 +389,78 @@ async function syncCampeonato(
   return `${count} filas de campeonato sincronizadas${resumenIgnoradas(ignoradas)}`;
 }
 
-// RaceResultRecords*.xls ("Track Records"): pisa el récord vigente de
-// cada categoría para este circuito -- circuito_records guarda el
-// récord actual, no un historial, así que un upsert alcanza ("el
-// reporte siempre trae lo mejor"). Solo se importan las categorías cuyo
-// nombre matchea exacto con una fila de `clases` ya cargada -- el
-// reporte puede traer más categorías de las que el club usa, y no
-// tiene sentido crear clases nuevas a partir de un archivo de récords.
+// RaceResultRecords*.xls ("Track Records"): pisa el récord vigente
+// (posición 1) de cada categoría para este circuito -- circuito_records
+// guarda el récord actual, no un historial, así que un upsert alcanza
+// ("el reporte siempre trae lo mejor"). El resto de las posiciones que
+// trae el archivo (2..10) se guardan aparte en circuito_records_top10,
+// migración 0028 -- se borran antes las que ya hubiera de esa
+// categoría+sentido (el archivo siempre trae el top completo vigente,
+// no hace falta mezclar con lo que ya había) y se insertan las nuevas.
+// Solo se importan las categorías cuyo nombre matchea exacto con una
+// fila de `clases` ya cargada -- el reporte puede traer más categorías
+// de las que el club usa, y no tiene sentido crear clases nuevas a
+// partir de un archivo de récords.
 async function syncRecordsCircuito(sb: SupabaseClient, bytes: Uint8Array, circuitoId: string, sentido: string): Promise<string> {
   const filas = parseRecordsCircuito(bytes);
+  const porClase = new Map<string, typeof filas>();
+  for (const f of filas) {
+    const grupo = porClase.get(f.clase);
+    if (grupo) grupo.push(f);
+    else porClase.set(f.clase, [f]);
+  }
+
   let count = 0;
   const ignoradas: string[] = [];
 
-  for (const f of filas) {
-    const { data: clase } = await sb.from("clases").select("id").eq("nombre", f.clase).maybeSingle();
+  for (const [nombreClase, filasClase] of porClase) {
+    const { data: clase } = await sb.from("clases").select("id").eq("nombre", nombreClase).maybeSingle();
     if (!clase) {
-      if (!ignoradas.includes(f.clase)) ignoradas.push(f.clase);
+      ignoradas.push(nombreClase);
       continue;
     }
 
-    const { error } = await sb.from("circuito_records").upsert(
-      {
+    const vigente = filasClase.find((f) => f.posicion === 1);
+    if (vigente) {
+      const { error } = await sb.from("circuito_records").upsert(
+        {
+          circuito_id: circuitoId,
+          clase_id: clase.id,
+          sentido,
+          piloto_nombre: vigente.pilotoNombre,
+          tiempo: vigente.tiempo,
+          fecha: vigente.fechaIso,
+        },
+        { onConflict: "circuito_id,clase_id,sentido" }
+      );
+      if (error) throw new Error(`circuito_records.upsert (${nombreClase}): ${error.message}`);
+    }
+
+    const { error: errorBorrado } = await sb
+      .from("circuito_records_top10")
+      .delete()
+      .eq("circuito_id", circuitoId)
+      .eq("clase_id", clase.id)
+      .eq("sentido", sentido);
+    if (errorBorrado) throw new Error(`circuito_records_top10.delete (${nombreClase}): ${errorBorrado.message}`);
+
+    const { error: errorTop10 } = await sb.from("circuito_records_top10").insert(
+      filasClase.map((f) => ({
         circuito_id: circuitoId,
         clase_id: clase.id,
         sentido,
+        posicion: f.posicion,
         piloto_nombre: f.pilotoNombre,
         tiempo: f.tiempo,
         fecha: f.fechaIso,
-      },
-      { onConflict: "circuito_id,clase_id,sentido" }
+      }))
     );
-    if (error) throw new Error(`circuito_records.upsert (${f.clase}): ${error.message}`);
+    if (errorTop10) throw new Error(`circuito_records_top10.insert (${nombreClase}): ${errorTop10.message}`);
+
     count++;
   }
 
-  let resumen = `${count} récord(es) actualizados`;
+  let resumen = `${count} categoría(s) actualizadas`;
   if (ignoradas.length > 0) resumen += ` (se ignoraron categorías sin clase asociada: ${ignoradas.join(", ")})`;
   return resumen;
 }

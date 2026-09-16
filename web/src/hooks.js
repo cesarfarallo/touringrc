@@ -548,6 +548,57 @@ export function useCircuitoRecords(circuitoId, sentido) {
   return { porClase, loading, error, recargar };
 }
 
+// Top 10 de vueltas de un circuito, agrupado por categoría:
+// { [claseNombre]: [{ posicion, pilotoNombre, tiempo, fecha }, ...] },
+// ordenado por posicion -- viene del mismo archivo "Importar records" que
+// circuito_records (migración 0028), no es editable a mano.
+export function useCircuitoRecordsTop10(circuitoId, sentido) {
+  const [porClase, setPorClase] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    if (!circuitoId) {
+      setPorClase({});
+      return;
+    }
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("circuito_records_top10")
+      .select("clase_id, posicion, piloto_nombre, tiempo, fecha, clases ( nombre )")
+      .eq("circuito_id", circuitoId)
+      .eq("sentido", sentido)
+      .order("posicion", { ascending: true })
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) {
+          setLoading(false);
+          return;
+        }
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          const clase = fila.clases?.nombre ?? "Sin categoría";
+          (agrupado[clase] ??= []).push({
+            posicion: fila.posicion,
+            pilotoNombre: fila.piloto_nombre,
+            tiempo: fila.tiempo,
+            fecha: fila.fecha,
+          });
+        }
+        setPorClase(agrupado);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [circuitoId, sentido, version]);
+
+  return { porClase, loading, recargar };
+}
+
 // Catálogo completo de clases (para el selector de la inscripción online).
 export function useClases() {
   const [clases, setClases] = useState([]);

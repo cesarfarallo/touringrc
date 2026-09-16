@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { Pencil, Plus, Trash2, RefreshCcw, Upload, Share2 } from "lucide-react";
+import { Pencil, Plus, Trash2, RefreshCcw, Upload, Share2, ChevronDown, ChevronUp } from "lucide-react";
 import { T } from "../theme";
-import { useCircuitos, useCircuitoRecords, useClases } from "../hooks";
+import { useCircuitos, useCircuitoRecords, useCircuitoRecordsTop10, useClases } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
 import { rutaImagenCircuito as rutaImagen } from "../lib/circuitos";
@@ -131,8 +131,9 @@ function FormularioRecord({ circuitoId, sentido, clase, record, onCancelar, onGu
 // `<table>`, para que en una tarjeta angosta (grilla de dos columnas)
 // piloto/tiempo/fecha se acomoden en más de una línea en vez de forzar
 // scroll horizontal como hacía la tabla vieja.
-function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado }) {
+function FilaRecord({ clase, record, top10, circuitoId, sentido, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
+  const [top10Abierto, setTop10Abierto] = useState(false);
 
   async function borrar() {
     if (!confirm(`¿Borrar el récord de ${clase.nombre}?`)) return;
@@ -166,16 +167,27 @@ function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado })
               {record.fecha ? new Date(record.fecha + "T00:00:00").toLocaleDateString("es-AR") : "—"}
             </span>
           </div>
-          {esAdmin && (
-            <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button onClick={() => setEditando(true)} title="Editar" style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}>
-                <Pencil size={12} />
+          <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {top10?.length > 1 && (
+              <button
+                onClick={() => setTop10Abierto((v) => !v)}
+                title="Ver el top 10 de vueltas de esta categoría"
+                style={{ display: "flex", alignItems: "center", gap: 3, background: "transparent", border: "none", color: T.muted, fontSize: 11, fontWeight: 600, cursor: "pointer", padding: 0 }}
+              >
+                Top {top10.length} {top10Abierto ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
               </button>
-              <button onClick={borrar} title="Borrar" style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: "pointer", padding: 0 }}>
-                <Trash2 size={12} />
-              </button>
-            </span>
-          )}
+            )}
+            {esAdmin && (
+              <>
+                <button onClick={() => setEditando(true)} title="Editar" style={{ display: "flex", background: "transparent", border: "none", color: T.muted, cursor: "pointer", padding: 0 }}>
+                  <Pencil size={12} />
+                </button>
+                <button onClick={borrar} title="Borrar" style={{ display: "flex", background: "transparent", border: "none", color: T.red, cursor: "pointer", padding: 0 }}>
+                  <Trash2 size={12} />
+                </button>
+              </>
+            )}
+          </span>
         </div>
       ) : (
         <div style={{ marginTop: 4 }}>
@@ -189,6 +201,20 @@ function FilaRecord({ clase, record, circuitoId, sentido, esAdmin, onGuardado })
           ) : (
             <span style={{ color: T.muted, fontSize: 12 }}>Sin récord cargado</span>
           )}
+        </div>
+      )}
+      {top10Abierto && top10?.length > 1 && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+          {top10.map((fila) => (
+            <div key={fila.posicion} style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.muted, fontSize: 11, width: 18, flexShrink: 0 }}>{fila.posicion}º</span>
+              <span style={{ fontFamily: "Inter, sans-serif", color: T.text, fontSize: 12 }}>{fila.pilotoNombre}</span>
+              <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.muted, fontSize: 12 }}>{fila.tiempo}</span>
+              <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.muted, fontSize: 11 }}>
+                {fila.fecha ? new Date(fila.fecha + "T00:00:00").toLocaleDateString("es-AR") : "—"}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -269,7 +295,12 @@ function ImportarRecords({ circuitoId, sentido, onImportado }) {
 // ahora se ven los 7 circuitos juntos, cada uno con su propio toggle.
 function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
   const [sentido, setSentido] = useState("normal");
-  const { porClase: records, loading: cargandoRecords, recargar } = useCircuitoRecords(circuito.id, sentido);
+  const { porClase: records, loading: cargandoRecords, recargar: recargarRecords } = useCircuitoRecords(circuito.id, sentido);
+  const { porClase: top10, recargar: recargarTop10 } = useCircuitoRecordsTop10(circuito.id, sentido);
+  const recargar = () => {
+    recargarRecords();
+    recargarTop10();
+  };
   const [compartiendo, setCompartiendo] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [errorCompartir, setErrorCompartir] = useState(null);
@@ -388,6 +419,7 @@ function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
               key={clase.id}
               clase={clase}
               record={records[clase.nombre]}
+              top10={top10[clase.nombre]}
               circuitoId={circuito.id}
               sentido={sentido}
               esAdmin={esAdmin}
