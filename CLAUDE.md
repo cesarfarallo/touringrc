@@ -1643,10 +1643,10 @@ y `InscriptosLista` en `GestionEventos.jsx` (el listado de inscriptos de Gestió
   "Usar X en cambio", resultados de búsqueda para elegir uno), no un listado de identidades que
   se navega; una foto al lado de cada botón chico ensuciaría más de lo que ayuda.
 
-**Tamaño y forma**: rectángulo vertical (proporción ~1:1.2, `size` por default 28px de ancho)
-en vez de círculo, para que se lea como una foto carnet real y no como un logo/avatar circular
-genérico (ese lenguaje visual ya lo usa `LogoMarca.jsx` para las marcas). `InscriptosLista`
-usa `size={22}` (una fila más angosta y sin tanto texto alrededor que una tabla de resultados).
+**Tamaño y forma**: círculo (`size` por default 36px de diámetro) — probado primero como
+rectángulo tipo carnet (~1:1.2), pero a pedido se cambió a círculo para que se lea como un
+avatar de verdad, y se subió el tamaño default (28 → 36px) para que se note más. `InscriptosLista`
+usa `size={28}` (una fila más angosta y sin tanto texto alrededor que una tabla de resultados).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

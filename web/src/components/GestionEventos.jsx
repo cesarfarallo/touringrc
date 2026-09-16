@@ -651,7 +651,7 @@ function InscriptosLista({ evento, onCambio }) {
             inscriptos.map((i) => (
               <div key={i.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <FotoPiloto size={22} />
+                  <FotoPiloto size={28} />
                   {[i.pilotos?.first_name, i.pilotos?.last_name].filter(Boolean).join(" ") || "(sin nombre)"}
                   <span style={{ color: T.muted }}> — {i.clases?.nombre ?? "Sin categoría"}</span>
                 </span>
