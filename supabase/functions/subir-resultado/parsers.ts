@@ -9,6 +9,14 @@
 // Corre en Deno (Supabase Edge Functions), usa SheetJS vía npm: para leer
 // .xls viejos (formato OLE2/BIFF8) y .csv.
 import * as XLSX from "npm:xlsx@0.18.5";
+// `xlsx` re-exporta esta utilidad como `XLSX.CFB` en Node (CJS), pero en
+// Deno el import "npm:xlsx" resuelve al build ESM (xlsx.mjs), que no la
+// expone igual -- verificado en la primera prueba real en staging
+// ("Cannot read properties of undefined (reading 'read')"). Se importa
+// el paquete `cfb` (la librería de la que `xlsx` depende para esto,
+// misma versión que trae internamente) directo, en vez de pasar por
+// `XLSX.CFB`.
+import * as CFB from "npm:cfb@1.2.2";
 
 // pandas trata estos strings como "valor faltante" (na_values) aunque la
 // celda tenga texto literal -- lo replicamos para no divergir del parser
@@ -317,8 +325,8 @@ export interface FilaCampeonato {
 // si el resto del código no la hubiera filtrado por otro motivo).
 //
 // Estructura (resumida, [MS-ODRAW]):
-// - El stream "Workbook" (leído acá directo con XLSX.CFB, sin pasar por
-//   XLSX.read/sheet_to_json) tiene registros BIFF8 (tipo de 2 bytes +
+// - El stream "Workbook" (leído acá directo con el paquete `cfb`, sin
+//   pasar por XLSX.read/sheet_to_json) tiene registros BIFF8 (tipo de 2 bytes +
 //   largo de 2 bytes + payload). Los registros MSODRAWINGGROUP (0x00EB,
 //   uno solo, con TODAS las imágenes del archivo) y MSODRAWING (0x00EC,
 //   uno por hoja, con los dibujos de esa hoja) pueden partirse en varios
@@ -502,9 +510,9 @@ function extraerLogosPorFila(bytes: Uint8Array, columnaMfr: number): { mapa: Map
   const resultado = new Map<number, Uint8Array>();
   try {
     // deno-lint-ignore no-explicit-any
-    const CFB = (XLSX as any).CFB;
-    const cfb = CFB.read(bytes, { type: "array" });
-    const entradaWorkbook = CFB.find(cfb, "Workbook");
+    const cfb = (CFB as any).read(bytes, { type: "array" });
+    // deno-lint-ignore no-explicit-any
+    const entradaWorkbook = (CFB as any).find(cfb, "Workbook");
     if (!entradaWorkbook?.content) return { mapa: resultado, diagnostico: "no se encontró el stream Workbook (CFB)" };
     const wb = new Uint8Array(entradaWorkbook.content);
 
