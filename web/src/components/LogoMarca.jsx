@@ -6,12 +6,13 @@
 // nada -- no hay un ícono "sin marca", es simplemente ausencia de dato.
 //
 // ⚠️ A 16px (el tamaño original) el logo quedaba ilegible -- un blip
-// chiquito imposible de reconocer como marca -- y como algunos vienen con
-// fondo transparente y colores oscuros, se perdían contra el fondo oscuro
-// de la app (mismo problema que ya se había resuelto para los dibujos de
-// circuito). Ahora usa un tamaño más grande por default y un fondo blanco
-// fijo para que se vea nítido sin importar el color del logo en sí.
-export default function LogoMarca({ marca, size = 22, style }) {
+// chiquito imposible de reconocer como marca. Se probó subirlo a 22px con
+// un fondo blanco fijo (mismo criterio que el fix de contraste de los
+// dibujos de circuito), pero en la práctica seguía sin notarse -- el
+// fondo blanco en un tamaño tan chico no alcanza para que el logo se lea,
+// solo agrega un cuadradito blanco. Se sacó el fondo/padding y se duplicó
+// el tamaño default (44px) en su lugar.
+export default function LogoMarca({ marca, size = 44, style }) {
   if (!marca?.logoUrl) return null;
   return (
     <img
@@ -23,8 +24,6 @@ export default function LogoMarca({ marca, size = 22, style }) {
         height: size,
         objectFit: "contain",
         borderRadius: 4,
-        background: "#FFFFFF",
-        padding: 1,
         flexShrink: 0,
         ...style,
       }}

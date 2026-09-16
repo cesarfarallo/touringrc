@@ -1580,12 +1580,18 @@ piloto no tiene marca cargada en ese contexto):
 logo quedaba ilegible — un puntito borroso imposible de reconocer como marca — y como algunos
 logos vienen con fondo transparente y colores oscuros, se perdían contra el fondo oscuro de la
 app (mismo problema que ya se había resuelto antes para los dibujos de circuito, ver más arriba).
-Se subió el tamaño default (22px) y se le agregó fondo blanco fijo, para que se vea nítido sin
-importar el color del logo en sí — mismo criterio que el fondo blanco de los dibujos de circuito.
-De paso, en `TablaClasificacion.jsx`/`TablaCampeonato.jsx` el `<td>` del nombre había quedado con
-`display: "flex"` directo (para poner el logo al lado del nombre) — riesgoso porque un `<td>`
-flex puede romper el cálculo de ancho de columna de la tabla; se movió el `display: flex` a un
-`<span>` interno en vez del `<td>` mismo (mismo patrón, más seguro).
+Primer intento: subir el tamaño default a 22px y agregarle fondo blanco fijo, mismo criterio que
+el fondo blanco de los dibujos de circuito. De paso, en `TablaClasificacion.jsx`/
+`TablaCampeonato.jsx` el `<td>` del nombre había quedado con `display: "flex"` directo (para
+poner el logo al lado del nombre) — riesgoso porque un `<td>` flex puede romper el cálculo de
+ancho de columna de la tabla; se movió el `display: flex` a un `<span>` interno en vez del `<td>`
+mismo (mismo patrón, más seguro).
+
+⚠️ **El fondo blanco no alcanzó**: probado de nuevo en staging, los logos seguían sin notarse —
+a diferencia de los dibujos de circuito (imágenes grandes, 48-160px), acá el logo es tan chico
+que un fondo blanco de 22px solo agrega un cuadradito blanco apenas visible, no resuelve la
+legibilidad. Se sacó el fondo/padding por completo y se duplicó el tamaño default (44px) en su
+lugar — a ese tamaño el logo se distingue solo, sin necesidad de contraste de fondo.
 
 **Panel admin "Marcas de auto"** (`MarcasAutosAdmin.jsx`, nuevo sub-tab en `AdminPanel.jsx`,
 mismo patrón que `CampeonatosAdmin.jsx`): lista el catálogo completo de `marcas_autos`
