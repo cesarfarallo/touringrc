@@ -13,6 +13,7 @@ import {
   useMisModulos,
   useGanadoresPorEvento,
   useFrasesDestacadas,
+  useMarcasPorEvento,
 } from "./hooks";
 import { supabase } from "./lib/supabase";
 import NavTab from "./components/NavTab";
@@ -159,6 +160,7 @@ export default function TouringRCApp() {
     loading: cargandoClasificacion,
     error: errorClasificacion,
   } = useClasificacionEvento(eventoResultadosIdActivo);
+  const marcasPorPiloto = useMarcasPorEvento(eventoResultadosIdActivo);
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -712,7 +714,7 @@ export default function TouringRCApp() {
                   <>
                     {cargandoResultados && <div style={{ color: T.muted, fontSize: 13 }}>Cargando resultados...</div>}
                     {!cargandoResultados && claseActiva && resultadosPorClase[claseActiva] ? (
-                      <TablaResultados data={resultadosPorClase[claseActiva]} pilotoId={piloto?.id} />
+                      <TablaResultados data={resultadosPorClase[claseActiva]} pilotoId={piloto?.id} marcasPorPiloto={marcasPorPiloto} />
                     ) : (
                       !cargandoResultados && (
                         <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>
@@ -725,7 +727,7 @@ export default function TouringRCApp() {
                   <>
                     {cargandoClasificacion && <div style={{ color: T.muted, fontSize: 13 }}>Cargando clasificación...</div>}
                     {!cargandoClasificacion && claseActiva && clasificacionPorClase[claseActiva] ? (
-                      <TablaClasificacion data={clasificacionPorClase[claseActiva]} pilotoId={piloto?.id} />
+                      <TablaClasificacion data={clasificacionPorClase[claseActiva]} pilotoId={piloto?.id} marcasPorPiloto={marcasPorPiloto} />
                     ) : (
                       !cargandoClasificacion && (
                         <div style={{ color: T.muted, fontSize: 13, padding: "24px 0" }}>

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Check, X, Pencil, UserPlus, Trash2, Link2, Merge } from "lucide-react";
 import CampoBusqueda from "./CampoBusqueda";
 import { T } from "../theme";
-import { usePilotos, useRolesYModulos, usePilotoRoles } from "../hooks";
+import { usePilotos, useRolesYModulos, usePilotoRoles, useMarcaVigentePorPiloto } from "../hooks";
 import { supabase } from "../lib/supabase";
 import VinculosPendientes from "./VinculosPendientes";
 import NombreEditable from "./PilotoEditable";
+import LogoMarca from "./LogoMarca";
 
 function EmailEditable({ piloto, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -314,7 +315,7 @@ function NuevoPiloto({ roles, onCreado }) {
   );
 }
 
-function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol, onGuardado, pilotos }) {
+function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol, onGuardado, pilotos, marca }) {
   const [borrando, setBorrando] = useState(false);
   const [error, setError] = useState(null);
   const [vinculando, setVinculando] = useState(false);
@@ -411,7 +412,10 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-          <NombreEditable piloto={piloto} onGuardado={onGuardado} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <NombreEditable piloto={piloto} onGuardado={onGuardado} />
+            <LogoMarca marca={marca} />
+          </div>
           <EmailEditable piloto={piloto} onGuardado={onGuardado} />
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
@@ -548,6 +552,7 @@ export default function PilotosAdmin() {
   const { pilotos, loading, error, recargar } = usePilotos();
   const { roles } = useRolesYModulos(true);
   const { porPiloto, recargar: recargarRoles } = usePilotoRoles(true);
+  const marcasPorPiloto = useMarcaVigentePorPiloto();
   const [trabajandoRol, setTrabajandoRol] = useState(null);
   // "todos" | "vinculados" | "sin_vincular" -- antes era un solo checkbox
   // "Solo sin vincular"; se suma el filtro opuesto ("Vinculados") como
@@ -673,6 +678,7 @@ export default function PilotosAdmin() {
               pilotos={pilotos}
               roles={roles}
               rolesDelPiloto={porPiloto[p.id]}
+              marca={marcasPorPiloto[p.id]}
               trabajandoRol={trabajandoRol}
               onToggleRol={toggleRol}
               onGuardado={() => {

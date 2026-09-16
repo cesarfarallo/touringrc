@@ -1476,11 +1476,12 @@ completo.
 README de la función) — no verificable end-to-end desde este entorno de desarrollo por la misma
 razón de siempre (sin acceso de red a un proyecto de Supabase real).
 
-## Marca del auto por piloto y por evento (migración 0029) — PARTE 1: parser + carga
+## Marca del auto por piloto y por evento (migración 0029)
 
 Pedido del club: mostrar la marca del auto (chasis) con la que corre cada piloto al lado de su
-nombre. Se hace en dos partes — esta es la **parte 1** (el parser y la carga de datos a la
-base); mostrar el logo en cada pantalla queda para una parte 2 aparte, todavía no hecha.
+nombre. Se hizo en dos partes — parser + carga de datos primero, mostrarlo en cada pantalla
+después — para poder confirmar en staging que la carga funcionaba antes de construir la UI
+encima. **Las dos partes están hechas y verificadas end-to-end en staging.**
 
 **El obstáculo real**: la columna "Mfr" de `SeriesResultReport.xls` no trae texto — cada celda
 tiene el logo de la marca **incrustado como imagen** dentro del `.xls` (formato binario BIFF8
@@ -1541,17 +1542,42 @@ arriba), la granularidad real es "la marca vigente al momento del último `Serie
 subido para esa fecha", no un registro perfecto fecha por fecha — es la mejor señal disponible
 sin agregarle a Live Timing algo que no exporta.
 
-⚠️ Pendiente (parte 2, no hecha todavía): mostrar el logo al lado del nombre del piloto en
-Resultados finales, Clasificación, Campeonato, Pilotos y Circuitos; resolver qué marca mostrar
-en las vistas que no son de una fecha puntual (Campeonato/Pilotos/Mi Perfil — decidido: la del
-evento más reciente en el que el piloto tenga marca asociada); y heredar la marca en
-`circuito_records` cuando la fecha del récord coincida con la de un evento con marca cargada
-para ese piloto (decidido en el pedido original, todavía sin implementar).
+⚠️ **Bug encontrado en la primera prueba real en staging**: `XLSX.CFB` (la utilidad que expone
+`xlsx` para leer el compound file crudo, usada para extraer los logos) tiraba
+`Cannot read properties of undefined (reading 'read')` — funciona en Node (`require('xlsx')`,
+build CJS) pero en Deno el import `npm:xlsx@0.18.5` resuelve al build ESM (`xlsx.mjs`), que no
+la re-exporta igual. Fix: importar el paquete `cfb` directo (`npm:cfb@1.2.2`, la librería de la
+que `xlsx` ya depende para esto — mismo `.read()`/`.find()`) en vez de pasar por `XLSX.CFB`.
+Para poder diagnosticar esto sin acceso directo a la base, el resumen del botón "Subir
+resultados" incluye el diagnóstico completo del parser de logos (columna encontrada, blips,
+anclas, logos resueltos) cada vez que resuelve 0 marcas — con al menos una marca resuelta
+muestra solo el conteo, para no ensuciar el mensaje en el caso normal.
 
-⚠️ Igual que toda migración/Storage nueva: falta correr la 0029 en staging y producción, y
-confirmar que el bucket `marcas-autos` se crea bien en los dos proyectos (la migración lo
-crea via SQL, pero es la primera vez que este repo usa `storage.buckets` — vale la pena
-confirmarlo a mano en el dashboard de cada proyecto la primera vez).
+**Parte 2 — mostrar el logo** (`LogoMarca.jsx`, componente compartido — no renderiza nada si el
+piloto no tiene marca cargada en ese contexto):
+- **Resultados finales y Clasificación** (`TablaResultados.jsx`/`TablaClasificacion.jsx`, tanto
+  en el tab Resultados como en Resultados históricos): `useMarcasPorEvento(eventoId)` — la
+  marca de cada piloto en ESE evento puntual. Consulta aparte de `resultados_finales`/
+  `clasificacion` (no hay FK entre esas tablas y `piloto_marca_evento`, cada una referencia
+  evento_id/piloto_id por separado) que se cruza en el cliente por `pilotoId`, mismo criterio
+  que `useGanadoresPorEvento()`.
+- **Campeonato, Pilotos y Mi Perfil** (`TablaCampeonato.jsx`, `PilotosAdmin.jsx`,
+  `MiPerfil.jsx`): no son vistas de una fecha puntual, así que muestran la marca **vigente**
+  (`useMarcaVigentePorPiloto()`) — la del evento más reciente en el que ese piloto tenga marca
+  asociada, sin importar la temporada. Una sola consulta a `piloto_marca_evento` con
+  `.order("fecha", { foreignTable: "eventos", ascending: false })` que se queda con la primera
+  aparición de cada piloto, mismo patrón que `useCategoriaPreferida()`.
+- **Circuitos — récord vigente** (`CircuitosView.jsx`, `useMarcasRecordCircuito()`): el récord
+  de pista (`circuito_records`) no trae marca en el reporte que lo importa, y `piloto_nombre`
+  es texto libre sin FK a `pilotos`. Si la fecha del récord coincide EXACTO con la de un evento
+  corrido en ese mismo circuito+sentido, y ese evento tiene una marca cargada para un piloto
+  cuyo nombre completo matchea el texto libre del récord, se muestra esa marca — sin match
+  (fecha vieja sin evento en la web, o nombre que no calza exacto), no se muestra nada, no hay
+  forma de inventar el dato. No se hizo lo mismo para el top10 de récords (migración 0028) por
+  no haberse pedido explícitamente.
+
+⚠️ Igual que toda migración/Storage nueva: falta correr la 0029 en **producción** (ya corrida y
+verificada en staging) y confirmar que el bucket `marcas-autos` se crea bien ahí también.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

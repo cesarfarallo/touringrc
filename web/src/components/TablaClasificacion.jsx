@@ -1,6 +1,7 @@
 import { T } from "../theme";
+import LogoMarca from "./LogoMarca";
 
-export default function TablaClasificacion({ data, pilotoId }) {
+export default function TablaClasificacion({ data, pilotoId, marcasPorPiloto = {} }) {
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
@@ -45,8 +46,9 @@ export default function TablaClasificacion({ data, pilotoId }) {
               >
                 {r.pos}
               </td>
-              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400 }}>
+              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400, display: "flex", alignItems: "center" }}>
                 {r.piloto}
+                <LogoMarca marca={marcasPorPiloto[r.pilotoId]} style={{ marginLeft: 6 }} />
               </td>
               <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", color: T.muted }}>
                 {r.resultado}

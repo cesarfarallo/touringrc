@@ -2,6 +2,8 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Mail } from "lucide-react";
 import { T } from "../theme";
 import { supabase } from "../lib/supabase";
+import { useMarcaVigentePorPiloto } from "../hooks";
+import LogoMarca from "./LogoMarca";
 
 // Toggle de opt-in para el aviso por email de "se abrió la inscripción"
 // (migración 0026) -- nadie recibe nada hasta que lo activa a mano. Usa
@@ -69,9 +71,11 @@ function TogglePreferenciaEmail({ piloto, onGuardado }) {
 // tipo de cuenta se quedaba mostrando "pendiente de aprobación" para
 // siempre, aunque su situación ya estuviera resuelta.
 export default function MiPerfil({ session, piloto, loading, esAdmin, onCambioPiloto }) {
+  const marcasPorPiloto = useMarcaVigentePorPiloto();
   if (!session) return null;
 
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
+  const marca = piloto ? marcasPorPiloto[piloto.id] : null;
   const tieneAlgunRol = (piloto?.piloto_roles ?? []).length > 0;
   const faltaVincular = !loading && !piloto;
   const pendienteAprobacion = !loading && !!piloto && !tieneAlgunRol;
@@ -98,9 +102,10 @@ export default function MiPerfil({ session, piloto, loading, esAdmin, onCambioPi
         {faltaVincular ? <AlertTriangle size={14} /> : pendienteAprobacion ? <Clock size={14} /> : <CheckCircle2 size={14} />}
         {loading && "Verificando piloto vinculado..."}
         {ok && (
-          <span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             Conectado como <strong>{session.user.email}</strong> · piloto vinculado:{" "}
             <strong>{nombre || "(sin nombre todavía)"}</strong>
+            <LogoMarca marca={marca} />
           </span>
         )}
         {pendienteAprobacion && (

@@ -1,6 +1,9 @@
 import { T } from "../theme";
+import { useMarcaVigentePorPiloto } from "../hooks";
+import LogoMarca from "./LogoMarca";
 
 export default function TablaCampeonato({ data, pilotoId }) {
+  const marcasPorPiloto = useMarcaVigentePorPiloto();
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
@@ -45,8 +48,9 @@ export default function TablaCampeonato({ data, pilotoId }) {
               >
                 {r.pos}
               </td>
-              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", fontWeight: 500, color: r.pilotoId === pilotoId ? T.amber : T.text }}>
+              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", fontWeight: 500, color: r.pilotoId === pilotoId ? T.amber : T.text, display: "flex", alignItems: "center" }}>
                 {r.piloto}
+                <LogoMarca marca={marcasPorPiloto[r.pilotoId]} style={{ marginLeft: 6 }} />
               </td>
               <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", fontWeight: 700, color: T.amber }}>
                 {r.puntos}

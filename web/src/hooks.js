@@ -182,6 +182,77 @@ export function useResultadosEvento(eventoId) {
   return { porClase, loading, error };
 }
 
+// Marca del auto de cada piloto EN un evento puntual (migración 0029):
+// { [pilotoId]: { nombre, logoUrl } }. `piloto_marca_evento` no tiene FK
+// hacia `resultados_finales`/`clasificacion` (son tablas independientes,
+// las dos referencian evento_id/piloto_id por separado) así que no se
+// puede traer con un select anidado como el resto -- es una consulta
+// aparte que se cruza en el cliente por pilotoId, mismo criterio que
+// `useGanadoresPorEvento` (una consulta consolidada, no una por fila).
+export function useMarcasPorEvento(eventoId) {
+  const [porPiloto, setPorPiloto] = useState({});
+
+  useEffect(() => {
+    if (!eventoId) {
+      setPorPiloto({});
+      return;
+    }
+    let activo = true;
+    supabase
+      .from("piloto_marca_evento")
+      .select("piloto_id, marcas_autos ( nombre, logo_url )")
+      .eq("evento_id", eventoId)
+      .then(({ data, error }) => {
+        if (!activo || error) return;
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          if (fila.marcas_autos) {
+            agrupado[fila.piloto_id] = { nombre: fila.marcas_autos.nombre, logoUrl: fila.marcas_autos.logo_url };
+          }
+        }
+        setPorPiloto(agrupado);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [eventoId]);
+
+  return porPiloto;
+}
+
+// Marca "vigente" de cada piloto: la del evento MÁS RECIENTE en el que
+// tenga una marca asociada, sin importar la temporada -- para las
+// vistas que no son de una fecha puntual (Campeonato, Pilotos, Mi
+// Perfil). Una sola consulta para todos los pilotos (se usa en tablas
+// completas, no tiene sentido una consulta por fila) ordenada por fecha
+// de evento descendente -- se queda con la primera aparición de cada
+// piloto_id, mismo criterio que `useCategoriaPreferida()`.
+export function useMarcaVigentePorPiloto() {
+  const [porPiloto, setPorPiloto] = useState({});
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("piloto_marca_evento")
+      .select("piloto_id, eventos ( fecha ), marcas_autos ( nombre, logo_url )")
+      .order("fecha", { foreignTable: "eventos", ascending: false })
+      .then(({ data, error }) => {
+        if (!activo || error) return;
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          if (!fila.marcas_autos || agrupado[fila.piloto_id]) continue;
+          agrupado[fila.piloto_id] = { nombre: fila.marcas_autos.nombre, logoUrl: fila.marcas_autos.logo_url };
+        }
+        setPorPiloto(agrupado);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  return porPiloto;
+}
+
 // Ganador de cada final (A/B) por clase, para TODOS los eventos en una
 // sola consulta -- se usa en las tarjetas del Calendario, no tiene
 // sentido hacer una consulta por tarjeta. Mismo criterio de heat que
@@ -546,6 +617,78 @@ export function useCircuitoRecords(circuitoId, sentido) {
   }, [circuitoId, sentido, version]);
 
   return { porClase, loading, error, recargar };
+}
+
+// Marca del auto para el récord VIGENTE de cada categoría de un circuito
+// (a pedido): `circuito_records.piloto_nombre` es texto libre, sin FK a
+// `pilotos` (récords viejos de gente que nunca se logueó a la web), y el
+// reporte de récords (RaceResultRecords*.xls) no trae ninguna marca --
+// pero si la fecha del récord coincide exacto con la de un evento
+// corrido en este mismo circuito+sentido, y ese evento tiene una marca
+// cargada (migración 0029) para un piloto cuyo nombre completo matchea
+// el texto libre del récord, se la mostramos igual. Sin match (fecha
+// vieja sin evento asociado en la web, o nombre que no calza exacto), no
+// se muestra nada -- no hay forma de inventar el dato.
+export function useMarcasRecordCircuito(circuitoId, sentido, records) {
+  const [porClase, setPorClase] = useState({});
+  // Clave estable con fecha+piloto de cada clase -- si cambia cualquiera
+  // de los dos (se edita el récord a mano) hay que recalcular el match,
+  // no solo cuando cambia el set de fechas.
+  const datosKey = Object.entries(records ?? {})
+    .map(([clase, r]) => `${clase}:${r.fecha ?? ""}:${r.pilotoNombre ?? ""}`)
+    .sort()
+    .join("|");
+
+  useEffect(() => {
+    const fechas = [...new Set(Object.values(records ?? {}).map((r) => r.fecha).filter(Boolean))];
+    if (!circuitoId || fechas.length === 0) {
+      setPorClase({});
+      return;
+    }
+    let activo = true;
+    (async () => {
+      const { data: eventos } = await supabase
+        .from("eventos")
+        .select("id, fecha")
+        .eq("circuito_id", circuitoId)
+        .eq("circuito_sentido", sentido)
+        .in("fecha", fechas);
+      if (!activo || !eventos || eventos.length === 0) {
+        setPorClase({});
+        return;
+      }
+      const eventoIdPorFecha = {};
+      for (const e of eventos) eventoIdPorFecha[e.fecha] = e.id;
+
+      const { data: marcas } = await supabase
+        .from("piloto_marca_evento")
+        .select("evento_id, marcas_autos ( nombre, logo_url ), pilotos ( first_name, last_name )")
+        .in(
+          "evento_id",
+          eventos.map((e) => e.id)
+        );
+      if (!activo) return;
+
+      const agrupado = {};
+      for (const [clase, r] of Object.entries(records ?? {})) {
+        const eventoId = eventoIdPorFecha[r.fecha];
+        if (!eventoId) continue;
+        const buscado = (r.pilotoNombre ?? "").trim().toLowerCase();
+        const match = (marcas ?? []).find((m) => {
+          if (m.evento_id !== eventoId || !m.marcas_autos) return false;
+          const nombreCompleto = [m.pilotos?.first_name, m.pilotos?.last_name].filter(Boolean).join(" ").trim().toLowerCase();
+          return nombreCompleto === buscado;
+        });
+        if (match) agrupado[clase] = { nombre: match.marcas_autos.nombre, logoUrl: match.marcas_autos.logo_url };
+      }
+      setPorClase(agrupado);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [circuitoId, sentido, datosKey]);
+
+  return porClase;
 }
 
 // Top 10 de vueltas de un circuito, agrupado por categoría:

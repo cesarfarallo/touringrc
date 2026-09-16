@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { T } from "../theme";
-import { useCampeonatos, useEventos, useResultadosEvento, useClasificacionEvento, useCampeonato } from "../hooks";
+import { useCampeonatos, useEventos, useResultadosEvento, useClasificacionEvento, useCampeonato, useMarcasPorEvento } from "../hooks";
 import TablaResultados from "./TablaResultados";
 import TablaClasificacion from "./TablaClasificacion";
 import TablaCampeonato from "./TablaCampeonato";
@@ -64,6 +64,7 @@ export default function ResultadosHistoricos({ pilotoId }) {
   const [subTab, setSubTab] = useState("finales");
   const { porClase: resultadosPorClase, loading: cargandoResultados } = useResultadosEvento(eventoIdActivo);
   const { porClase: clasificacionPorClase, loading: cargandoClasificacion } = useClasificacionEvento(eventoIdActivo);
+  const marcasPorPiloto = useMarcasPorEvento(eventoIdActivo);
 
   const clasesResultados = Object.keys(subTab === "finales" ? resultadosPorClase : clasificacionPorClase);
   const [claseResultados, setClaseResultados] = useState(null);
@@ -194,7 +195,7 @@ export default function ResultadosHistoricos({ pilotoId }) {
                   <>
                     {cargandoResultados && <div style={{ color: T.muted, fontSize: 13 }}>Cargando resultados...</div>}
                     {!cargandoResultados && claseResultadosActiva && resultadosPorClase[claseResultadosActiva] ? (
-                      <TablaResultados data={resultadosPorClase[claseResultadosActiva]} pilotoId={pilotoId} />
+                      <TablaResultados data={resultadosPorClase[claseResultadosActiva]} pilotoId={pilotoId} marcasPorPiloto={marcasPorPiloto} />
                     ) : (
                       !cargandoResultados && (
                         <div style={{ color: T.muted, fontSize: 13, padding: "12px 0" }}>
@@ -207,7 +208,7 @@ export default function ResultadosHistoricos({ pilotoId }) {
                   <>
                     {cargandoClasificacion && <div style={{ color: T.muted, fontSize: 13 }}>Cargando clasificación...</div>}
                     {!cargandoClasificacion && claseResultadosActiva && clasificacionPorClase[claseResultadosActiva] ? (
-                      <TablaClasificacion data={clasificacionPorClase[claseResultadosActiva]} pilotoId={pilotoId} />
+                      <TablaClasificacion data={clasificacionPorClase[claseResultadosActiva]} pilotoId={pilotoId} marcasPorPiloto={marcasPorPiloto} />
                     ) : (
                       !cargandoClasificacion && (
                         <div style={{ color: T.muted, fontSize: 13, padding: "12px 0" }}>

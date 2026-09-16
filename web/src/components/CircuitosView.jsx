@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { Pencil, Plus, Trash2, RefreshCcw, Upload, Share2, ChevronDown, ChevronUp } from "lucide-react";
 import { T } from "../theme";
-import { useCircuitos, useCircuitoRecords, useCircuitoRecordsTop10, useClases } from "../hooks";
+import { useCircuitos, useCircuitoRecords, useCircuitoRecordsTop10, useMarcasRecordCircuito, useClases } from "../hooks";
 import { supabase } from "../lib/supabase";
 import { archivoABase64, extraerMensajeError } from "../lib/edgeFunction";
 import { rutaImagenCircuito as rutaImagen } from "../lib/circuitos";
+import LogoMarca from "./LogoMarca";
 
 function NombreCircuitoEditable({ circuito, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -131,7 +132,7 @@ function FormularioRecord({ circuitoId, sentido, clase, record, onCancelar, onGu
 // `<table>`, para que en una tarjeta angosta (grilla de dos columnas)
 // piloto/tiempo/fecha se acomoden en más de una línea en vez de forzar
 // scroll horizontal como hacía la tabla vieja.
-function FilaRecord({ clase, record, top10, circuitoId, sentido, esAdmin, onGuardado }) {
+function FilaRecord({ clase, record, marca, top10, circuitoId, sentido, esAdmin, onGuardado }) {
   const [editando, setEditando] = useState(false);
   const [top10Abierto, setTop10Abierto] = useState(false);
 
@@ -161,7 +162,10 @@ function FilaRecord({ clase, record, top10, circuitoId, sentido, esAdmin, onGuar
       ) : record ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "Inter, sans-serif", color: T.text, fontWeight: 500, fontSize: 13 }}>{record.pilotoNombre}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ fontFamily: "Inter, sans-serif", color: T.text, fontWeight: 500, fontSize: 13 }}>{record.pilotoNombre}</span>
+              <LogoMarca marca={marca} />
+            </span>
             <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.amber, fontWeight: 700, fontSize: 13 }}>{record.tiempo}</span>
             <span style={{ fontFamily: "JetBrains Mono, monospace", color: T.muted, fontSize: 12 }}>
               {record.fecha ? new Date(record.fecha + "T00:00:00").toLocaleDateString("es-AR") : "—"}
@@ -297,6 +301,7 @@ function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
   const [sentido, setSentido] = useState("normal");
   const { porClase: records, loading: cargandoRecords, recargar: recargarRecords } = useCircuitoRecords(circuito.id, sentido);
   const { porClase: top10, recargar: recargarTop10 } = useCircuitoRecordsTop10(circuito.id, sentido);
+  const marcasRecord = useMarcasRecordCircuito(circuito.id, sentido, records);
   const recargar = () => {
     recargarRecords();
     recargarTop10();
@@ -419,6 +424,7 @@ function CircuitoCard({ circuito, clases, esAdmin, onCircuitoGuardado }) {
               key={clase.id}
               clase={clase}
               record={records[clase.nombre]}
+              marca={marcasRecord[clase.nombre]}
               top10={top10[clase.nombre]}
               circuitoId={circuito.id}
               sentido={sentido}
