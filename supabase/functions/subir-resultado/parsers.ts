@@ -494,22 +494,25 @@ function extraerAnclajes(bufShapes: Uint8Array): AnclaDibujo[] {
 // Punto de entrada: dado el .xls completo y el índice de columna (0-based,
 // mismo índice que usan las filas de leerFilasXls) donde está la columna
 // "Mfr", devuelve un mapa fila (0-based, mismo índice que filasCrudas) ->
-// bytes crudos de la imagen del logo. Las filas sin logo resuelto no
-// aparecen en el mapa -- se ignoran, no rompen el import.
-function extraerLogosPorFila(bytes: Uint8Array, columnaMfr: number): Map<number, Uint8Array> {
+// bytes crudos de la imagen del logo, más un diagnóstico en texto (cuántas
+// filas dio, o qué pasó si no dio ninguna) -- ver el ⚠️ de
+// `parseSeriesResult` sobre por qué hace falta este diagnóstico en vez de
+// solo tragarse cualquier error en silencio.
+function extraerLogosPorFila(bytes: Uint8Array, columnaMfr: number): { mapa: Map<number, Uint8Array>; diagnostico: string } {
   const resultado = new Map<number, Uint8Array>();
   try {
     // deno-lint-ignore no-explicit-any
     const CFB = (XLSX as any).CFB;
     const cfb = CFB.read(bytes, { type: "array" });
     const entradaWorkbook = CFB.find(cfb, "Workbook");
-    if (!entradaWorkbook?.content) return resultado;
+    if (!entradaWorkbook?.content) return { mapa: resultado, diagnostico: "no se encontró el stream Workbook (CFB)" };
     const wb = new Uint8Array(entradaWorkbook.content);
 
     const registros = leerRegistrosBiff(wb);
     const grupo = registros.find((r) => r.tipo === 0x00eb)?.payload;
     const shapes = concatUint8(registros.filter((r) => r.tipo === 0x00ec).map((r) => r.payload));
-    if (!grupo || shapes.length === 0) return resultado;
+    if (!grupo) return { mapa: resultado, diagnostico: "el archivo no tiene ningún MSODRAWINGGROUP (0x00EB)" };
+    if (shapes.length === 0) return { mapa: resultado, diagnostico: "el archivo no tiene ningún MSODRAWING (0x00EC)" };
 
     const blips = extraerBlips(grupo);
     const anclas = extraerAnclajes(shapes);
@@ -519,16 +522,22 @@ function extraerLogosPorFila(bytes: Uint8Array, columnaMfr: number): Map<number,
       const blip = blips[a.pib - 1];
       if (blip) resultado.set(a.fila, blip);
     }
-  } catch {
+    return {
+      mapa: resultado,
+      diagnostico: `columna Mfr=${columnaMfr}, ${blips.length} blip(s) en el archivo, ${anclas.length} dibujo(s) anclado(s), ${resultado.size} logo(s) resuelto(s) en esa columna`,
+    };
+  } catch (e) {
     // Cualquier archivo con un layout Escher que no se ajuste a lo
     // verificado no debe romper el import de puntos/campeonato -- si no
-    // se pueden leer los logos, se sigue sin ellos.
-    return new Map();
+    // se pueden leer los logos, se sigue sin ellos, pero se deja
+    // constancia del motivo en el diagnóstico en vez de tragárselo mudo.
+    return { mapa: new Map(), diagnostico: `excepción al leer logos: ${e instanceof Error ? e.message : String(e)}` };
   }
-  return resultado;
 }
 
-export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | null; filas: FilaCampeonato[] } {
+export function parseSeriesResult(
+  bytes: Uint8Array
+): { nombreTorneo: string | null; filas: FilaCampeonato[]; logoDiagnostico: string } {
   const filasCrudas = leerFilasXls(bytes);
   let nombreTorneo: string | null = null;
   const out: FilaCampeonato[] = [];
@@ -536,6 +545,7 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
   let fechasCols: [number, string][] | null = null;
   let colMfr: number | null = null;
   let logosPorFila: Map<number, Uint8Array> | null = null;
+  let logoDiagnostico = "columna Mfr: no se encontró ninguna fila de headers (\"Driver Name\") en el archivo";
 
   filasCrudas.forEach((fila, filaIdx) => {
     const vals = fila.map(limpiar);
@@ -561,7 +571,14 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
       if (colMfr === null) {
         const idxMfr = vals.indexOf("Mfr");
         colMfr = idxMfr; // -1 si este archivo no trae la columna
-        logosPorFila = idxMfr >= 0 ? extraerLogosPorFila(bytes, idxMfr) : new Map();
+        if (idxMfr >= 0) {
+          const { mapa, diagnostico } = extraerLogosPorFila(bytes, idxMfr);
+          logosPorFila = mapa;
+          logoDiagnostico = diagnostico;
+        } else {
+          logosPorFila = new Map();
+          logoDiagnostico = 'columna "Mfr" no encontrada en la fila de headers de este archivo';
+        }
       }
       return;
     }
@@ -601,7 +618,7 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
       });
     }
   });
-  return { nombreTorneo, filas: out };
+  return { nombreTorneo, filas: out, logoDiagnostico };
 }
 
 // ---------------------------------------------------------------

@@ -397,7 +397,7 @@ async function syncCampeonato(
   eventoId: string,
   resolver: PilotoResolver
 ): Promise<string> {
-  const { filas } = parseSeriesResult(bytes);
+  const { filas, logoDiagnostico } = parseSeriesResult(bytes);
   let count = 0;
   let marcasResueltas = 0;
   const ignoradas = new Set<string>();
@@ -444,7 +444,7 @@ async function syncCampeonato(
     }
   }
   let resumen = `${count} filas de campeonato sincronizadas${resumenIgnoradas(ignoradas)}`;
-  if (marcasResueltas > 0) resumen += ` (${marcasResueltas} marca(s) de auto resueltas)`;
+  resumen += ` (${marcasResueltas} marca(s) de auto resueltas -- ${logoDiagnostico})`;
   return resumen;
 }
 
