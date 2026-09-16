@@ -1576,6 +1576,25 @@ piloto no tiene marca cargada en ese contexto):
   forma de inventar el dato. No se hizo lo mismo para el top10 de récords (migración 0028) por
   no haberse pedido explícitamente.
 
+⚠️ **Bug encontrado al probarlo en staging**: a 16px (el tamaño original de `LogoMarca.jsx`) el
+logo quedaba ilegible — un puntito borroso imposible de reconocer como marca — y como algunos
+logos vienen con fondo transparente y colores oscuros, se perdían contra el fondo oscuro de la
+app (mismo problema que ya se había resuelto antes para los dibujos de circuito, ver más arriba).
+Se subió el tamaño default (22px) y se le agregó fondo blanco fijo, para que se vea nítido sin
+importar el color del logo en sí — mismo criterio que el fondo blanco de los dibujos de circuito.
+De paso, en `TablaClasificacion.jsx`/`TablaCampeonato.jsx` el `<td>` del nombre había quedado con
+`display: "flex"` directo (para poner el logo al lado del nombre) — riesgoso porque un `<td>`
+flex puede romper el cálculo de ancho de columna de la tabla; se movió el `display: flex` a un
+`<span>` interno en vez del `<td>` mismo (mismo patrón, más seguro).
+
+**Panel admin "Marcas de auto"** (`MarcasAutosAdmin.jsx`, nuevo sub-tab en `AdminPanel.jsx`,
+mismo patrón que `CampeonatosAdmin.jsx`): lista el catálogo completo de `marcas_autos`
+(`useMarcasAutos()`) con lápiz para renombrar cada una (lo más importante — las que se
+autogeneran quedan como "Marca sin nombre N") y de paso poder pisar la URL del logo a mano o
+borrar una que no correspondía (`on delete set null` en `piloto_marca_evento.marca_id`, no deja
+nada roto). No hay alta manual a propósito: estas filas solo tiene sentido que las cree el
+import, nunca un admin escribiendo un nombre sin tener el logo real.
+
 ⚠️ Igual que toda migración/Storage nueva: falta correr la 0029 en **producción** (ya corrida y
 verificada en staging) y confirmar que el bucket `marcas-autos` se crea bien ahí también.
 

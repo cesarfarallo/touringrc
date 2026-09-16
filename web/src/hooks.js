@@ -253,6 +253,38 @@ export function useMarcaVigentePorPiloto() {
   return porPiloto;
 }
 
+// Catálogo completo de marcas_autos (migración 0029), para el panel admin
+// -- las que se autogeneran con nombre genérico ("Marca sin nombre N") al
+// importar un SeriesResultReport.xls con un logo nuevo se renombran acá.
+export function useMarcasAutos() {
+  const [marcas, setMarcas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
+
+  const recargar = () => setVersion((v) => v + 1);
+
+  useEffect(() => {
+    let activo = true;
+    setLoading(true);
+    supabase
+      .from("marcas_autos")
+      .select("id, nombre, logo_url")
+      .order("nombre")
+      .then(({ data, error }) => {
+        if (!activo) return;
+        if (error) setError(error);
+        else setMarcas(data ?? []);
+        setLoading(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [version]);
+
+  return { marcas, loading, error, recargar };
+}
+
 // Ganador de cada final (A/B) por clase, para TODOS los eventos en una
 // sola consulta -- se usa en las tarjetas del Calendario, no tiene
 // sentido hacer una consulta por tarjeta. Mismo criterio de heat que

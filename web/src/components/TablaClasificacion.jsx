@@ -46,9 +46,11 @@ export default function TablaClasificacion({ data, pilotoId, marcasPorPiloto = {
               >
                 {r.pos}
               </td>
-              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400, display: "flex", alignItems: "center" }}>
-                {r.piloto}
-                <LogoMarca marca={marcasPorPiloto[r.pilotoId]} style={{ marginLeft: 6 }} />
+              <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400 }}>
+                <span style={{ display: "inline-flex", alignItems: "center" }}>
+                  {r.piloto}
+                  <LogoMarca marca={marcasPorPiloto[r.pilotoId]} style={{ marginLeft: 6 }} />
+                </span>
               </td>
               <td style={{ padding: "12px 16px", fontFamily: "JetBrains Mono, monospace", color: T.muted }}>
                 {r.resultado}
