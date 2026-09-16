@@ -1476,6 +1476,83 @@ completo.
 README de la función) — no verificable end-to-end desde este entorno de desarrollo por la misma
 razón de siempre (sin acceso de red a un proyecto de Supabase real).
 
+## Marca del auto por piloto y por evento (migración 0029) — PARTE 1: parser + carga
+
+Pedido del club: mostrar la marca del auto (chasis) con la que corre cada piloto al lado de su
+nombre. Se hace en dos partes — esta es la **parte 1** (el parser y la carga de datos a la
+base); mostrar el logo en cada pantalla queda para una parte 2 aparte, todavía no hecha.
+
+**El obstáculo real**: la columna "Mfr" de `SeriesResultReport.xls` no trae texto — cada celda
+tiene el logo de la marca **incrustado como imagen** dentro del `.xls` (formato binario BIFF8
+viejo, con las imágenes guardadas en estructuras Escher/OfficeArt de Microsoft). Ninguna
+librería disponible para Deno (ni SheetJS, que ya se usa para todo el resto de los parsers, ni
+ninguna otra) lee esto — hubo que escribir un parser de bajo nivel a mano
+(`supabase/functions/subir-resultado/parsers.ts`, sección "Logos de marca..."), verificado byte
+a byte contra el archivo real de muestra (`touringrc-sync/files/SeriesResultReport.xls`): 46
+logos embebidos, **44 de 44 pilotos reales** con su logo correctamente resuelto.
+
+**Cómo funciona** (comentario largo en el propio código con el detalle del formato binario):
+1. Se lee el stream `Workbook` crudo del `.xls` (con `XLSX.CFB`, la utilidad de bajo nivel que
+   ya trae empaquetada `xlsx@0.18.5` — no hizo falta ninguna dependencia nueva) en vez de pasar
+   por `XLSX.read`/`sheet_to_json` como el resto de los parsers.
+2. Se reconstruyen los registros `MSODRAWINGGROUP` (uno solo, con todas las imágenes del
+   archivo) y `MSODRAWING` (uno por hoja, con los dibujos de esa hoja) uniendo los `CONTINUE`
+   que los siguen — sin esto, cualquier imagen de más de ~8KB queda cortada a la mitad.
+3. Del `MSODRAWINGGROUP` se sacan los blips (imágenes) del `BstoreContainer` — cada uno con un
+   índice 1-based ("pib") que después referencia cada dibujo.
+4. De los `MSODRAWING` (concatenados, forman un solo stream Escher por hoja) se saca, por cada
+   dibujo, a qué celda está anclado (fila/columna) y qué blip usa (propiedad "pib") — así se
+   sabe qué logo corresponde a qué piloto, no solo "hay logos sueltos en el archivo".
+5. La columna "Mfr" se ubica dinámicamente (buscando el texto "Mfr" en la fila de headers, no
+   un índice hardcodeado) para no depender de que el layout del reporte no cambie nunca.
+
+⚠️ **Bug encontrado en el archivo real, del exportador de LiveTime (no del formato en sí)**:
+para blips grandes (>64KB, los logos de ~300×300px), el campo `cb` del header del BSE viene
+**truncado a 16 bits** (guarda `cb % 65536` en vez del valor real) — se detectó comparando
+contra el campo `size` de ese mismo BSE (que si tiene el valor correcto: `36 + cbName + size`
+tiene que ser el `cb` real; si el `cb` crudo coincide con eso módulo 65536, se usa el valor
+corregido). Sin este fix, la mitad de los logos (los grandes) no se podían leer y además
+rompía la lectura de TODOS los que venían después en el archivo (el offset se perdía).
+
+**Dónde se guarda**:
+- `marcas_autos` (catálogo, nombre + `logo_url` + `hash_logo`): a diferencia de
+  `marcas_neumaticos` (carga manual, sin upload), esta se llena **sola** — cada logo extraído
+  se compara por hash exacto (SHA-256 del archivo de imagen, la misma marca siempre trae el
+  mismo logo byte a byte porque LiveTime usa un set fijo de assets) contra las ya cargadas; si
+  no matchea ninguna, se sube a Storage y se crea una fila nueva con nombre genérico ("Marca
+  sin nombre N", mismo criterio que "Circuito 1".."Circuito 7") para que el admin la renombre
+  después — todavía no hay pantalla para eso (parte 2).
+- **Supabase Storage, bucket `marcas-autos`** (público de lectura): primera vez que este
+  proyecto usa Storage — hasta ahora todas las imágenes de la app (logo del club, dibujos de
+  circuitos) son archivos estáticos en `web/public/`, pero estos logos se generan en tiempo
+  real a partir de un `.xls` subido, no se pueden commitear al repo de antemano.
+- `piloto_marca_evento` (evento + piloto + marca, `unique(evento_id, piloto_id)`): la marca
+  puede cambiar de una fecha a otra, por eso no vive en `pilotos` directamente. Sin policy de
+  insert/update/delete a propósito — mismo criterio que `frases_destacadas` (migración 0027):
+  solo la escribe la Edge Function con la `service_role key`.
+
+**Cuándo se completa**: `syncCampeonato` (`index.ts`) ahora recibe también el `eventoId` del
+evento cuyo botón "Subir resultados" disparó el upload (ya viajaba en el body de la Edge
+Function para los demás tipos, solo faltaba pasárselo a esta función) — cada vez que se sube un
+`SeriesResultReport.xls` para una fecha puntual, la marca de cada piloto en ese archivo queda
+asociada a **esa** fecha. Como este reporte no se sube necesariamente después de cada fecha
+("se corre solo cuando hace falta actualizar el acumulado", ver sección de Edge Function más
+arriba), la granularidad real es "la marca vigente al momento del último `SeriesResultReport.xls`
+subido para esa fecha", no un registro perfecto fecha por fecha — es la mejor señal disponible
+sin agregarle a Live Timing algo que no exporta.
+
+⚠️ Pendiente (parte 2, no hecha todavía): mostrar el logo al lado del nombre del piloto en
+Resultados finales, Clasificación, Campeonato, Pilotos y Circuitos; resolver qué marca mostrar
+en las vistas que no son de una fecha puntual (Campeonato/Pilotos/Mi Perfil — decidido: la del
+evento más reciente en el que el piloto tenga marca asociada); y heredar la marca en
+`circuito_records` cuando la fecha del récord coincida con la de un evento con marca cargada
+para ese piloto (decidido en el pedido original, todavía sin implementar).
+
+⚠️ Igual que toda migración/Storage nueva: falta correr la 0029 en staging y producción, y
+confirmar que el bucket `marcas-autos` se crea bien en los dos proyectos (la migración lo
+crea via SQL, pero es la primera vez que este repo usa `storage.buckets` — vale la pena
+confirmarlo a mano en el dashboard de cada proyecto la primera vez).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

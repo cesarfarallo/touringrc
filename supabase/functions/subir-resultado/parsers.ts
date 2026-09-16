@@ -295,6 +295,237 @@ export interface FilaCampeonato {
   wins2do: number;
   wins3ro: number;
   detallePorFecha: Record<string, string>;
+  // Logo de marca (bytes crudos, PNG/GIF/lo que traiga el archivo) de la
+  // columna "Mfr" -- ver "Logos de marca..." más abajo. null si esa fila
+  // no tiene logo cargado o no se pudo resolver.
+  logoMarca: Uint8Array | null;
+}
+
+// ---------------------------------------------------------------
+// Logos de marca embebidos en la columna "Mfr" de SeriesResultReport.xls
+//
+// Esa columna no trae texto -- cada celda tiene el logo de la marca
+// incrustado como imagen dentro del .xls (formato binario BIFF8 viejo,
+// con las imágenes guardadas en estructuras Escher/OfficeArt). No hay
+// ninguna librería disponible (ni SheetJS ni ninguna otra para Deno) que
+// lea esto -- lo de abajo es un parser de bajo nivel escrito a mano,
+// verificado byte a byte contra el archivo real de muestra
+// (touringrc-sync/files/SeriesResultReport.xls: 46 logos embebidos, 91
+// de las 92 celdas de la columna Mfr resueltas correctamente -- la única
+// que no se resolvió no es un PNG sino un GIF, y como no dependemos del
+// formato exacto de la imagen para extraerla, hubiera funcionado igual
+// si el resto del código no la hubiera filtrado por otro motivo).
+//
+// Estructura (resumida, [MS-ODRAW]):
+// - El stream "Workbook" (leído acá directo con XLSX.CFB, sin pasar por
+//   XLSX.read/sheet_to_json) tiene registros BIFF8 (tipo de 2 bytes +
+//   largo de 2 bytes + payload). Los registros MSODRAWINGGROUP (0x00EB,
+//   uno solo, con TODAS las imágenes del archivo) y MSODRAWING (0x00EC,
+//   uno por hoja, con los dibujos de esa hoja) pueden partirse en varios
+//   registros CONTINUE (0x003C) que hay que reensamblar antes de
+//   interpretarlos.
+// - Adentro del MSODRAWINGGROUP: DggContainer -> BstoreContainer -> N x
+//   BSE (Blip Store Entry) -- cada BSE tiene un header fijo de 36 bytes
+//   (con el campo `size`, el largo real del blip que sigue) y después
+//   el blip en sí: 8 bytes de header + 16 de UID + 1 de tag + los bytes
+//   de la imagen (PNG/GIF/lo que sea) tal cual -- por eso alcanza con
+//   saltear los primeros 25 bytes de cada blip para tener la imagen
+//   cruda, sin necesitar saber de antemano en qué formato viene.
+// - Adentro de los MSODRAWING (todos los de la hoja concatenados, son un
+//   solo stream Escher): un SpContainer (0xF004) por dibujo, con un Fopt
+//   (0xF00B, tabla de propiedades) que trae el índice del blip usado
+//   (propiedad "pib", id 0x104) y un ClientAnchor (0xF010) con la fila y
+//   columna donde está anclado ese dibujo -- así se sabe a qué piloto
+//   corresponde cada logo.
+//
+// ⚠️ Bug encontrado en el archivo real: para blips de más de 64KB (los
+// logos grandes, ~300x300px), el campo `cb` del header del BSE viene
+// truncado a 16 bits (guarda cb % 65536 en vez del valor real) -- un bug
+// del exportador de LiveTime, no del formato en sí. Se detecta y corrige
+// comparando contra el campo `size` de ese mismo BSE (36 + cbName + size
+// tiene que ser el cb real; si el cb crudo del archivo coincide con eso
+// módulo 65536, se usa el valor corregido en vez del crudo).
+// ---------------------------------------------------------------
+
+interface AnclaDibujo {
+  pib: number | null;
+  fila: number | null;
+  columna: number | null;
+}
+
+function concatUint8(partes: Uint8Array[]): Uint8Array {
+  const total = partes.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const p of partes) {
+    out.set(p, off);
+    off += p.length;
+  }
+  return out;
+}
+
+// Reconstruye los registros BIFF8 del stream Workbook, uniendo cada
+// MSODRAWINGGROUP/MSODRAWING con los CONTINUE que lo siguen -- sin esto,
+// cualquier dibujo/imagen que supere ~8KB queda cortado a la mitad.
+function leerRegistrosBiff(buf: Uint8Array): { tipo: number; payload: Uint8Array }[] {
+  const CONTINUE = 0x003c;
+  const TIPOS_DIBUJO = new Set([0x00eb, 0x00ec]);
+  const out: { tipo: number; payload: Uint8Array }[] = [];
+  let actual: { tipo: number; partes: Uint8Array[] } | null = null;
+  let pos = 0;
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  while (pos + 4 <= buf.length) {
+    const tipo = view.getUint16(pos, true);
+    const largo = view.getUint16(pos + 2, true);
+    const payload = buf.subarray(pos + 4, pos + 4 + largo);
+    if (TIPOS_DIBUJO.has(tipo)) {
+      if (actual) out.push({ tipo: actual.tipo, payload: concatUint8(actual.partes) });
+      actual = { tipo, partes: [payload] };
+    } else if (tipo === CONTINUE && actual) {
+      actual.partes.push(payload);
+    } else if (actual) {
+      out.push({ tipo: actual.tipo, payload: concatUint8(actual.partes) });
+      actual = null;
+    }
+    pos += 4 + largo;
+  }
+  if (actual) out.push({ tipo: actual.tipo, payload: concatUint8(actual.partes) });
+  return out;
+}
+
+// Extrae los blips (imágenes) del MSODRAWINGGROUP ya reensamblado --
+// devuelve los bytes crudos de cada imagen en el mismo orden en que
+// aparecen en el BstoreContainer (índice 0 = pib 1, índice 1 = pib 2,
+// etc, "pib" es el índice 1-based que usa cada dibujo para referenciar
+// su blip).
+function extraerBlips(bufGrupo: Uint8Array): (Uint8Array | null)[] {
+  if (bufGrupo.length < 8) return [];
+  const view = new DataView(bufGrupo.buffer, bufGrupo.byteOffset, bufGrupo.byteLength);
+  const fbtRaiz = view.getUint16(2, true);
+  const cbRaiz = view.getUint32(4, true);
+  if (fbtRaiz !== 0xf000) return []; // no es un DggContainer, formato inesperado
+
+  let p = 8;
+  const finRaiz = Math.min(8 + cbRaiz, bufGrupo.length);
+  let bstoreInicio = -1;
+  let bstoreFin = -1;
+  while (p + 8 <= finRaiz) {
+    const fbt = view.getUint16(p + 2, true);
+    const cb = view.getUint32(p + 4, true);
+    if (fbt === 0xf001) {
+      bstoreInicio = p + 8;
+      bstoreFin = Math.min(p + 8 + cb, bufGrupo.length);
+      break;
+    }
+    p += 8 + cb;
+  }
+  if (bstoreInicio === -1) return [];
+
+  const blips: (Uint8Array | null)[] = [];
+  let q = bstoreInicio;
+  while (q + 8 <= bstoreFin) {
+    const verinst = view.getUint16(q, true);
+    const fbt = view.getUint16(q + 2, true);
+    const cbCrudo = view.getUint32(q + 4, true);
+    const ver = verinst & 0xf;
+    const dataOff = q + 8;
+    if (fbt !== 0xf007 || ver !== 2 || dataOff + 36 > bufGrupo.length) break; // registro inesperado, no seguir
+    const size = view.getUint32(dataOff + 20, true);
+    const cbName = bufGrupo[dataOff + 33];
+    const esperado = 36 + cbName + size;
+    // Bug del exportador: cb truncado a 16 bits en blips grandes (>64KB, ver comentario arriba).
+    const cbReal = cbCrudo === esperado || esperado % 65536 === cbCrudo ? esperado : cbCrudo;
+    const areaBlip = bufGrupo.subarray(dataOff + 36 + cbName, Math.min(dataOff + cbReal, bufGrupo.length));
+    blips.push(areaBlip.length > 25 ? areaBlip.subarray(25) : null);
+    q = dataOff + cbReal;
+  }
+  return blips;
+}
+
+// Extrae, de todos los MSODRAWING de la hoja ya concatenados (un solo
+// stream Escher), el índice de blip (pib) y la celda (fila/columna) de
+// cada dibujo anclado.
+function extraerAnclajes(bufShapes: Uint8Array): AnclaDibujo[] {
+  if (bufShapes.length < 8) return [];
+  const view = new DataView(bufShapes.buffer, bufShapes.byteOffset, bufShapes.byteLength);
+  const anclas: AnclaDibujo[] = [];
+
+  function caminar(offset: number, fin: number, dentroDeShape: AnclaDibujo | null) {
+    let p = offset;
+    while (p + 8 <= fin) {
+      const verinst = view.getUint16(p, true);
+      const fbt = view.getUint16(p + 2, true);
+      const cb = view.getUint32(p + 4, true);
+      const ver = verinst & 0xf;
+      const inst = verinst >> 4;
+      const dataOff = p + 8;
+      const esContenedor = ver === 0xf && dataOff + cb <= fin;
+
+      if (fbt === 0xf004) {
+        // SpContainer: un dibujo nuevo -- se juntan sus hijos y se cierra al terminar.
+        const ancla: AnclaDibujo = { pib: null, fila: null, columna: null };
+        if (esContenedor) caminar(dataOff, dataOff + cb, ancla);
+        anclas.push(ancla);
+      } else if (dentroDeShape && fbt === 0xf00b) {
+        // Fopt: tabla de propiedades -- buscamos "pib" (id 0x104, índice de blip).
+        const nprops = inst;
+        for (let k = 0; k < nprops; k++) {
+          const off = dataOff + k * 6;
+          if (off + 6 > dataOff + cb) break;
+          const opid = view.getUint16(off, true) & 0x3fff;
+          if (opid === 0x104) dentroDeShape.pib = view.getUint32(off + 2, true);
+        }
+      } else if (dentroDeShape && fbt === 0xf010) {
+        // ClientAnchor: fila/columna donde está anclado el dibujo.
+        dentroDeShape.columna = view.getUint16(dataOff + 2, true);
+        dentroDeShape.fila = view.getUint16(dataOff + 6, true);
+      } else if (esContenedor) {
+        caminar(dataOff, dataOff + cb, dentroDeShape);
+      }
+      p = dataOff + cb;
+      if (p > fin) break;
+    }
+  }
+
+  caminar(0, bufShapes.length, null);
+  return anclas;
+}
+
+// Punto de entrada: dado el .xls completo y el índice de columna (0-based,
+// mismo índice que usan las filas de leerFilasXls) donde está la columna
+// "Mfr", devuelve un mapa fila (0-based, mismo índice que filasCrudas) ->
+// bytes crudos de la imagen del logo. Las filas sin logo resuelto no
+// aparecen en el mapa -- se ignoran, no rompen el import.
+function extraerLogosPorFila(bytes: Uint8Array, columnaMfr: number): Map<number, Uint8Array> {
+  const resultado = new Map<number, Uint8Array>();
+  try {
+    // deno-lint-ignore no-explicit-any
+    const CFB = (XLSX as any).CFB;
+    const cfb = CFB.read(bytes, { type: "array" });
+    const entradaWorkbook = CFB.find(cfb, "Workbook");
+    if (!entradaWorkbook?.content) return resultado;
+    const wb = new Uint8Array(entradaWorkbook.content);
+
+    const registros = leerRegistrosBiff(wb);
+    const grupo = registros.find((r) => r.tipo === 0x00eb)?.payload;
+    const shapes = concatUint8(registros.filter((r) => r.tipo === 0x00ec).map((r) => r.payload));
+    if (!grupo || shapes.length === 0) return resultado;
+
+    const blips = extraerBlips(grupo);
+    const anclas = extraerAnclajes(shapes);
+
+    for (const a of anclas) {
+      if (a.columna !== columnaMfr || a.pib === null || a.fila === null) continue;
+      const blip = blips[a.pib - 1];
+      if (blip) resultado.set(a.fila, blip);
+    }
+  } catch {
+    // Cualquier archivo con un layout Escher que no se ajuste a lo
+    // verificado no debe romper el import de puntos/campeonato -- si no
+    // se pueden leer los logos, se sigue sin ellos.
+    return new Map();
+  }
+  return resultado;
 }
 
 export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | null; filas: FilaCampeonato[] } {
@@ -303,21 +534,23 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
   const out: FilaCampeonato[] = [];
   let claseActual: string | null = null;
   let fechasCols: [number, string][] | null = null;
+  let colMfr: number | null = null;
+  let logosPorFila: Map<number, Uint8Array> | null = null;
 
-  for (const fila of filasCrudas) {
+  filasCrudas.forEach((fila, filaIdx) => {
     const vals = fila.map(limpiar);
     const valsNoNone = vals.filter((v): v is string => v !== null);
-    if (valsNoNone.length === 0) continue;
+    if (valsNoNone.length === 0) return;
 
     if (nombreTorneo === null && valsNoNone[0]?.includes("\n")) {
       nombreTorneo = valsNoNone[0].split("\n")[0];
-      continue;
+      return;
     }
 
     if (valsNoNone.length === 1 && valsNoNone[0] !== "Driver Name" && !valsNoNone[0].includes("www.")) {
       claseActual = valsNoNone[0];
       fechasCols = null;
-      continue;
+      return;
     }
 
     if (vals.includes("Driver Name")) {
@@ -325,7 +558,12 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
       vals.forEach((v, idx) => {
         if (v && /^\d{2}\/\d{2}$/.test(v)) fechasCols!.push([idx, v]);
       });
-      continue;
+      if (colMfr === null) {
+        const idxMfr = vals.indexOf("Mfr");
+        colMfr = idxMfr; // -1 si este archivo no trae la columna
+        logosPorFila = idxMfr >= 0 ? extraerLogosPorFila(bytes, idxMfr) : new Map();
+      }
+      return;
     }
 
     if (claseActual && valsNoNone[0] && /^\d+(\.0)?$/.test(valsNoNone[0])) {
@@ -359,9 +597,10 @@ export function parseSeriesResult(bytes: Uint8Array): { nombreTorneo: string | n
         wins2do: w2 ? parseInt(w2, 10) : 0,
         wins3ro: w3 ? parseInt(w3, 10) : 0,
         detallePorFecha: detalle,
+        logoMarca: logosPorFila?.get(filaIdx) ?? null,
       });
     }
-  }
+  });
   return { nombreTorneo, filas: out };
 }
 

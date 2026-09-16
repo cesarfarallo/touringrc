@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
         break;
       case "campeonato":
         if (!campeonatoId) return json({ error: "Falta campeonatoId" }, 400, cors);
-        resumen = await syncCampeonato(sb, bytes, campeonatoId, resolver);
+        resumen = await syncCampeonato(sb, bytes, campeonatoId, eventoId, resolver);
         break;
       case "recordsCircuito":
         resumen = await syncRecordsCircuito(sb, bytes, circuitoId, sentido);
@@ -347,14 +347,59 @@ async function syncClasificacion(
   return `${count} filas de clasificación sincronizadas${resumenIgnoradas(ignoradas)}`;
 }
 
+// Firma mágica de los formatos de imagen que puede traer el logo --
+// alcanza con mirar los primeros bytes, no hace falta decodificar nada.
+function contentTypeYExtension(bytes: Uint8Array): { contentType: string; ext: string } {
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) return { contentType: "image/png", ext: "png" };
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return { contentType: "image/gif", ext: "gif" };
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return { contentType: "image/jpeg", ext: "jpg" };
+  return { contentType: "application/octet-stream", ext: "bin" };
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// Resuelve el logo de marca extraído del .xls contra el catálogo
+// `marcas_autos` (migración 0029) por hash exacto del archivo de imagen
+// -- la misma marca siempre trae el mismo logo byte a byte (viene de un
+// set fijo de assets que usa LiveTime, no se regenera por reporte). Si
+// no matchea ninguna, la sube a Storage y crea una fila nueva con
+// nombre genérico para que el admin la renombre después.
+async function resolverMarcaAuto(sb: SupabaseClient, logo: Uint8Array): Promise<string | null> {
+  const hash = await sha256Hex(logo);
+  const { data: existente } = await sb.from("marcas_autos").select("id").eq("hash_logo", hash).maybeSingle();
+  if (existente) return existente.id;
+
+  const { contentType, ext } = contentTypeYExtension(logo);
+  const path = `${hash}.${ext}`;
+  const { error: errorSubida } = await sb.storage.from("marcas-autos").upload(path, logo, { contentType, upsert: true });
+  if (errorSubida) throw new Error(`marcas-autos storage.upload: ${errorSubida.message}`);
+  const { data: publicUrl } = sb.storage.from("marcas-autos").getPublicUrl(path);
+
+  const { count } = await sb.from("marcas_autos").select("id", { count: "exact", head: true });
+  const { data: nueva, error: errorInsert } = await sb
+    .from("marcas_autos")
+    .insert({ nombre: `Marca sin nombre ${(count ?? 0) + 1}`, logo_url: publicUrl.publicUrl, hash_logo: hash })
+    .select("id")
+    .single();
+  if (errorInsert) throw new Error(`marcas_autos.insert: ${errorInsert.message}`);
+  return nueva.id;
+}
+
 async function syncCampeonato(
   sb: SupabaseClient,
   bytes: Uint8Array,
   campeonatoId: string,
+  eventoId: string,
   resolver: PilotoResolver
 ): Promise<string> {
   const { filas } = parseSeriesResult(bytes);
   let count = 0;
+  let marcasResueltas = 0;
   const ignoradas = new Set<string>();
   for (const f of filas) {
     const claseId = await getClasePermitida(sb, f.clase);
@@ -385,8 +430,22 @@ async function syncCampeonato(
     );
     if (error) throw new Error(`campeonato_puntos.upsert (${f.pilotoCrudo}): ${error.message}`);
     count++;
+
+    if (f.logoMarca) {
+      const marcaId = await resolverMarcaAuto(sb, f.logoMarca);
+      const { error: errorMarca } = await sb
+        .from("piloto_marca_evento")
+        .upsert(
+          { evento_id: eventoId, piloto_id: pilotoId, marca_id: marcaId },
+          { onConflict: "evento_id,piloto_id" }
+        );
+      if (errorMarca) throw new Error(`piloto_marca_evento.upsert (${f.pilotoCrudo}): ${errorMarca.message}`);
+      marcasResueltas++;
+    }
   }
-  return `${count} filas de campeonato sincronizadas${resumenIgnoradas(ignoradas)}`;
+  let resumen = `${count} filas de campeonato sincronizadas${resumenIgnoradas(ignoradas)}`;
+  if (marcasResueltas > 0) resumen += ` (${marcasResueltas} marca(s) de auto resueltas)`;
+  return resumen;
 }
 
 // RaceResultRecords*.xls ("Track Records"): pisa el récord vigente
