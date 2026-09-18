@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, XCircle, Plus, Pencil, ChevronDown, ChevronUp, Clock, Trash2 } from "lucide-react";
 import CampoBusqueda from "./CampoBusqueda";
 import { T } from "../theme";
-import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones, useCampeonato } from "../hooks";
+import { useClases, useMarcasNeumaticos, useNeumaticosEstadoClase, useEventos, useHistorialHomologaciones, useCampeonato, useFotosPilotos } from "../hooks";
 import { supabase } from "../lib/supabase";
 import HomologacionesPendientes from "./HomologacionesPendientes";
 import FotoPiloto from "./FotoPiloto";
@@ -431,7 +431,7 @@ function HistorialPiloto({ historial, marcas, esAdmin, onCambio }) {
   );
 }
 
-function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marcas, esAdmin, onCambio }) {
+function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marcas, esAdmin, onCambio, fotoUrl }) {
   const [modo, setModo] = useState(null); // null | "hoy" | "historico" | "historial"
 
   const puedeHomologarHoy = fila.apto && eventoHoy;
@@ -451,7 +451,7 @@ function FilaPiloto({ fila, claseId, eventoHoy, eventosPasados, historial, marca
     <div style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <FotoPiloto />
+          <FotoPiloto fotoUrl={fotoUrl} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 600 }}>{fila.piloto_nombre}</div>
             <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
@@ -567,6 +567,7 @@ export default function OficinaTecnica({ esAdmin }) {
   const { marcas, loading: cargandoMarcas, recargar: recargarMarcas } = useMarcasNeumaticos();
   const { eventos } = useEventos();
   const { campeonato, loading: cargandoCampeonato } = useCampeonato();
+  const fotosPorPiloto = useFotosPilotos();
   // Mientras el campeonato vigente todavía está cargando, no se filtra
   // nada (mismo criterio de respaldo que App.jsx) para no parpadear una
   // lista vacía en el primer render.
@@ -668,6 +669,7 @@ export default function OficinaTecnica({ esAdmin }) {
                   historial={historialPorPiloto[fila.piloto_id]}
                   marcas={marcas}
                   esAdmin={esAdmin}
+                  fotoUrl={fotosPorPiloto[fila.piloto_id]}
                   onCambio={recargarTodo}
                 />
               ))}

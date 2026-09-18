@@ -85,7 +85,7 @@ export function usePilotos() {
     setLoading(true);
     supabase
       .from("pilotos")
-      .select("id, first_name, last_name, email, auth_user_id, created_at")
+      .select("id, first_name, last_name, email, auth_user_id, created_at, foto_url")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (!activo) return;
@@ -242,6 +242,35 @@ export function useMarcaVigentePorPiloto() {
         for (const fila of data ?? []) {
           if (!fila.marcas_autos || agrupado[fila.piloto_id]) continue;
           agrupado[fila.piloto_id] = { nombre: fila.marcas_autos.nombre, logoUrl: fila.marcas_autos.logo_url };
+        }
+        setPorPiloto(agrupado);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  return porPiloto;
+}
+
+// Foto de cada piloto (migración 0030): { [pilotoId]: fotoUrl }. A
+// diferencia de la marca del auto, la foto no varía por evento -- vive
+// directo en `pilotos`, así que una sola consulta sirve para cualquier
+// vista (Resultados, Clasificación, Campeonato, Oficina técnica), sin
+// necesidad de un eventoId ni de threadear un prop desde el padre.
+export function useFotosPilotos() {
+  const [porPiloto, setPorPiloto] = useState({});
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("pilotos")
+      .select("id, foto_url")
+      .then(({ data, error }) => {
+        if (!activo || error) return;
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          if (fila.foto_url) agrupado[fila.id] = fila.foto_url;
         }
         setPorPiloto(agrupado);
       });
@@ -915,7 +944,7 @@ export function useInscriptosEvento(eventoId) {
     setLoading(true);
     supabase
       .from("inscripciones")
-      .select("id, pilotos ( first_name, last_name ), clases ( nombre )")
+      .select("id, pilotos ( first_name, last_name, foto_url ), clases ( nombre )")
       .eq("evento_id", eventoId)
       .then(({ data, error }) => {
         if (!activo) return;

@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useMarcaVigentePorPiloto } from "../hooks";
 import LogoMarca from "./LogoMarca";
 import FotoPiloto from "./FotoPiloto";
+import SubirFotoPiloto from "./SubirFotoPiloto";
 
 // Toggle de opt-in para el aviso por email de "se abrió la inscripción"
 // (migración 0026) -- nadie recibe nada hasta que lo activa a mano. Usa
@@ -104,7 +105,7 @@ export default function MiPerfil({ session, piloto, loading, esAdmin, onCambioPi
         {loading && "Verificando piloto vinculado..."}
         {ok && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <FotoPiloto />
+            <FotoPiloto fotoUrl={piloto?.foto_url} size={22} />
             Conectado como <strong>{session.user.email}</strong> · piloto vinculado:{" "}
             <strong>{nombre || "(sin nombre todavía)"}</strong>
             <LogoMarca marca={marca} />
@@ -130,6 +131,11 @@ export default function MiPerfil({ session, piloto, loading, esAdmin, onCambioPi
         )}
       </div>
       {piloto && <TogglePreferenciaEmail piloto={piloto} onGuardado={onCambioPiloto} />}
+      {piloto && (
+        <div style={{ marginTop: 4, paddingTop: 6, borderTop: `1px solid ${T.line}` }}>
+          <SubirFotoPiloto pilotoId={piloto.id} fotoUrl={piloto.foto_url} onGuardado={onCambioPiloto} />
+        </div>
+      )}
     </div>
   );
 }

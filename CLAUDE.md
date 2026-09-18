@@ -1668,6 +1668,69 @@ anteriores, esta silueta **sí se lee bien a 28-36px** (la forma general cabeza+
 reconocible aunque el parche/insignia del pecho se reduzcan a puntitos), porque son formas
 sólidas grandes en vez de trazos finos.
 
+## Subida real de la foto de piloto (migración 0030)
+
+Pedido del club, segunda parte de `FotoPiloto.jsx` (la primera fue solo el placeholder, ver
+sección de arriba): que cada piloto pueda subir su propia foto desde "Mi Perfil", y que el
+admin pueda subir/cambiar la de cualquiera desde el módulo Pilotos. A diferencia de la marca
+del auto (migración 0029, varía por evento), la foto de un piloto no depende de la fecha —
+vive directo en `pilotos.foto_url`.
+
+- **`pilotos.foto_url`** (columna nueva, nullable) + bucket de Storage **`fotos-pilotos`**
+  (público de lectura, mismo patrón que `marcas-autos`) — sin policies de escritura para el
+  cliente: solo la Edge Function de abajo, con la `service_role key`, sube archivos ahí.
+- **Edge Function `subir-foto-piloto`** (`supabase/functions/subir-foto-piloto/`): a diferencia
+  de `subir-resultado` (solo admin), acá hay **dos** formas válidas de estar autorizado —
+  resuelve el piloto vinculado a la sesión (igual que `es_admin()` del lado de Postgres, pero
+  reimplementado en la función porque no corre dentro de una policy de RLS) y permite la subida
+  si `pilotoId === el propio piloto` **o** si el rol es `admin`; cualquier otro caso, 403. Sube
+  el archivo a `fotos-pilotos/{pilotoId}.jpg` (`upsert: true`, siempre pisa la foto anterior de
+  ese piloto) y actualiza `pilotos.foto_url` con la URL pública — le suma un `?v=timestamp` para
+  evitar que el navegador siga mostrando la versión vieja cacheada al cambiar la foto (mismo
+  path se reusa siempre). Un límite de tamaño (3MB) rechaza cualquier archivo inesperadamente
+  grande, aunque el cliente ya debería mandar algo mucho más chico (ver abajo).
+- **`web/src/lib/fotoPiloto.js`** (`subirFotoPiloto(pilotoId, file)`): antes de mandar el
+  archivo, lo recorta a un **cuadrado centrado** y lo re-codifica como JPEG chico (480×480,
+  calidad 0.85) con un `<canvas>` — mismo criterio de recorte centrado que ya usa
+  `FotoPiloto.jsx` para mostrar la foto (`object-fit: cover` en un círculo), hecho ACÁ antes de
+  subir en vez de dejarlo a ciegas del lado de cada pantalla que la muestra, y de paso evita
+  mandar el archivo pesado original (una foto de celular sin comprimir) a la Edge Function.
+  Reutiliza `archivoABase64`/`extraerMensajeError` de `web/src/lib/edgeFunction.js` (ya
+  existían para `subir-resultado`).
+- **`SubirFotoPiloto.jsx`** (componente compartido): la foto actual (`FotoPiloto`) + un botón
+  "Cambiar foto" que abre el selector de archivos del navegador — mismo control en los dos
+  puntos de entrada, la autorización real la decide la Edge Function, no el componente:
+  - **Mi Perfil** (`MiPerfil.jsx`): visible para cualquier piloto vinculado (con o sin rol
+    asignado todavía, mismo criterio que el toggle de notificaciones de la migración 0026 — no
+    hace falta esperar la aprobación del admin para poder cargar una foto).
+  - **Pilotos** (`PilotosAdmin.jsx` → `FilaPiloto`): reemplaza el placeholder fijo que había
+    ahí — el admin puede cambiar la foto de cualquier piloto directo desde esta fila, sin
+    pasar por Mi Perfil de esa persona.
+- **`useFotosPilotos()`** (`hooks.js`, nuevo): `{ [pilotoId]: fotoUrl }` para **todos** los
+  pilotos en una sola consulta — a diferencia de `useMarcaVigentePorPiloto()`/
+  `useMarcasPorEvento()` (la marca sí varía por evento), la foto es un solo valor por piloto,
+  así que no hace falta threadear un prop desde el padre ni depender de un `eventoId`: cada
+  vista que muestra un nombre de piloto (`TablaResultados.jsx`, `TablaClasificacion.jsx`,
+  `TablaCampeonato.jsx`, `OficinaTecnica.jsx`) llama al hook directo y le pasa `fotoUrl` a su
+  `FotoPiloto`. `InscriptosLista` (`GestionEventos.jsx`) y `PilotosAdmin.jsx` ya traían
+  `pilotos`/`inscripciones` con un select anidado, así que ahí alcanzó con sumar `foto_url` a
+  ese mismo select en vez de otra consulta aparte.
+
+⚠️ **Limitación conocida, no resuelta a propósito todavía**: el recorte a cuadrado en
+`fotoPiloto.js` es **centrado y automático**, no manual — el piloto no puede reposicionar la
+cara antes de confirmar. Esto ya se había detectado antes de construir esta función (ver la
+prueba visual que se hizo con una foto real de Cesar Farallo comparada contra el placeholder,
+más arriba en la conversación de esta migración): una foto donde la persona está chica en el
+cuadro (plano general, con fondo) se recorta mal — corta por el medio de la cara en vez de
+centrarla. Se decidió avanzar igual con el recorte automático por ahora (es mejor que nada, y
+cubre bien el caso común de una foto tipo selfie/retrato) y dejar un recorte manual (arrastrar
+para reposicionar antes de confirmar) como mejora pendiente si el club lo pide después de
+probarlo con fotos reales.
+
+⚠️ Igual que toda migración/Storage/Edge Function nueva: falta correr la 0030 y deployar
+`subir-foto-piloto` en staging y producción — no verificable end-to-end desde este entorno de
+desarrollo por la misma razón de siempre (sin acceso de red a un proyecto de Supabase real).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
