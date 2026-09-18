@@ -1716,16 +1716,21 @@ vive directo en `pilotos.foto_url`.
   `pilotos`/`inscripciones` con un select anidado, así que ahí alcanzó con sumar `foto_url` a
   ese mismo select en vez de otra consulta aparte.
 
-⚠️ **Limitación conocida, no resuelta a propósito todavía**: el recorte a cuadrado en
-`fotoPiloto.js` es **centrado y automático**, no manual — el piloto no puede reposicionar la
-cara antes de confirmar. Esto ya se había detectado antes de construir esta función (ver la
-prueba visual que se hizo con una foto real de Cesar Farallo comparada contra el placeholder,
-más arriba en la conversación de esta migración): una foto donde la persona está chica en el
-cuadro (plano general, con fondo) se recorta mal — corta por el medio de la cara en vez de
-centrarla. Se decidió avanzar igual con el recorte automático por ahora (es mejor que nada, y
-cubre bien el caso común de una foto tipo selfie/retrato) y dejar un recorte manual (arrastrar
-para reposicionar antes de confirmar) como mejora pendiente si el club lo pide después de
-probarlo con fotos reales.
+**Recorte manual antes de subir** (`RecortarFoto.jsx`, resuelve la limitación de arriba): el
+recorte centrado automático que tenía primero `fotoPiloto.js` cortaba mal una foto donde la
+persona queda chica en el cuadro (plano general, con fondo) — confirmado con una prueba visual
+real (foto de Cesar Farallo comparada contra el placeholder). En vez de eso, elegir un archivo
+en `SubirFotoPiloto.jsx` abre un editor modal: el mismo círculo de 240px que después va a
+mostrar `FotoPiloto.jsx`, con la foto de fondo — el piloto arrastra para centrarla (pointer
+events, sin librería nueva) y un slider de zoom (1x a 3x) para acercar, con el offset siempre
+clampeado para que la imagen nunca deje un hueco vacío dentro del círculo. "Confirmar" dibuja
+en un `<canvas>` de 480×480 exactamente la región que se ve en el viewport (mismo cálculo de
+escala/offset, sin volver a centrar nada a ciegas) y recién ahí se llama a `subirFotoPiloto()`
+con ese blob ya recortado — `fotoPiloto.js` dejó de hacer ningún recorte por su cuenta, solo
+manda a la Edge Function lo que le llega. "Cancelar" descarta el archivo elegido sin subir
+nada. El contrato con la Edge Function `subir-foto-piloto` no cambió (sigue recibiendo
+`{pilotoId, contenidoBase64}` de un JPEG cuadrado) — este cambio es 100% frontend, no requiere
+correr nada nuevo en Supabase.
 
 ⚠️ Igual que toda migración/Storage/Edge Function nueva: falta correr la 0030 y deployar
 `subir-foto-piloto` en staging y producción — no verificable end-to-end desde este entorno de
