@@ -52,7 +52,7 @@ export default function TablaCampeonato({ data, pilotoId }) {
               </td>
               <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", fontWeight: 500, color: r.pilotoId === pilotoId ? T.amber : T.text }}>
                 <span style={{ display: "inline-flex", alignItems: "center" }}>
-                  <FotoPiloto fotoUrl={fotosPorPiloto[r.pilotoId]} size={30} style={{ marginRight: 8 }} />
+                  <FotoPiloto fotoUrl={fotosPorPiloto[r.pilotoId]} size={48} style={{ marginRight: 8 }} />
                   {r.piloto}
                   <LogoMarca marca={marcasPorPiloto[r.pilotoId]} style={{ marginLeft: 6 }} />
                 </span>

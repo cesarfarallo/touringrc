@@ -94,7 +94,7 @@ export default function TablaResultados({ data, pilotoId, marcasPorPiloto = {} }
                   {r.pos}
                 </td>
                 <td style={{ padding: "12px 16px", fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center" }}>
-                  <FotoPiloto fotoUrl={fotosPorPiloto[r.pilotoId]} size={30} style={{ marginRight: 8 }} />
+                  <FotoPiloto fotoUrl={fotosPorPiloto[r.pilotoId]} size={48} style={{ marginRight: 8 }} />
                   {podio && <IconoPodio tipo={podio.tipo} lugar={podio.lugar} />}
                   <span style={{ color: r.pilotoId === pilotoId ? T.amber : T.text, fontWeight: r.pilotoId === pilotoId ? 700 : 400 }}>
                     {r.piloto}
