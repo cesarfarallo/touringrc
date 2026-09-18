@@ -1,4 +1,4 @@
-import { User } from "lucide-react";
+import { PersonStanding } from "lucide-react";
 import { T } from "../theme";
 
 // Avatar de piloto a la izquierda del nombre, en los lugares donde se
@@ -44,7 +44,7 @@ export default function FotoPiloto({ fotoUrl, size = 36, style }) {
         ...style,
       }}
     >
-      <User size={Math.round(size * 0.6)} color={T.muted} strokeWidth={1.6} />
+      <PersonStanding size={Math.round(size * 0.75)} color={T.muted} strokeWidth={1.6} />
     </div>
   );
 }

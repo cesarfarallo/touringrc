@@ -1648,6 +1648,12 @@ rectángulo tipo carnet (~1:1.2), pero a pedido se cambió a círculo para que s
 avatar de verdad, y se subió el tamaño default (28 → 36px) para que se note más. `InscriptosLista`
 usa `size={28}` (una fila más angosta y sin tanto texto alrededor que una tabla de resultados).
 
+**Ícono del placeholder**: a pedido, se cambió el ícono `User` de lucide-react (busto/cabeza)
+por `PersonStanding` (figura de cuerpo entero) — el club pidió algo parecido a un logo de
+referencia (una silueta de pescador tipo ícono, sin el resto del branding de esa imagen), en
+escala de grises y con solo la figura, sin fondo de color. Se mantiene el mismo criterio de
+color (`T.muted`, gris — ya era escala de grises) y de fondo (`T.surfaceRaised`, neutro).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
