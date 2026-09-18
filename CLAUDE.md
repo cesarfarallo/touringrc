@@ -1648,28 +1648,25 @@ rectángulo tipo carnet (~1:1.2), pero a pedido se cambió a círculo para que s
 avatar de verdad, y se subió el tamaño default (28 → 36px) para que se note más. `InscriptosLista`
 usa `size={28}` (una fila más angosta y sin tanto texto alrededor que una tabla de resultados).
 
-**Ícono del placeholder — rediseñado dos veces a pedido**: primero se probó el ícono `User` de
+**Ícono del placeholder — rediseñado tres veces a pedido**: primero se probó el ícono `User` de
 lucide-react (busto/cabeza) en un círculo `T.surfaceRaised`; después `PersonStanding` (cuerpo
-entero) en el mismo círculo. Ninguno de los dos se parecía a lo que el club tenía en mente — un
-logo de referencia que mandaron (insignia rómbica bicolor con una silueta activa adentro, más
-wordmark y un logo chico que no correspondía reproducir). Versión final: `Placeholder`
-(`FotoPiloto.jsx`), un SVG propio dibujado a mano (no un ícono de librería, para poder controlar
-la pose) — un rombo partido en dos grises (`#E8E9EB`/`#9AA0A8`, imitando el bicolor de la
-insignia de referencia) con una silueta centrada en trazos gruesos con puntas redondeadas
-(círculo para la cabeza + `polyline`s para torso/piernas/brazo, más un trazo más fino para un
-"bastón" que sostiene, evocando la pose de la referencia) — sin texto ni logo, solo gris y
-blanco, como se pidió explícitamente.
+entero) en el mismo círculo; después un rombo bicolor con una silueta en trazos gruesos
+(imitando un primer logo de referencia que mandó el club, con una insignia rómbica y una
+silueta activa) — ninguna de las tres se pareció a lo que el club tenía en mente, y la del
+rombo además perdía todo el detalle de la pose a los 28-36px reales en que se usa el
+componente (una silueta tan chica no se lee, sin importar cuánto se engrosaran los trazos).
 
-⚠️ **Limitación conocida, no resuelta a pedido explícito todavía**: a los tamaños reales en los
-que se usa este componente (28-36px, al lado de un nombre) el detalle de la pose no se
-distingue bien — se ve como una mancha oscura dentro del rombo bicolor, que sigue leyéndose
-como una insignia intencional pero no como una silueta reconocible. Es una limitación de
-legibilidad a esa escala (cualquier ilustración con este nivel de detalle se pierde tan chica,
-no un bug puntual) — se subieron los grosores de trazo (14/12/12/10/5 → 20/18/18/16/9) para
-mejorar un poco, pero no alcanza para que la pose se lea nítida a 28-36px. Pendiente: si el club
-quiere más legibilidad a ese tamaño, la solución sería simplificar la silueta (menos detalle,
-trazos aún más gruesos) a costa de parecerse menos a la referencia — no se hizo ese trade-off
-sin confirmarlo primero, porque iría en contra del pedido explícito de "igual que la imagen".
+Versión final (la que se usa hoy): el club mandó una segunda referencia — un ícono de stock
+clásico de "piloto genérico" (gorra con visera e insignia, cara en blanco sin rasgos, mono de
+piloto con cuello alto y una insignia + un parche en el pecho) — con el pedido de usarlo en
+escala de grises. Como esa imagen es un asset de stock de terceros (marca de agua incluida, no
+algo que se pueda commitear al repo), `Placeholder` (`FotoPiloto.jsx`) es un **dibujo propio**
+que reproduce el mismo lenguaje visual (gorra + cabeza en blanco + mono con insignia y parche)
+en escala de grises puro, sobre un fondo blanco circular (mismo criterio de contraste que ya se
+usa para los dibujos de circuito y los logos de marca) — a diferencia de las tres versiones
+anteriores, esta silueta **sí se lee bien a 28-36px** (la forma general cabeza+gorra+hombros es
+reconocible aunque el parche/insignia del pecho se reduzcan a puntitos), porque son formas
+sólidas grandes en vez de trazos finos.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
