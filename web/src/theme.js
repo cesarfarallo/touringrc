@@ -26,7 +26,8 @@ export const FONTS = `
 export const RESPONSIVE_CSS = `
 @media (max-width: 640px) {
   .header-inner { height: 56px !important; padding: 0 14px !important; }
-  .header-logo { height: 38px !important; }
+  .header-logo-desktop { display: none !important; }
+  .header-logo-mobile { display: block !important; }
   .nav-tabs { display: none !important; }
   .mobile-nav-toggle { display: flex !important; }
   .mobile-nav-current { display: flex !important; }

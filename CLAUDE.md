@@ -840,6 +840,18 @@ la navegación. El favicon sigue siendo
 `web/public/favicon.svg`, con fondo circular gris oscuro (`#4B5563`), logo cian (`#00D9FF`)
 y contorno negro fino.
 
+**Logo distinto en mobile** (`web/public/logo-mobile.png`, PNG con transparencia): a pedido
+del club, el logo con el auto (`logo.png`) se lee mal a los 38px de alto que le tocaban en el
+header compacto de mobile — a ese tamaño el auto se pierde y solo queda el wordmark chico. Se
+sumó una segunda imagen (solo el wordmark "touring RC", sin el auto, con el trazo blanco
+alrededor de las letras que la hace legible más chica) que reemplaza al logo con auto **solo
+en mobile** — mismo mecanismo de dos elementos + `display:none`/`!important` en la media query
+que ya usan `.mobile-nav-toggle`/`.mobile-nav-current` (`RESPONSIVE_CSS`, `theme.js`): el
+`<img>` de escritorio suma la clase `header-logo-desktop` (se oculta a 640px o menos) y el de
+mobile (`header-logo-mobile`, oculto por default vía `style={{display:"none"}}`) se muestra
+`!important` en esa misma media query, a 34px de alto. Ningún JS decide cuál mostrar — las dos
+imágenes están siempre en el DOM, el CSS elige una.
+
 ## Calendario y cuenta regresiva
 
 El home consulta todas las fechas de `eventos` y ordena las tarjetas del calendario por fecha

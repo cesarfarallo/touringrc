@@ -269,10 +269,16 @@ export default function TouringRCApp() {
         >
           <div style={{ display: "flex", alignItems: "center" }} title="Touring 1:10 Arg">
             <img
-              className="header-logo"
+              className="header-logo header-logo-desktop"
               src="/logo.png"
               alt="Touring 1:10 Arg"
               style={{ height: 152, maxWidth: "min(340px, 30vw)", width: "auto", display: "block" }}
+            />
+            <img
+              className="header-logo-mobile"
+              src="/logo-mobile.png"
+              alt="Touring 1:10 Arg"
+              style={{ height: 34, width: "auto", display: "none" }}
             />
           </div>
           <div className="nav-tabs" style={{ display: "flex", gap: 4 }}>
