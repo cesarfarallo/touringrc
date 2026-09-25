@@ -1736,6 +1736,45 @@ correr nada nuevo en Supabase.
 `subir-foto-piloto` en staging y producción — no verificable end-to-end desde este entorno de
 desarrollo por la misma razón de siempre (sin acceso de red a un proyecto de Supabase real).
 
+## Menú de usuario y "Mi perfil" como popup (sin migración nueva)
+
+Pedido del club: que el botón de usuario del header (una vez logueado) abra un menú
+desplegable en vez de cerrar sesión directo, con dos opciones — "Ver perfil" y "Cerrar
+sesión" — y que "Ver perfil" abra la edición de foto + aviso por email en un popup en vez de
+vivir fijo en el Calendario. De paso, mostrar el avatar del piloto en el propio botón.
+
+- **`MiPerfil.jsx` se separa en dos componentes** (mismo nombre de archivo para el que se
+  queda en el Calendario, para no tener que retocar el resto de las referencias):
+  - **`MiPerfil.jsx`** (sigue viviendo fijo en el tab Calendario, solo si `logueado`): ahora
+    es **puramente texto** — los tres estados de siempre (sin vincular / pendiente de
+    aprobación / todo ok) con el mismo criterio de colores y mensajes, pero sin `FotoPiloto`
+    ni `LogoMarca` — a pedido explícito ("sin imágenes" en esta sección). Perdió el prop
+    `onCambioPiloto` (ya no tiene nada editable adentro).
+  - **`PanelPerfil.jsx`** (nuevo): el popup "Mi perfil" — mismo patrón de overlay que
+    `ModalInscriptos.jsx` (fondo oscuro, tarjeta centrada, click afuera para cerrar). Adentro,
+    solo lo que el propio piloto puede editar: `SubirFotoPiloto` (foto + botón "Cambiar
+    foto") y `TogglePreferenciaEmail` (el checkbox de aviso por email, migración 0026 —
+    se mudó tal cual desde `MiPerfil.jsx`, sin cambios de lógica). Nada de nombre/roles/
+    estado de vinculación — eso lo sigue mostrando el cartel de Calendario o lo edita un
+    admin desde Pilotos. Si todavía no hay ningún piloto vinculado a la cuenta, muestra un
+    aviso en vez de un formulario vacío.
+- **Botón de usuario con avatar y menú** (`App.jsx`): logueado, el botón ahora muestra
+  `<FotoPiloto fotoUrl={piloto?.foto_url} size={20} />` en vez del ícono `User` fijo, al lado
+  del nombre — mismo componente que ya se usa en el resto de la app, con su propio
+  placeholder si el piloto no tiene foto cargada. El click ya no dispara `salir()` directo:
+  togglea `menuUsuarioAbierto`, que despliega un menú de dos botones ("Ver perfil" → abre
+  `PanelPerfil`, "Cerrar sesión" → llama a `salir()` de siempre). El menú se cierra solo con
+  un overlay invisible (`position:fixed, inset:0`) detrás del panel desplegable, mismo
+  truco que el backdrop de un modal pero sin oscurecer la pantalla — cualquier click afuera
+  del menú lo cierra. `perfilAbierto` es un estado separado de `menuUsuarioAbierto` (el menú
+  se cierra al elegir "Ver perfil", pero el popup se abre aparte) para que el popup siga
+  visible aunque el menú ya se haya cerrado.
+- Verificado visualmente en este entorno (Vite dev server + `headless_shell` con sesión y
+  piloto mockeados a mano, ya que no hay acceso de red a Supabase): el botón muestra
+  avatar+nombre, el menú despliega las dos opciones, y el popup muestra foto+checkbox sin
+  nada más — sin necesidad de ninguna migración ni redeploy de Edge Function, es 100%
+  frontend.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History, Menu, X, ChevronDown } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History, Menu, X, ChevronDown, LogOut } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -25,6 +25,8 @@ import TablaClasificacion from "./components/TablaClasificacion";
 import TablaCampeonato from "./components/TablaCampeonato";
 import LoginCard from "./components/LoginCard";
 import MiPerfil from "./components/MiPerfil";
+import PanelPerfil from "./components/PanelPerfil";
+import FotoPiloto from "./components/FotoPiloto";
 import AdminPanel from "./components/AdminPanel";
 import CircuitosView from "./components/CircuitosView";
 import OficinaTecnica from "./components/OficinaTecnica";
@@ -63,6 +65,8 @@ const ES_DEV = import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "staging"
 export default function TouringRCApp() {
   const [tab, setTab] = useState("calendario");
   const [menuMobileAbierto, setMenuMobileAbierto] = useState(false);
+  const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
+  const [perfilAbierto, setPerfilAbierto] = useState(false);
   const [inscripcionVersion, setInscripcionVersion] = useState(0);
   const [formularioDestacadoAbierto, setFormularioDestacadoAbierto] = useState(false);
   const [compartiendoInscriptos, setCompartiendoInscriptos] = useState(false);
@@ -277,26 +281,97 @@ export default function TouringRCApp() {
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              onClick={logueado ? salir : ingresar}
-              title={logueado ? "Cerrar sesión" : "Ingresar con Google"}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: `1px solid ${T.line}`,
-                background: T.surfaceRaised,
-                color: T.text,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-              }}
-            >
-              <User size={14} />
-              {logueado ? nombreParaMostrar(piloto, session) : "Ingresar con Google"}
-            </button>
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => (logueado ? setMenuUsuarioAbierto((v) => !v) : ingresar())}
+                title={logueado ? nombreParaMostrar(piloto, session) : "Ingresar con Google"}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.line}`,
+                  background: T.surfaceRaised,
+                  color: T.text,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                {logueado ? <FotoPiloto fotoUrl={piloto?.foto_url} size={20} /> : <User size={14} />}
+                {logueado ? nombreParaMostrar(piloto, session) : "Ingresar con Google"}
+              </button>
+
+              {menuUsuarioAbierto && (
+                <>
+                  <div
+                    onClick={() => setMenuUsuarioAbierto(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 998 }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      right: 0,
+                      minWidth: 170,
+                      background: T.surface,
+                      border: `1px solid ${T.line}`,
+                      borderRadius: 8,
+                      boxShadow: "0 12px 24px rgba(0,0,0,0.35)",
+                      overflow: "hidden",
+                      zIndex: 999,
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        setMenuUsuarioAbierto(false);
+                        setPerfilAbierto(true);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: "none",
+                        background: "transparent",
+                        color: T.text,
+                        fontSize: 13,
+                        fontFamily: "Inter, sans-serif",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <User size={14} /> Ver perfil
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuUsuarioAbierto(false);
+                        salir();
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: "none",
+                        borderTop: `1px solid ${T.line}`,
+                        background: "transparent",
+                        color: T.text,
+                        fontSize: 13,
+                        fontFamily: "Inter, sans-serif",
+                        textAlign: "left",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <LogOut size={14} /> Cerrar sesión
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               className="mobile-nav-toggle"
               onClick={() => setMenuMobileAbierto((v) => !v)}
@@ -412,13 +487,7 @@ export default function TouringRCApp() {
 
         {!logueado && tab === "calendario" && <LoginCard />}
         {logueado && tab === "calendario" && (
-          <MiPerfil
-            session={session}
-            piloto={piloto}
-            loading={cargandoPiloto}
-            esAdmin={esAdminReal}
-            onCambioPiloto={recargarPiloto}
-          />
+          <MiPerfil session={session} piloto={piloto} loading={cargandoPiloto} esAdmin={esAdminReal} />
         )}
 
         {tab === "calendario" && (
@@ -766,6 +835,15 @@ export default function TouringRCApp() {
           porClase={modalInscriptosPorClase}
           error={errorModalInscriptos}
           onClose={() => setModalInscriptosAbierto(false)}
+        />
+      )}
+
+      {perfilAbierto && (
+        <PanelPerfil
+          session={session}
+          piloto={piloto}
+          onCambioPiloto={recargarPiloto}
+          onClose={() => setPerfilAbierto(false)}
         />
       )}
     </div>
