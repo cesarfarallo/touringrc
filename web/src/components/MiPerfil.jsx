@@ -100,14 +100,16 @@ export default function MiPerfil({ session, piloto, loading, esAdmin, onCambioPi
         gap: 4,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {faltaVincular ? <AlertTriangle size={14} /> : pendienteAprobacion ? <Clock size={14} /> : <CheckCircle2 size={14} />}
         {loading && "Verificando piloto vinculado..."}
         {ok && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <FotoPiloto fotoUrl={piloto?.foto_url} size={22} />
-            Conectado como <strong>{session.user.email}</strong> · piloto vinculado:{" "}
-            <strong>{nombre || "(sin nombre todavía)"}</strong>
+            <span>
+              Conectado como <strong>{session.user.email}</strong> · piloto vinculado:{" "}
+              <strong>{nombre || "(sin nombre todavía)"}</strong>
+            </span>
             <LogoMarca marca={marca} />
           </span>
         )}
