@@ -299,7 +299,7 @@ export default function TouringRCApp() {
                   cursor: "pointer",
                 }}
               >
-                {logueado ? <FotoPiloto fotoUrl={piloto?.foto_url} size={20} /> : <User size={14} />}
+                {logueado ? <FotoPiloto fotoUrl={piloto?.foto_url} size={40} /> : <User size={14} />}
                 {logueado ? nombreParaMostrar(piloto, session) : "Ingresar con Google"}
               </button>
 
