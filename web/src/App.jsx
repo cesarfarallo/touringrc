@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History, Menu, X, ChevronDown, LogOut } from "lucide-react";
+import { Calendar, Trophy, Flag, User, ShieldCheck, AlertTriangle, UserPlus, Map, Share2, Eye, Wrench, History, Menu, X, ChevronDown, LogOut, Download } from "lucide-react";
 import { T, FONTS, RESPONSIVE_CSS } from "./theme";
 import {
   useEventos,
@@ -14,8 +14,12 @@ import {
   useGanadoresPorEvento,
   useFrasesDestacadas,
   useMarcasPorEvento,
+  useMarcaVigentePorPiloto,
+  useFotosPilotos,
+  usePaisesPilotos,
 } from "./hooks";
 import { supabase } from "./lib/supabase";
+import { descargarImagenTop10 } from "./lib/imagenSocial";
 import NavTab from "./components/NavTab";
 import StartLights from "./components/StartLights";
 import EventoCard, { FormularioInscripcion, inscripcionAbierta } from "./components/EventoCard";
@@ -56,6 +60,35 @@ async function obtenerInscriptosPorClase(eventoId) {
 function nombreParaMostrar(piloto, session) {
   const nombre = [piloto?.first_name, piloto?.last_name].filter(Boolean).join(" ");
   return nombre || session?.user?.email || "Piloto";
+}
+
+// Botón "Descargar imagen" (PNG top 10 para Instagram) -- mismo componente
+// para Resultados finales/Clasificación/Campeonato, cambia solo el `tipo`
+// que le pasa a `imagenSocial.js`.
+function BotonDescargarImagen({ onClick, generando, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || generando}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 12px",
+        borderRadius: 8,
+        border: `1px solid ${T.line}`,
+        background: "transparent",
+        color: disabled || generando ? T.muted : T.text,
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: disabled || generando ? "default" : "pointer",
+        opacity: disabled || generando ? 0.6 : 1,
+      }}
+    >
+      <Download size={14} />
+      {generando ? "Generando..." : "Descargar imagen"}
+    </button>
+  );
 }
 
 // Mismo criterio que DevRibbon.jsx: prende solo en local (npm run dev) o
@@ -113,6 +146,16 @@ export default function TouringRCApp() {
   const { frases: frasesDestacadas, loading: cargandoFrasesDestacadas } = useFrasesDestacadas(
     cargandoCampeonato ? "" : campeonato?.id ?? null
   );
+  // Para el botón "Descargar imagen" (top 10 para Instagram) -- se
+  // consultan acá aparte en vez de threadear props desde las tablas
+  // (TablaResultados/TablaClasificacion/TablaCampeonato ya las llaman
+  // internamente para sí mismas) porque App.jsx necesita esos mismos datos
+  // para armar las `filas` que le manda a `imagenSocial.js`.
+  const marcaVigentePorPiloto = useMarcaVigentePorPiloto();
+  const fotosPorPiloto = useFotosPilotos();
+  const paisesPorPiloto = usePaisesPilotos();
+  const [generandoImagen, setGenerandoImagen] = useState(false);
+  const [errorImagen, setErrorImagen] = useState(null);
 
   const clases = Object.keys(campeonatoPorClase);
   const [clase, setClase] = useState(null);
@@ -243,6 +286,70 @@ export default function TouringRCApp() {
       setErrorModalInscriptos(err.message ?? String(err));
     } finally {
       setCargandoModalInscriptos(false);
+    }
+  }
+
+  function nombreArchivoSeguro(texto) {
+    return (texto ?? "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .toLowerCase();
+  }
+
+  // Botón "Descargar imagen" (top 10 para Instagram) de Resultados
+  // finales/Clasificación/Campeonato -- arma las `filas` a partir de los
+  // mismos datos que ya muestra la tabla de esa vista más
+  // foto/marca/país de cada piloto, y le pasa todo a `imagenSocial.js`
+  // (canvas puro, sin backend). La marca es la vigente (no ligada a un
+  // evento puntual) para Campeonato, y la de ESE evento para
+  // Resultados/Clasificación -- mismo criterio que ya usan
+  // TablaCampeonato.jsx vs. TablaResultados.jsx/TablaClasificacion.jsx.
+  async function handleDescargarImagen(tipo) {
+    setErrorImagen(null);
+    const datos =
+      tipo === "campeonato"
+        ? campeonatoPorClase[claseActiva]
+        : tipo === "resultados"
+          ? resultadosPorClase[claseActiva]
+          : clasificacionPorClase[claseActiva];
+    if (!datos || datos.length === 0) return;
+
+    const marcas = tipo === "campeonato" ? marcaVigentePorPiloto : marcasPorPiloto;
+    const filas = datos.map((r) => ({
+      pos: r.pos,
+      nombre: r.piloto,
+      fotoUrl: fotosPorPiloto[r.pilotoId],
+      marca: marcas[r.pilotoId],
+      pais: paisesPorPiloto[r.pilotoId],
+      stat: tipo === "campeonato" ? String(r.puntos) : r.resultado,
+      tq: r.tq,
+      vr: r.vueltaRapida,
+    }));
+
+    const evento = tipo === "campeonato" ? null : eventos.find((e) => e.id === eventoResultadosIdActivo);
+    const fechaEvento = evento
+      ? new Date(`${evento.fecha}T00:00:00`).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : "";
+
+    const eyebrow = tipo === "campeonato" ? campeonato?.nombre ?? "" : `${campeonato?.nombre ?? ""} · ${evento?.nombre ?? ""}`;
+    const footerTexto =
+      tipo === "campeonato"
+        ? "Puntos acumulados de la temporada"
+        : tipo === "resultados"
+          ? `Resultados finales — ${evento?.nombre ?? ""}, ${fechaEvento}`
+          : `Clasificación — ${evento?.nombre ?? ""}, ${fechaEvento}`;
+
+    const nombreArchivo = `${tipo}-${nombreArchivoSeguro(claseActiva)}${evento ? "-" + nombreArchivoSeguro(evento.nombre) : ""}.png`;
+
+    setGenerandoImagen(true);
+    try {
+      await descargarImagenTop10({ tipo, eyebrow, subtitulo: claseActiva ?? "", footerTexto, filas, nombreArchivo });
+    } catch (err) {
+      setErrorImagen(err.message ?? String(err));
+    } finally {
+      setGenerandoImagen(false);
     }
   }
 
@@ -729,7 +836,16 @@ export default function TouringRCApp() {
 
             {tab === "resultados" ? (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    marginBottom: errorImagen ? 6 : 16,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ color: T.muted, fontSize: 12, fontFamily: "Inter, sans-serif" }}>Fecha:</span>
                     <select
@@ -783,7 +899,19 @@ export default function TouringRCApp() {
                       </button>
                     ))}
                   </div>
+                  <BotonDescargarImagen
+                    onClick={() => handleDescargarImagen(subTabResultados === "finales" ? "resultados" : "clasificacion")}
+                    generando={generandoImagen}
+                    disabled={
+                      subTabResultados === "finales"
+                        ? !resultadosPorClase[claseActiva]?.length
+                        : !clasificacionPorClase[claseActiva]?.length
+                    }
+                  />
                 </div>
+                {errorImagen && (
+                  <div style={{ color: T.red, fontSize: 12, marginBottom: 16 }}>{errorImagen}</div>
+                )}
 
                 {subTabResultados === "finales" ? (
                   <>
@@ -818,15 +946,32 @@ export default function TouringRCApp() {
               <>
                 {cargandoCampeonato && <div style={{ color: T.muted, fontSize: 13 }}>Cargando campeonato...</div>}
                 {campeonato && (
-                  <div style={{ color: T.muted, fontSize: 13, marginBottom: 12, fontFamily: "JetBrains Mono, monospace" }}>
-                    {campeonato.nombre.toUpperCase()}
-                    {campeonato.fecha_inicio && campeonato.fecha_fin
-                      ? ` — ${new Date(campeonato.fecha_inicio).toLocaleDateString("es-AR")} al ${new Date(
-                          campeonato.fecha_fin
-                        ).toLocaleDateString("es-AR")}`
-                      : ""}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      flexWrap: "wrap",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div style={{ color: T.muted, fontSize: 13, fontFamily: "JetBrains Mono, monospace" }}>
+                      {campeonato.nombre.toUpperCase()}
+                      {campeonato.fecha_inicio && campeonato.fecha_fin
+                        ? ` — ${new Date(campeonato.fecha_inicio).toLocaleDateString("es-AR")} al ${new Date(
+                            campeonato.fecha_fin
+                          ).toLocaleDateString("es-AR")}`
+                        : ""}
+                    </div>
+                    <BotonDescargarImagen
+                      onClick={() => handleDescargarImagen("campeonato")}
+                      generando={generandoImagen}
+                      disabled={!campeonatoPorClase[claseActiva]?.length}
+                    />
                   </div>
                 )}
+                {errorImagen && <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{errorImagen}</div>}
                 {claseActiva && campeonatoPorClase[claseActiva] &&                 <TablaCampeonato data={campeonatoPorClase[claseActiva]} pilotoId={piloto?.id} />}
               </>
             )}

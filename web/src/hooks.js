@@ -282,6 +282,35 @@ export function useFotosPilotos() {
   return porPiloto;
 }
 
+// País de cada piloto (`pilotos.country`, código de 3 letras tipo 'ARG'):
+// { [pilotoId]: country }. Hook aparte en vez de sumarlo a `useFotosPilotos()`
+// para no cambiar la forma de ese hook (media app ya asume que devuelve
+// directo la URL, no un objeto) -- hoy solo lo usa el generador de
+// imágenes para redes (`imagenSocial.js`, bandera junto al nombre).
+export function usePaisesPilotos() {
+  const [porPiloto, setPorPiloto] = useState({});
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("pilotos")
+      .select("id, country")
+      .then(({ data, error }) => {
+        if (!activo || error) return;
+        const agrupado = {};
+        for (const fila of data ?? []) {
+          if (fila.country) agrupado[fila.id] = fila.country;
+        }
+        setPorPiloto(agrupado);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  return porPiloto;
+}
+
 // Catálogo completo de marcas_autos (migración 0029), para el panel admin
 // -- las que se autogeneran con nombre genérico ("Marca sin nombre N") al
 // importar un SeriesResultReport.xls con un logo nuevo se renombran acá.

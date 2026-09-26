@@ -1787,6 +1787,90 @@ vivir fijo en el Calendario. De paso, mostrar el avatar del piloto en el propio 
   nada más — sin necesidad de ninguna migración ni redeploy de Edge Function, es 100%
   frontend.
 
+## Imágenes para Instagram (top 10, sin migración nueva)
+
+Pedido del club: poder generar rápido una imagen prolija para publicar en Instagram con el
+detalle de una fecha o del campeonato — una por Campeonato, una por Resultados finales y una
+por Clasificación, cada una por categoría. Mismo criterio que el resto de la app (CSV de
+inscriptos, texto de "Compartir"): **100% client-side con `<canvas>`, sin backend ni servicio
+externo** — no hizo falta ninguna migración ni Edge Function nueva, toda la data ya estaba
+disponible (`pilotos.foto_url`, `pilotos.country`, `marcas_autos`/`piloto_marca_evento`).
+
+- **Diseño validado primero como mockup HTML estático**, con datos de prueba, antes de escribir
+  ninguna línea de canvas — fondo con una foto real de la pista (oscurecida con un filtro CSS +
+  degradé, mismo criterio de contraste que ya se usó para los dibujos de circuito/logos de
+  marca), tarjetas tipo "vidrio esmerilado" para el podio y las filas 4-10, copas más realistas
+  (con degradé y base) para el 1°/2°/3° de Campeonato y Resultados finales. **Clasificación NO
+  lleva copas** — a diferencia de ganar una carrera o el campeonato, la posición de largada no
+  es un resultado "ganado" (mismo criterio real que la F1: no dan trofeo por clasificar), así
+  que usa una medalla numerada lisa en su lugar.
+- **Tipografía**: se probó primero pedir la tipografía oficial de Fórmula 1, pero es un asset
+  con licencia propietaria de Formula One World Championship Limited — se descartó por lo
+  mismo que ya se había descartado antes reproducir el ícono de stock con marca de agua del
+  placeholder de `FotoPiloto.jsx` (no usar assets de terceros sin licencia clara, aunque estén
+  disponibles para descargar). Se usó **Baloo 2** (Google Fonts, licencia abierta) en su lugar
+  — a pedido, "una fuente un poco más redondeada" que la primera alternativa probada
+  (Titillium Web). Se carga on-demand solo para esta función (no se agrega a `theme.js`, que
+  usa Oswald/Inter/JetBrains Mono para el resto del sitio) para no sumarle peso al resto de la
+  app.
+- **Técnica de porteo pixel-perfect**: el diseño se armó y aprobó primero como HTML/CSS
+  (mockups descartables, no versionados en el repo), y las posiciones/tamaños exactos que usa
+  `imagenSocial.js` salen de medir ese mockup aprobado con `getBoundingClientRect()` (un harness
+  ad-hoc, no committeado) en vez de recalcular a mano la geometría de flexbox/CSS en términos de
+  canvas (propenso a error, canvas no tiene layout automático).
+- **`web/src/lib/imagenSocial.js`** (`descargarImagenTop10({ tipo, eyebrow, subtitulo,
+  footerTexto, filas, nombreArchivo })`): dibuja un PNG de 1080×1350 (formato post de
+  Instagram) con canvas puro. `tipo` es `"campeonato"` | `"resultados"` | `"clasificacion"` —
+  determina si hay copas o medallas numeradas, y si las filas 4-10 muestran los tags TQ/VR
+  (solo `"resultados"`, no tiene sentido en clasificación ni en el acumulado de campeonato).
+  Cada fila lleva nombre, avatar (`FotoPiloto`, mismo placeholder gris que el resto del sitio
+  si no hay foto cargada), bandera (emoji, vía una tabla de códigos de país de 3 letras —
+  variantes ISO-3166 e IOC para los países sudamericanos, porque no está confirmado cuál usa
+  Live Timing en `pilotos.country`) y logo de marca (`marcas_autos`/`piloto_marca_evento`,
+  mismo dato que ya muestra `LogoMarca.jsx` en el resto de la app). Todas las imágenes se cargan
+  con `Promise.all` antes de dibujar; si alguna falla (red, CORS, sin foto/logo cargado), se
+  degrada con gracia (sin foto → placeholder, sin logo → no se dibuja nada) en vez de romper la
+  imagen completa.
+- **Frontend** (`App.jsx`): botón "Descargar imagen" (`BotonDescargarImagen`, ícono `Download`)
+  al lado del selector "Resultados finales"/"Clasificación" en el tab Resultados, y al lado del
+  nombre del campeonato en el tab Campeonato. Arma las `filas` cruzando los mismos datos que ya
+  muestra la tabla de esa vista (`resultadosPorClase`/`clasificacionPorClase`/
+  `campeonatoPorClase`, ya vienen de `hooks.js`) con foto/marca/país de cada piloto — la marca
+  es la **vigente** (`useMarcaVigentePorPiloto()`) para Campeonato (no está atado a una fecha
+  puntual) y la de **ese evento** (`useMarcasPorEvento()`, ya se llamaba en `App.jsx` para las
+  tablas) para Resultados/Clasificación, mismo criterio que ya usa `TablaCampeonato.jsx` vs.
+  `TablaResultados.jsx`/`TablaClasificacion.jsx`. `useFotosPilotos()` y la nueva
+  `usePaisesPilotos()` (mismo patrón que `useFotosPilotos()`, `{ [pilotoId]: country }`) se
+  llaman de nuevo directo en `App.jsx` en vez de threadearlas como prop desde las tablas — se
+  aceptó duplicar esas consultas (ya las llaman también `TablaResultados.jsx` y compañía para
+  sí mismas) en vez de tocar tres componentes que ya funcionaban, mismo criterio de mínimo
+  impacto que ya usaba `useMarcasPorEvento` en este mismo archivo.
+
+⚠️ **Bug encontrado al verificar con datos de prueba reales**: `dibujarLogoMarca()` dibujaba
+el círculo blanco de fondo del logo de marca **siempre**, incluso cuando el piloto no tenía
+ninguna marca cargada (`img` null) — lo cual es el caso común (no todos los pilotos tienen un
+`SeriesResultReport.xls` con su marca ya sincronizada). El círculo blanco vacío quedaba flotando
+sobre el layout, superpuesto al texto del resultado (`stat`) en las filas 4-10 y pisando parte
+de los dígitos. Corregido: la función devuelve antes de dibujar nada si no hay imagen.
+
+⚠️ **Segundo bug encontrado en la misma verificación**: el subtítulo (nombre de la categoría,
+ej. "TOURING ECO MODIFIED") se veía roto — letras faltantes/superpuestas ("TOUR NG ECOMOD
+FED"). La causa real: `ctx.textAlign` quedaba en `"right"` desde el dibujo del título grande
+(línea anterior en el mismo canvas) y `textoEspaciadoDerecha()` (letter-spacing manual,
+carácter por carácter) asume alineación izquierda al calcular la posición `x` de cada letra —
+con `textAlign="right"` cada carácter se dibujaba ancorado por su borde derecho en vez del
+izquierdo, corriendo y superponiendo letras entre sí. Corregido seteando `ctx.textAlign =
+"left"` al principio de `textoEspaciadoDerecha()`, para que la función sea robusta sin importar
+en qué estado haya dejado el `ctx` el dibujo anterior.
+
+✅ **Verificado con datos de prueba** (no reales de Supabase, mismo motivo de siempre: sin
+acceso de red a un proyecto real desde este entorno) usando la técnica de `headless_shell` +
+un harness que intercepta el `<a download>` para mostrar el PNG resultante en la página — las
+tres variantes (Campeonato con copas, Resultados finales con tags TQ/VR, Clasificación con
+medallas numeradas) generan correctamente después de los dos fixes de arriba. Falta probarlo
+con datos reales en staging (fotos/marcas/banderas reales, nombres largos, más de 10
+pilotos en una categoría) antes de confirmarlo en producción.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
