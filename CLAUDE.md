@@ -1924,6 +1924,21 @@ nombre/apellido/email no necesitó nada nuevo en su momento), así que `country`
 escribir, solo faltaba el campo en la UI. `usePilotos()` (`hooks.js`) suma `country` al
 `select()` para que `PilotosAdmin.jsx` tenga el dato disponible.
 
+⚠️ **Bug encontrado en producción — nombre largo se sale de la tarjeta del podio**: el nombre
+del podio se dibujaba siempre al tamaño de fuente nominal (27/22/22px según el puesto), sin
+ningún límite de ancho — con un nombre de dos apellidos o compuesto, el texto se salía de los
+bordes de la tarjeta en vez de recortarse o acomodarse. `dibujarTarjetaPodio()` ahora achica la
+fuente del renglón "bandera + nombre" (los dos juntos, para que sigan viéndose proporcionados)
+en pasos del 5% hasta que entre en el ancho de la tarjeta (`w - 32`), con un piso del 65% del
+tamaño nominal para que nunca quede ilegible — verificado con nombres de hasta tres palabras
+("Sebastian Rodriguez Fernandez") en las tres tarjetas del podio a la vez, sin superponerse ni
+salirse. A propósito el `cursor`/alto de fila que viene después (logo de marca, stat) sigue
+usando el tamaño **nominal**, no el achicado — así un nombre largo nunca corre el resto del
+contenido de la tarjeta ni arriesga la superposición con el stat (el caso más ajustado,
+Campeonato con fuente de puntos de 54px, ya tenía poco margen antes de este fix). Las filas
+4-10 no se tocaron (el pedido era específico del podio, y ahí el ancho disponible es mucho
+mayor).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

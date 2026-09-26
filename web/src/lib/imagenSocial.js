@@ -436,13 +436,31 @@ function dibujarTarjetaPodio(ctx, opts) {
   }
   cursor += avatarSize;
 
-  // bandera + nombre (grupo centrado)
+  // bandera + nombre (grupo centrado) -- un nombre largo (dos apellidos,
+  // nombre compuesto) puede no entrar en el ancho de la tarjeta al tamaño
+  // de fuente nominal; en vez de dejarlo salirse de la caja, se achica la
+  // fuente (nombre + bandera juntos, para que sigan viéndose proporcionados
+  // entre sí) hasta que entre, con un piso del 65% para que nunca quede
+  // ilegible. El renglón sigue ocupando el mismo alto de siempre (el
+  // `cursor`/`centerY` de abajo usan el tamaño nominal, no el achicado) --
+  // así achicar un nombre largo no corre el logo de marca ni el stat que
+  // vienen después.
   cursor += 12;
   const nombreUpper = nombre.toUpperCase();
-  ctx.font = `800 ${nombreFontSize}px "Baloo 2"`;
-  const nombreAncho = ctx.measureText(nombreUpper).width;
-  const banderaAncho = paisCode ? nombreFontSize * 0.9 : 0;
+  const anchoMaximoNombre = w - 32;
+  let escalaNombre = 1;
+  let fontSizeNombre = nombreFontSize;
+  ctx.font = `800 ${fontSizeNombre}px "Baloo 2"`;
+  let nombreAncho = ctx.measureText(nombreUpper).width;
+  let banderaAncho = paisCode ? fontSizeNombre * 0.9 : 0;
   const gapBandera = paisCode ? 6 : 0;
+  while (banderaAncho + gapBandera + nombreAncho > anchoMaximoNombre && escalaNombre > 0.65) {
+    escalaNombre -= 0.05;
+    fontSizeNombre = Math.round(nombreFontSize * escalaNombre);
+    ctx.font = `800 ${fontSizeNombre}px "Baloo 2"`;
+    nombreAncho = ctx.measureText(nombreUpper).width;
+    banderaAncho = paisCode ? fontSizeNombre * 0.9 : 0;
+  }
   let px = cx - (banderaAncho + gapBandera + nombreAncho) / 2;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
@@ -452,7 +470,7 @@ function dibujarTarjetaPodio(ctx, opts) {
     dibujarBandera(ctx, paisCode, px, centerY - bh / 2, banderaAncho, bh);
     px += banderaAncho + gapBandera;
   }
-  ctx.font = `800 ${nombreFontSize}px "Baloo 2"`;
+  ctx.font = `800 ${fontSizeNombre}px "Baloo 2"`;
   ctx.fillStyle = COLOR.text;
   ctx.fillText(nombreUpper, px, centerY);
   cursor += Math.round(nombreFontSize * 1.05);
