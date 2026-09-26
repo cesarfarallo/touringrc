@@ -1911,8 +1911,18 @@ simplemente no dibuja nada (no hay forma de inventar el dato), igual que antes.
 se completa desde `GenericImport.csv` (columna `Country`, ver `sync_pilotos`/`get_or_create_clase`
 más arriba) o `EventVerification-*.xls` (`cargar_roster.py`). Un piloto creado por un login sin
 match, o dado de alta a mano desde `PilotosAdmin.jsx`, no tiene ese dato salvo que un admin lo
-cargue después a mano — no hay ningún campo editable para `country` en la web hoy. Es un hueco
-de datos esperado, no algo que este fix resuelva.
+cargue después a mano.
+
+**País editable a mano** (`PaisEditable`, `PilotosAdmin.jsx`, a pedido inmediatamente después de
+lo de arriba): mismo patrón de `EmailEditable` (click para abrir, `<select>` + Guardar/Cancelar)
+pero con un `<select>` en vez de un input libre — las opciones salen de `PAISES` (nueva
+constante exportada desde `imagenSocial.js`, un código canónico por cada país que sabe dibujar
+`FLAGS`, sin las variantes de `SINONIMOS_PAIS`) para que no se pueda cargar a mano un código que
+después no dibuje ninguna bandera en las imágenes de Instagram. Sin migración nueva: la policy
+de `update` de `pilotos` para admin ya es de cualquier columna (mismo motivo por el que editar
+nombre/apellido/email no necesitó nada nuevo en su momento), así que `country` ya se podía
+escribir, solo faltaba el campo en la UI. `usePilotos()` (`hooks.js`) suma `country` al
+`select()` para que `PilotosAdmin.jsx` tenga el dato disponible.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

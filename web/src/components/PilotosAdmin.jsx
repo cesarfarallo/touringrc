@@ -8,6 +8,7 @@ import VinculosPendientes from "./VinculosPendientes";
 import NombreEditable from "./PilotoEditable";
 import LogoMarca from "./LogoMarca";
 import SubirFotoPiloto from "./SubirFotoPiloto";
+import { PAISES } from "../lib/imagenSocial";
 
 function EmailEditable({ piloto, onGuardado }) {
   const [editando, setEditando] = useState(false);
@@ -82,6 +83,115 @@ function EmailEditable({ piloto, onGuardado }) {
             boxSizing: "border-box",
           }}
         />
+        <button
+          onClick={guardar}
+          disabled={guardando}
+          style={{
+            border: "none",
+            background: `${T.teal}22`,
+            color: T.teal,
+            borderRadius: 6,
+            padding: "4px 8px",
+            fontSize: 11,
+            cursor: guardando ? "default" : "pointer",
+          }}
+        >
+          {guardando ? "..." : "Guardar"}
+        </button>
+        <button
+          onClick={() => setEditando(false)}
+          style={{ border: "none", background: "transparent", color: T.muted, fontSize: 11, cursor: "pointer" }}
+        >
+          Cancelar
+        </button>
+      </div>
+      {error && <div style={{ color: T.red, fontSize: 11 }}>{error}</div>}
+    </div>
+  );
+}
+
+// Completa/corrige `pilotos.country` a mano -- mismo patrón que
+// `EmailEditable` (click para abrir, Guardar/Cancelar), pero con un
+// `<select>` en vez de un input libre: los códigos de país tienen que
+// matchear los que `imagenSocial.js` sabe dibujar como bandera (`PAISES`,
+// mismo archivo que arma las imágenes de Instagram) -- un texto libre
+// podría traer un código que no dibuje ninguna bandera. Casi siempre este
+// dato viene de Live Timing (`GenericImport.csv`/`EventVerification-*.xls`);
+// esto es solo para los pilotos que no pasaron por esa vía (login sin
+// match, alta manual).
+function PaisEditable({ piloto, onGuardado }) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(piloto.country ?? "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function guardar() {
+    setGuardando(true);
+    setError(null);
+    const { error } = await supabase
+      .from("pilotos")
+      .update({ country: valor || null })
+      .eq("id", piloto.id);
+    setGuardando(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEditando(false);
+    onGuardado();
+  }
+
+  const paisActual = PAISES.find((p) => p.code === piloto.country);
+
+  if (!editando) {
+    return (
+      <button
+        onClick={() => {
+          setValor(piloto.country ?? "");
+          setEditando(true);
+        }}
+        title="Editar país a mano"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          color: T.muted,
+          fontFamily: "Inter, sans-serif",
+          fontSize: 12,
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {paisActual ? paisActual.nombre : "Sin país"} <Pencil size={11} />
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <select
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          autoFocus
+          style={{
+            background: T.surfaceRaised,
+            border: `1px solid ${T.line}`,
+            borderRadius: 6,
+            padding: "4px 8px",
+            color: T.text,
+            fontSize: 12,
+          }}
+        >
+          <option value="">Sin especificar</option>
+          {PAISES.map((p) => (
+            <option key={p.code} value={p.code}>
+              {p.nombre}
+            </option>
+          ))}
+        </select>
         <button
           onClick={guardar}
           disabled={guardando}
@@ -420,6 +530,7 @@ function FilaPiloto({ piloto, roles, rolesDelPiloto, trabajandoRol, onToggleRol,
               <LogoMarca marca={marca} />
             </div>
             <EmailEditable piloto={piloto} onGuardado={onGuardado} />
+            <PaisEditable piloto={piloto} onGuardado={onGuardado} />
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>

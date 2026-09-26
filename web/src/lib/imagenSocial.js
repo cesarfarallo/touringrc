@@ -67,6 +67,34 @@ const FLAGS = {
 };
 const SINONIMOS_PAIS = { URU: "URY", CHI: "CHL", PAR: "PRY", DEU: "GER", PRT: "POR" };
 
+// Lista de países seleccionables (`PilotosAdmin.jsx`, para completar
+// `pilotos.country` a mano) -- un código canónico por cada entrada real de
+// `FLAGS` de arriba (sin las variantes de `SINONIMOS_PAIS`, esas son solo
+// para normalizar lo que ya vino de Live Timing, no hace falta ofrecerlas
+// las dos en un `<select>`). Exportada desde acá para que la lista de
+// países que se pueden elegir y la lista de banderas que efectivamente se
+// dibujan no se desincronicen con el tiempo.
+export const PAISES = [
+  { code: "ARG", nombre: "Argentina" },
+  { code: "URY", nombre: "Uruguay" },
+  { code: "BRA", nombre: "Brasil" },
+  { code: "CHL", nombre: "Chile" },
+  { code: "PRY", nombre: "Paraguay" },
+  { code: "BOL", nombre: "Bolivia" },
+  { code: "PER", nombre: "Perú" },
+  { code: "ECU", nombre: "Ecuador" },
+  { code: "COL", nombre: "Colombia" },
+  { code: "VEN", nombre: "Venezuela" },
+  { code: "MEX", nombre: "México" },
+  { code: "USA", nombre: "Estados Unidos" },
+  { code: "ESP", nombre: "España" },
+  { code: "ITA", nombre: "Italia" },
+  { code: "FRA", nombre: "Francia" },
+  { code: "GER", nombre: "Alemania" },
+  { code: "GBR", nombre: "Reino Unido" },
+  { code: "POR", nombre: "Portugal" },
+];
+
 function codigoBandera(pais) {
   if (!pais) return null;
   const code = pais.trim().toUpperCase();

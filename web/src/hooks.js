@@ -85,7 +85,7 @@ export function usePilotos() {
     setLoading(true);
     supabase
       .from("pilotos")
-      .select("id, first_name, last_name, email, auth_user_id, created_at, foto_url")
+      .select("id, first_name, last_name, email, auth_user_id, created_at, foto_url, country")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (!activo) return;
