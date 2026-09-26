@@ -1951,6 +1951,9 @@ espacio vertical. Por separado, se sacó la URL del sitio (`touring1:10arg.com.a
 derecho de la imagen — quedaba redundante con el logo del club que ya está arriba de todo; el
 pie ahora solo tiene el texto de la izquierda (fecha/categoría).
 
+A pedido, el badge se agrandó (radio `0.2x`→`0.28x` el tamaño de la copa, borde `2px`→`2.5px`)
+— el número entra cómodo y se lee mejor, sin invadir el avatar que va justo debajo.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

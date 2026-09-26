@@ -415,14 +415,14 @@ function dibujarTarjetaPodio(ctx, opts) {
   // tamaño (oro/plata/bronce son sutiles), a pedido del club.
   if (trofeoImg) {
     ctx.drawImage(trofeoImg, cx - medalSize / 2, cursor, medalSize, medalSize);
-    const badgeR = medalSize * 0.2;
+    const badgeR = medalSize * 0.28;
     const badgeCx = cx + medalSize / 2 - badgeR * 0.5;
     const badgeCy = cursor + medalSize - badgeR * 0.5;
     ctx.beginPath();
     ctx.arc(badgeCx, badgeCy, badgeR, 0, Math.PI * 2);
     ctx.fillStyle = medalColor.fondo;
     ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.strokeStyle = COLOR.bg;
     ctx.stroke();
     ctx.fillStyle = "#1A1300";
