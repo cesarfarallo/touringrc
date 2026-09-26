@@ -409,9 +409,27 @@ function dibujarTarjetaPodio(ctx, opts) {
 
   let cursor = top + 18;
 
-  // medalla / trofeo
+  // medalla / trofeo -- con copa (Campeonato/Resultados), suma además un
+  // numerito de posición en la esquina (mismo color que la medalla lisa de
+  // Clasificación) porque las tres copas se distinguen poco entre sí a este
+  // tamaño (oro/plata/bronce son sutiles), a pedido del club.
   if (trofeoImg) {
     ctx.drawImage(trofeoImg, cx - medalSize / 2, cursor, medalSize, medalSize);
+    const badgeR = medalSize * 0.2;
+    const badgeCx = cx + medalSize / 2 - badgeR * 0.5;
+    const badgeCy = cursor + medalSize - badgeR * 0.5;
+    ctx.beginPath();
+    ctx.arc(badgeCx, badgeCy, badgeR, 0, Math.PI * 2);
+    ctx.fillStyle = medalColor.fondo;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = COLOR.bg;
+    ctx.stroke();
+    ctx.fillStyle = "#1A1300";
+    ctx.font = `800 ${Math.round(badgeR * 1.2)}px "Baloo 2"`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(medalColor.texto), badgeCx, badgeCy + 1);
   } else {
     ctx.beginPath();
     ctx.arc(cx, cursor + medalSize / 2, medalSize / 2, 0, Math.PI * 2);
@@ -700,16 +718,13 @@ export async function descargarImagenTop10({ tipo, eyebrow, subtitulo, footerTex
     });
   }
 
-  // Footer
+  // Footer -- a pedido, sin la URL del sitio a la derecha (quedaba
+  // redundante con el logo del club que ya está arriba).
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = `600 15px "Baloo 2"`;
   ctx.fillStyle = COLOR.muted;
   ctx.fillText(footerTexto, PAD_X, FOOTER_Y);
-  ctx.textAlign = "right";
-  ctx.font = `700 15px "Baloo 2"`;
-  ctx.fillStyle = COLOR.amber;
-  ctx.fillText("touring1:10arg.com.ar", CONTENT_RIGHT, FOOTER_Y);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {

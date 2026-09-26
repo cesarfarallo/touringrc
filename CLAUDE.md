@@ -1939,6 +1939,18 @@ Campeonato con fuente de puntos de 54px, ya tenía poco margen antes de este fix
 4-10 no se tocaron (el pedido era específico del podio, y ahí el ancho disponible es mucho
 mayor).
 
+**Número de posición en la copa, y sin URL en el pie** (a pedido, dos ajustes chicos): en
+Campeonato/Resultados (los que llevan copa en vez de medalla numerada) las tres copas se
+distinguen poco entre sí a este tamaño — oro/plata/bronce es un cambio de color sutil, sin
+ningún numerito que confirme el puesto (a diferencia de Clasificación, que ya mostraba un
+círculo con el 1/2/3 en vez de copa). `dibujarTarjetaPodio()` ahora dibuja un badge circular
+chico (mismo color que la medalla lisa, `medalColor.fondo`/`texto`) en la esquina inferior
+derecha de cada copa, con el número de posición — no agrega alto a la tarjeta (se dibuja
+superpuesto a la copa, no en un renglón aparte), así no hace falta retocar ningún cálculo de
+espacio vertical. Por separado, se sacó la URL del sitio (`touring1:10arg.com.ar`) del pie
+derecho de la imagen — quedaba redundante con el logo del club que ya está arriba de todo; el
+pie ahora solo tiene el texto de la izquierda (fecha/categoría).
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal
