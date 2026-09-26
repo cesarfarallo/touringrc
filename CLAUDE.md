@@ -1892,6 +1892,28 @@ logo de esa fila a `x+700` (lejos de la columna del stat, en el espacio libre qu
 del nombre+bandera+tags) y subiendo su tamaño de todos modos (20px → 26px de radio nominal) —
 verificado de nuevo con el string más largo real y sin superposición.
 
+⚠️ **Bug encontrado en producción — la bandera no se veía, solo texto**: la primera versión
+dibujaba la bandera con el emoji real (`🇦🇷`, vía `ctx.fillText()`) — funciona en Mac/Linux
+(fuente de emoji con soporte de banderas), pero **Windows no renderiza el par de "regional
+indicator" characters como una bandera** — la fuente del sistema (Segoe UI Emoji) cae al glyph
+de esos dos caracteres sueltos, que en la práctica se ve como texto plano en vez de un ícono.
+Como el renderizado de emoji depende 100% de la fuente del sistema operativo del visitante (no
+hay forma de forzar un emoji-color-font desde `canvas`), la solución real es no depender de
+fuentes para esto: `FLAGS` + `dibujarBandera()` dibujan cada bandera **a mano con formas
+vectoriales** (bandas de color rectas, mismo criterio que los trofeos/el placeholder de piloto)
+en vez de un carácter de texto — 100% consistente en cualquier navegador/sistema operativo,
+porque no depende de qué fuentes tenga instaladas quien la mira. Son versiones simplificadas
+(sin escudos/soles/estrellas centrales — a 16-24px esos detalles no se leen igual de todos
+modos) para los ~18 países más esperables en un club argentino; un país sin bandera en la tabla
+simplemente no dibuja nada (no hay forma de inventar el dato), igual que antes.
+
+⚠️ **Aclaración, no bug**: por qué no todos los pilotos tienen bandera — `pilotos.country` solo
+se completa desde `GenericImport.csv` (columna `Country`, ver `sync_pilotos`/`get_or_create_clase`
+más arriba) o `EventVerification-*.xls` (`cargar_roster.py`). Un piloto creado por un login sin
+match, o dado de alta a mano desde `PilotosAdmin.jsx`, no tiene ese dato salvo que un admin lo
+cargue después a mano — no hay ningún campo editable para `country` en la web hoy. Es un hueco
+de datos esperado, no algo que este fix resuelva.
+
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 
 Archivo único, sin build, usado como **referencia de diseño e IA**, no como código a reusar tal

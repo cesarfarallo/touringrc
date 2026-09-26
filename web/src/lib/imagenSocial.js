@@ -32,35 +32,132 @@ const COLOR = {
 // de "URY"), así que el mapa cubre las dos variantes para los países que
 // realistamente aparecen en un club de RC argentino. Un código que no está
 // acá simplemente no muestra bandera -- no hay forma de inventar el dato.
-const BANDERAS = {
-  ARG: "🇦🇷",
-  URY: "🇺🇾",
-  URU: "🇺🇾",
-  BRA: "🇧🇷",
-  CHL: "🇨🇱",
-  CHI: "🇨🇱",
-  PRY: "🇵🇾",
-  PAR: "🇵🇾",
-  BOL: "🇧🇴",
-  PER: "🇵🇪",
-  ECU: "🇪🇨",
-  COL: "🇨🇴",
-  VEN: "🇻🇪",
-  MEX: "🇲🇽",
-  USA: "🇺🇸",
-  ESP: "🇪🇸",
-  ITA: "🇮🇹",
-  FRA: "🇫🇷",
-  GER: "🇩🇪",
-  DEU: "🇩🇪",
-  GBR: "🇬🇧",
-  POR: "🇵🇹",
-  PRT: "🇵🇹",
+//
+// Las banderas se DIBUJAN a mano con canvas (bandas de color, no un emoji de
+// bandera) -- se probó primero con el emoji real (🇦🇷 etc.) pero el
+// renderizado de banderas por emoji depende de la fuente del sistema
+// operativo: Windows en particular no las renderiza como bandera, muestra
+// las dos letras del código de país como texto plano en vez del ícono
+// (`ctx.fillText()` cae al glyph que tenga esa fuente para esos dos
+// "regional indicator" characters, sin garantía de que sea una bandera).
+// Dibujarlas como formas vectoriales propias es 100% consistente entre
+// navegadores/sistemas operativos, igual que el resto de los íconos de esta
+// imagen (trofeos, placeholder de piloto). Son versiones simplificadas
+// (sin escudos/soles/estrellas) -- a 16-22px de alto esos detalles no se
+// leen igual, así que no vale la pena el esfuerzo de dibujarlos.
+const FLAGS = {
+  ARG: { bandas: "h", colores: ["#75AADB", "#FFFFFF", "#75AADB"] },
+  URY: { bandas: "h", colores: ["#FFFFFF", "#0038A8", "#FFFFFF", "#0038A8", "#FFFFFF"] },
+  BRA: { tipo: "brasil" },
+  CHL: { tipo: "chile" },
+  PRY: { bandas: "h", colores: ["#D52B1E", "#FFFFFF", "#0038A8"] },
+  BOL: { bandas: "h", colores: ["#D52B1E", "#F9E300", "#007934"] },
+  PER: { bandas: "v", colores: ["#D91023", "#FFFFFF", "#D91023"] },
+  ECU: { bandas: "h", colores: ["#FFD100", "#FFD100", "#0038A8", "#D52B1E"] },
+  COL: { bandas: "h", colores: ["#FCD116", "#FCD116", "#003893", "#CE1126"] },
+  VEN: { bandas: "h", colores: ["#FFD100", "#0038A8", "#CE1126"] },
+  MEX: { bandas: "v", colores: ["#006847", "#FFFFFF", "#CE1126"] },
+  USA: { tipo: "usa" },
+  ESP: { bandas: "h", colores: ["#AA151B", "#F1BF00", "#F1BF00", "#AA151B"] },
+  ITA: { bandas: "v", colores: ["#008C45", "#FFFFFF", "#CD212A"] },
+  FRA: { bandas: "v", colores: ["#0055A4", "#FFFFFF", "#EF4135"] },
+  GER: { bandas: "h", colores: ["#000000", "#DD0000", "#FFCE00"] },
+  GBR: { tipo: "reinounido" },
+  POR: { bandas: "v", colores: ["#046A38", "#046A38", "#DA020E", "#DA020E", "#DA020E"] },
 };
+const SINONIMOS_PAIS = { URU: "URY", CHI: "CHL", PAR: "PRY", DEU: "GER", PRT: "POR" };
 
-function bandera(pais) {
+function codigoBandera(pais) {
   if (!pais) return null;
-  return BANDERAS[pais.trim().toUpperCase()] ?? null;
+  const code = pais.trim().toUpperCase();
+  const normalizado = SINONIMOS_PAIS[code] ?? code;
+  return FLAGS[normalizado] ? normalizado : null;
+}
+
+// Dibuja la bandera de `code` dentro del rectángulo (x,y,w,h) -- clipeada a
+// ese rectángulo así ninguna banda/forma se sale del recuadro.
+function dibujarBandera(ctx, code, x, y, w, h) {
+  const spec = FLAGS[code];
+  if (!spec) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  if (spec.bandas === "h") {
+    const n = spec.colores.length;
+    spec.colores.forEach((color, i) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y + (h * i) / n, w, h / n + 0.5);
+    });
+  } else if (spec.bandas === "v") {
+    const n = spec.colores.length;
+    spec.colores.forEach((color, i) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x + (w * i) / n, y, w / n + 0.5, h);
+    });
+  } else if (spec.tipo === "brasil") {
+    ctx.fillStyle = "#009C3B";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#FFDF00";
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y + h * 0.12);
+    ctx.lineTo(x + w * 0.88, y + h / 2);
+    ctx.lineTo(x + w / 2, y + h * 0.88);
+    ctx.lineTo(x + w * 0.12, y + h / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#002776";
+    ctx.beginPath();
+    ctx.arc(x + w / 2, y + h / 2, h * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (spec.tipo === "chile") {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(x, y, w, h / 2);
+    ctx.fillStyle = "#D52B1E";
+    ctx.fillRect(x, y + h / 2, w, h / 2);
+    ctx.fillStyle = "#0039A6";
+    ctx.fillRect(x, y, w / 3, h / 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(x + w / 6, y + h / 4, h * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (spec.tipo === "usa") {
+    const bandas = 7;
+    for (let i = 0; i < bandas; i++) {
+      ctx.fillStyle = i % 2 === 0 ? "#B22234" : "#FFFFFF";
+      ctx.fillRect(x, y + (h * i) / bandas, w, h / bandas + 0.5);
+    }
+    ctx.fillStyle = "#3C3B6E";
+    ctx.fillRect(x, y, w * 0.45, h * 4.5 / bandas);
+  } else if (spec.tipo === "reinounido") {
+    ctx.fillStyle = "#00247D";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = h * 0.28;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.moveTo(x + w, y);
+    ctx.lineTo(x, y + h);
+    ctx.stroke();
+    ctx.strokeStyle = "#CF142B";
+    ctx.lineWidth = h * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.moveTo(x + w, y);
+    ctx.lineTo(x, y + h);
+    ctx.stroke();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(x + w * 0.42, y, w * 0.16, h);
+    ctx.fillRect(x, y + h * 0.38, w, h * 0.24);
+    ctx.fillStyle = "#CF142B";
+    ctx.fillRect(x + w * 0.45, y, w * 0.1, h);
+    ctx.fillRect(x, y + h * 0.42, w, h * 0.16);
+  }
+
+  ctx.restore();
 }
 
 // Mismo dibujo que `FotoPiloto.jsx` (silueta gris genérica) -- se mantiene
@@ -263,7 +360,7 @@ function dibujarTarjetaPodio(ctx, opts) {
     medalSize,
     avatarImg,
     avatarSize,
-    banderaEmoji,
+    paisCode,
     nombre,
     nombreFontSize,
     marcaImg,
@@ -316,15 +413,15 @@ function dibujarTarjetaPodio(ctx, opts) {
   const nombreUpper = nombre.toUpperCase();
   ctx.font = `800 ${nombreFontSize}px "Baloo 2"`;
   const nombreAncho = ctx.measureText(nombreUpper).width;
-  const banderaAncho = banderaEmoji ? nombreFontSize * 0.9 : 0;
-  const gapBandera = banderaEmoji ? 6 : 0;
+  const banderaAncho = paisCode ? nombreFontSize * 0.9 : 0;
+  const gapBandera = paisCode ? 6 : 0;
   let px = cx - (banderaAncho + gapBandera + nombreAncho) / 2;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   const centerY = cursor + nombreFontSize * 0.52;
-  if (banderaEmoji) {
-    ctx.font = `${nombreFontSize}px sans-serif`;
-    ctx.fillText(banderaEmoji, px, centerY);
+  if (paisCode) {
+    const bh = banderaAncho * (2 / 3);
+    dibujarBandera(ctx, paisCode, px, centerY - bh / 2, banderaAncho, bh);
     px += banderaAncho + gapBandera;
   }
   ctx.font = `800 ${nombreFontSize}px "Baloo 2"`;
@@ -345,7 +442,7 @@ function dibujarTarjetaPodio(ctx, opts) {
 }
 
 function dibujarFila(ctx, opts) {
-  const { x, y, w, h, fondo, pos, avatarImg, banderaEmoji, nombre, tags, marcaImg, statTexto, statFontSize } = opts;
+  const { x, y, w, h, fondo, pos, avatarImg, paisCode, nombre, tags, marcaImg, statTexto, statFontSize } = opts;
   redondeado(ctx, x, y, w, h, 10);
   ctx.fillStyle = fondo;
   ctx.fill();
@@ -366,10 +463,9 @@ function dibujarFila(ctx, opts) {
 
   let px = x + 145;
   ctx.textAlign = "left";
-  if (banderaEmoji) {
-    ctx.font = `22px sans-serif`;
-    ctx.fillText(banderaEmoji, px, midY);
-    px += 22 + 8;
+  if (paisCode) {
+    dibujarBandera(ctx, paisCode, px, midY - 9, 24, 18);
+    px += 24 + 8;
   }
   const nombreUpper = nombre.toUpperCase();
   ctx.font = `700 25px "Baloo 2"`;
@@ -516,7 +612,7 @@ export async function descargarImagenTop10({ tipo, eyebrow, subtitulo, footerTex
       medalSize,
       avatarImg: avatarImgs[rank - 1],
       avatarSize: medidas.avatarSize[rank],
-      banderaEmoji: bandera(f.pais),
+      paisCode: codigoBandera(f.pais),
       nombre: f.nombre,
       nombreFontSize: medidas.nombreFontSize[rank],
       marcaImg: marcaImgs[rank - 1],
@@ -548,7 +644,7 @@ export async function descargarImagenTop10({ tipo, eyebrow, subtitulo, footerTex
         fondo: i % 2 === 1 ? "rgba(36,40,41,0.68)" : "rgba(29,33,36,0.68)",
         pos: f.pos,
         avatarImg: avatarImgs[3 + i],
-        banderaEmoji: bandera(f.pais),
+        paisCode: codigoBandera(f.pais),
         nombre: f.nombre,
         tags,
         marcaImg: marcaImgs[3 + i],
