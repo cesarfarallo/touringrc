@@ -899,17 +899,19 @@ export default function TouringRCApp() {
                       </button>
                     ))}
                   </div>
-                  <BotonDescargarImagen
-                    onClick={() => handleDescargarImagen(subTabResultados === "finales" ? "resultados" : "clasificacion")}
-                    generando={generandoImagen}
-                    disabled={
-                      subTabResultados === "finales"
-                        ? !resultadosPorClase[claseActiva]?.length
-                        : !clasificacionPorClase[claseActiva]?.length
-                    }
-                  />
+                  {esAdminReal && (
+                    <BotonDescargarImagen
+                      onClick={() => handleDescargarImagen(subTabResultados === "finales" ? "resultados" : "clasificacion")}
+                      generando={generandoImagen}
+                      disabled={
+                        subTabResultados === "finales"
+                          ? !resultadosPorClase[claseActiva]?.length
+                          : !clasificacionPorClase[claseActiva]?.length
+                      }
+                    />
+                  )}
                 </div>
-                {errorImagen && (
+                {esAdminReal && errorImagen && (
                   <div style={{ color: T.red, fontSize: 12, marginBottom: 16 }}>{errorImagen}</div>
                 )}
 
@@ -964,14 +966,18 @@ export default function TouringRCApp() {
                           ).toLocaleDateString("es-AR")}`
                         : ""}
                     </div>
-                    <BotonDescargarImagen
-                      onClick={() => handleDescargarImagen("campeonato")}
-                      generando={generandoImagen}
-                      disabled={!campeonatoPorClase[claseActiva]?.length}
-                    />
+                    {esAdminReal && (
+                      <BotonDescargarImagen
+                        onClick={() => handleDescargarImagen("campeonato")}
+                        generando={generandoImagen}
+                        disabled={!campeonatoPorClase[claseActiva]?.length}
+                      />
+                    )}
                   </div>
                 )}
-                {errorImagen && <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{errorImagen}</div>}
+                {esAdminReal && errorImagen && (
+                  <div style={{ color: T.red, fontSize: 12, marginBottom: 12 }}>{errorImagen}</div>
+                )}
                 {claseActiva && campeonatoPorClase[claseActiva] &&                 <TablaCampeonato data={campeonatoPorClase[claseActiva]} pilotoId={piloto?.id} />}
               </>
             )}

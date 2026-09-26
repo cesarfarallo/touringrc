@@ -1833,7 +1833,9 @@ disponible (`pilotos.foto_url`, `pilotos.country`, `marcas_autos`/`piloto_marca_
   imagen completa.
 - **Frontend** (`App.jsx`): botón "Descargar imagen" (`BotonDescargarImagen`, ícono `Download`)
   al lado del selector "Resultados finales"/"Clasificación" en el tab Resultados, y al lado del
-  nombre del campeonato en el tab Campeonato. Arma las `filas` cruzando los mismos datos que ya
+  nombre del campeonato en el tab Campeonato — **visible solo para admin** (`esAdminReal`, a
+  pedido explícito: es una herramienta de gestión del club para redes, no algo que un piloto
+  necesite). Arma las `filas` cruzando los mismos datos que ya
   muestra la tabla de esa vista (`resultadosPorClase`/`clasificacionPorClase`/
   `campeonatoPorClase`, ya vienen de `hooks.js`) con foto/marca/país de cada piloto — la marca
   es la **vigente** (`useMarcaVigentePorPiloto()`) para Campeonato (no está atado a una fecha
@@ -1870,6 +1872,25 @@ tres variantes (Campeonato con copas, Resultados finales con tags TQ/VR, Clasifi
 medallas numeradas) generan correctamente después de los dos fixes de arriba. Falta probarlo
 con datos reales en staging (fotos/marcas/banderas reales, nombres largos, más de 10
 pilotos en una categoría) antes de confirmarlo en producción.
+
+**Ajustes a pedido después de ver el resultado**: sacar el círculo blanco de fondo del logo de
+marca (quedaba bien contra el fondo blanco del resto del sitio, pero acá el fondo ya es un
+degradé oscuro con las tarjetas de vidrio esmerilado — el círculo blanco se veía como un
+recuadro sin motivo) y agrandar el logo. `dibujarLogoMarca()` ya no dibuja el círculo, solo el
+logo (si no hay imagen, no dibuja nada, igual que antes); la escala de "contain" subió de 1.7x a
+2.2x el radio nominal, y el tamaño nominal del logo en el podio subió de 54/44/44px a 66/56/56px
+(1°/2°/3°).
+
+⚠️ **Bug encontrado al verificar el agrandado con un logo de prueba real (no `marca: null`)**:
+en las filas 4-10, el logo de marca estaba anclado cerca de la columna del resultado
+(`x+875+20`, muy pegado a los `x+982` donde termina el texto del stat alineado a la derecha) —
+con el logo más grande, y sobre todo con un resultado crudo largo tipo `"9/2:15.004 (DNF)"`
+(mide ~147px a este tamaño de fuente, medido con `ctx.measureText()` real, no a ojo), el logo
+quedaba encima de los dígitos del resultado. No se había notado en la verificación anterior
+porque los datos de prueba usaban `marca: null` para todos los pilotos. Corregido moviendo el
+logo de esa fila a `x+700` (lejos de la columna del stat, en el espacio libre que queda después
+del nombre+bandera+tags) y subiendo su tamaño de todos modos (20px → 26px de radio nominal) —
+verificado de nuevo con el string más largo real y sin superposición.
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

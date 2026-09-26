@@ -192,11 +192,7 @@ function dibujarAvatar(ctx, img, cx, cy, r) {
 // no son cuadrados/circulares como una foto de piloto.
 function dibujarLogoMarca(ctx, img, cx, cy, r) {
   if (!img) return;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fill();
-  const escala = Math.min((r * 1.7) / img.width, (r * 1.7) / img.height);
+  const escala = Math.min((r * 2.2) / img.width, (r * 2.2) / img.height);
   const dw = img.width * escala;
   const dh = img.height * escala;
   ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh);
@@ -251,7 +247,7 @@ function medidasPodio(tipo) {
     medalSize,
     avatarSize: { 1: 150, 2: 116, 3: 116 },
     nombreFontSize: { 1: 27, 2: 22, 3: 22 },
-    marcaSize: { 1: 54, 2: 44, 3: 44 },
+    marcaSize: { 1: 66, 2: 56, 3: 56 },
   };
 }
 
@@ -396,7 +392,11 @@ function dibujarFila(ctx, opts) {
     px += boxW + 8;
   }
 
-  dibujarLogoMarca(ctx, marcaImg, x + 875 + 20, midY, 20);
+  // Centrado en x+700 (no en la columna del stat) a propósito: un resultado
+  // crudo largo tipo "9/2:15.004 (DNF)" mide ~147px a este tamaño de fuente
+  // -- si el logo quedara más cerca del stat (columna que termina en
+  // x+982), lo pisaría. Medido contra el string más largo real, no a ojo.
+  dibujarLogoMarca(ctx, marcaImg, x + 700, midY, 26);
 
   ctx.textAlign = "right";
   ctx.font = `800 ${statFontSize}px "Baloo 2"`;
