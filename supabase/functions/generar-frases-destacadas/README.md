@@ -113,9 +113,21 @@ empieza con A" identifica al resultado real sin ambigüedad):
   ninguna de las últimas dos fechas corridas.
 - **Victoria alternada**: entre las últimas 3 o 4 fechas corridas (las que haya), exactamente dos
   pilotos se repartieron todas las victorias -- una rivalidad de dos.
-- **Autos apretados en clasificación**: en la fecha corrida más reciente, al menos 3 autos
-  quedaron a un segundo o menos de la vuelta de clasificación más rápida (mínimo `fastest_lap`
-  por piloto en `resultados_ronda`, excluyendo DNF/DNS/DQ de esa tabla).
+- **Autos apretados en clasificación**: en la fecha **más reciente con clasificación cargada**
+  (no necesariamente la última "corrida" -- ver bug corregido abajo), al menos 3 autos quedaron
+  a un segundo o menos de la vuelta de clasificación más rápida (mínimo `fastest_lap` por piloto
+  en `resultados_ronda`, excluyendo DNF/DNS/DQ de esa tabla).
+
+⚠️ **Bug encontrado en producción**: esta frase miraba `eventosCorridos[0]` (la fecha más
+reciente con `eventos.corrida = true`) para decidir de qué fecha sacar la clasificación --
+`corrida` recién se prende al subir `FinalResults.xls` (ver Edge Function `subir-resultado`), un
+archivo distinto e independiente de `Leaderboard-Event*.xls` (la clasificación). Si el admin sube
+la clasificación de una fecha antes que los resultados finales (o se olvida de subir
+`FinalResults.xls` un tiempo), la frase seguía mirando la fecha corrida ANTERIOR y nombraba al
+piloto más rápido de esa, no de la fecha real más reciente. Corregido con
+`eventoMasRecienteConClasificacion()`: recorre las fechas del campeonato vigente, de más
+reciente a más vieja, y se queda con la primera que tenga al menos una fila real en
+`resultados_ronda` para esa categoría -- ya no depende de `corrida` para nada.
 
 **Sobre la próxima fecha**:
 - **Récord del circuito en juego**: si la próxima fecha (no la última corrida) tiene un

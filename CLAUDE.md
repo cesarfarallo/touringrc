@@ -1488,6 +1488,27 @@ completo.
 README de la función) — no verificable end-to-end desde este entorno de desarrollo por la misma
 razón de siempre (sin acceso de red a un proyecto de Supabase real).
 
+⚠️ **Bug encontrado en producción — "autos apretados en clasificación" mostraba el piloto más
+rápido de una fecha vieja**: reportado por el club con un caso concreto (la frase nombraba a
+"Diego Pezzotti" como el más rápido, cuando el piloto más rápido de la última fecha real era
+Mariano Marcolongo). La causa: `detectarAutosEnUnSegundo()` miraba `eventosCorridos[0]` (la
+fecha más reciente con `eventos.corrida = true`) para decidir de qué fecha sacar la
+clasificación — pero `corrida` se prende recién al subir `FinalResults.xls` (ver Edge Function
+`subir-resultado`), un archivo **distinto e independiente** de `Leaderboard-Event*.xls` (el que
+trae la clasificación). Si el admin sube la clasificación de una fecha antes que los resultados
+finales de esa misma fecha (orden de subida habitual: clasificación el sábado, resultados
+finales el domingo), `corrida` todavía está en `false` para esa fecha en el medio, así que la
+frase miraba la fecha corrida ANTERIOR — con el piloto más rápido de esa, no de la real. Esto no
+tiene nada que ver con el "cada 3 días" de arriba (que sigue aplicando igual): aunque la función
+corra todos los días, mientras `corrida` no se prenda para la fecha nueva, la frase sigue
+apuntando a la vieja. Corregido con `eventoMasRecienteConClasificacion()` (nueva función en
+`index.ts`): recorre las fechas del campeonato vigente de más reciente a más vieja y se queda
+con la primera que tenga al menos una fila real en `resultados_ronda` para esa categoría — ya no
+depende de `corrida` para nada. Hay que re-deployar la función
+(`supabase functions deploy generar-frases-destacadas --no-verify-jwt`) en staging y producción
+para que el fix tome efecto, y forzar una regeneración inmediata (`{"forzar": true}`, paso 3 del
+README) en vez de esperar los 3 días si se quiere ver el cambio reflejado ya mismo.
+
 ## Marca del auto por piloto y por evento (migración 0029)
 
 Pedido del club: mostrar la marca del auto (chasis) con la que corre cada piloto al lado de su
@@ -1953,6 +1974,45 @@ pie ahora solo tiene el texto de la izquierda (fecha/categoría).
 
 A pedido, el badge se agrandó (radio `0.2x`→`0.28x` el tamaño de la copa, borde `2px`→`2.5px`)
 — el número entra cómodo y se lee mejor, sin invadir el avatar que va justo debajo.
+
+## Recordatorio de inscripción pendiente, cada 2 días (migración 0031)
+
+Pedido del club: además del aviso único de "se abrió la inscripción" (migración 0026,
+`avisar-inscripcion`), mandar un recordatorio periódico a los pilotos opt-in
+(`pilotos.acepta_notificaciones = true`) que todavía no se anotaron a la fecha vigente —
+mientras la ventana de inscripción siga abierta, cada 2 días, y solo a quien no se anotó
+todavía (deja de recibirlo en cuanto se anota).
+
+- **`eventos.ultimo_recordatorio_inscripcion`** (`timestamptz`, nullable) — a diferencia de
+  `notificacion_inscripcion_enviada` (migración 0026, boolean, "una vez y listo"), este aviso se
+  repite mientras la ventana esté abierta, así que necesita guardar **cuándo** fue el último
+  envío, no solo si ya se envió. Mismo patrón que `frases_destacadas.generado_en` (migración
+  0027) para su "cada 3 días": el cron de afuera corre simplemente **una vez por día**, y la
+  función mira cuánto pasó desde este timestamp para decidir si le toca correr todavía — así el
+  intervalo real entre recordatorios es siempre de 2 días, sin importar en qué día del mes caiga.
+- **Edge Function `recordatorio-inscripcion`** (`supabase/functions/recordatorio-inscripcion/`,
+  nueva, README propio con deploy/secrets/prueba manual/cron — mismo patrón que
+  `avisar-inscripcion`/`generar-frases-destacadas`, reusa los mismos secrets que ya tenga
+  configurados `avisar-inscripcion` en ese proyecto: `CRON_SECRET`, `RESEND_API_KEY`,
+  `RESEND_FROM`, `SITE_URL`). Para cada evento con la ventana de inscripción abierta hoy (mismo
+  cálculo que `avisar-inscripcion`, en UTC servidor) y que no haya recibido un recordatorio en
+  los últimos 2 días: busca los pilotos opt-in con email, les resta los que **ya tienen** una
+  fila en `inscripciones` para ese evento (sin importar la clase — alcanza con estar anotado a
+  una, no hace falta estar anotado a todas), y manda el email solo a los que quedan. Se marca el
+  timestamp igual con 0 destinatarios (ningún pendiente en ese ciclo puntual) — mismo criterio
+  que `avisar-inscripcion` marcando el evento avisado aunque nadie sea opt-in todavía.
+- **Independiente de `avisar-inscripcion`**: las dos funciones conviven sin pisarse — una es el
+  aviso único de apertura, la otra el recordatorio repetido para quien sigue sin anotarse. Se
+  puede desplegar/programar una sin la otra.
+- **Email**: mismo diseño que el de `avisar-inscripcion` (logo del club arriba, vía
+  `${SITE_URL}/logo.png`, link "Inscribite acá" abajo), copy distinto ("Todavía no te anotaste
+  para {evento}...") para que no se confunda con el aviso de apertura si alguien recibe los dos
+  en algún momento.
+
+⚠️ Igual que toda migración/Edge Function nueva: falta correr la 0031 y deployar
+`recordatorio-inscripcion` en staging y producción, y programar su `pg_cron` diario (paso 4 del
+README de la función) — no verificable end-to-end desde este entorno de desarrollo por la misma
+razón de siempre (sin acceso de red a un proyecto de Supabase real).
 
 ## Mockup de frontend (`touringrc-sync/mockup/touringrc-app-skeleton.jsx`)
 

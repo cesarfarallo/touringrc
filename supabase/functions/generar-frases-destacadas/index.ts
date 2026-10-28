@@ -157,7 +157,7 @@ async function generarFrases(sb: any, forzar: boolean) {
     candidatos.push(...(await detectarVueltasRapidasDominante(sb, eventoIdsVigente, vigente, clase)));
     candidatos.push(...(await detectarTQsDominante(sb, vigente, clase)));
     candidatos.push(...(await detectarRecordEnJuego(sb, proximaFecha, clase)));
-    candidatos.push(...(await detectarAutosEnUnSegundo(sb, eventosCorridos, clase)));
+    candidatos.push(...(await detectarAutosEnUnSegundo(sb, vigente, clase)));
   }
 
   // Se borra el set anterior de este campeonato recién acá (no antes de
@@ -549,15 +549,46 @@ async function detectarRecordEnJuego(sb: any, proximaFecha: any, clase: any) {
   return [{ texto, categoria: "record_en_juego", clase_id: clase.id }];
 }
 
+// Busca la fecha más reciente del campeonato vigente que tenga datos de
+// clasificación cargados para esta clase (al menos una fila de
+// `resultados_ronda` con `fastest_lap`) -- a propósito NO reusa
+// `eventosCorridos` (filtrado por `eventos.corrida`, que recién se prende
+// al subir FinalResults.xls, ver index.ts de subir-resultado): Live Timing
+// exporta la clasificación (Leaderboard-Event*.xls) como un archivo
+// independiente, que se puede subir antes que FinalResults.xls o incluso
+// sin subir ese -- gatear por `corrida` hacía que esta frase mirara la
+// fecha corrida anterior en vez de la última con clasificación real.
+// deno-lint-ignore no-explicit-any
+async function eventoMasRecienteConClasificacion(sb: any, vigente: any, clase: any) {
+  const { data: eventos, error } = await sb
+    .from("eventos")
+    .select("id, fecha")
+    .eq("campeonato_id", vigente.id)
+    .order("fecha", { ascending: false });
+  if (error) throw new Error(`eventos.select (más reciente con clasificación, ${clase.nombre}): ${error.message}`);
+
+  for (const evento of eventos ?? []) {
+    const { count, error: errCount } = await sb
+      .from("resultados_ronda")
+      .select("id", { count: "exact", head: true })
+      .eq("evento_id", evento.id)
+      .eq("clase_id", clase.id)
+      .not("fastest_lap", "is", null);
+    if (errCount) throw new Error(`resultados_ronda.select (chequeo clasificación, ${clase.nombre}): ${errCount.message}`);
+    if ((count ?? 0) > 0) return evento;
+  }
+  return null;
+}
+
 // "En la clasificación de la última fecha, N autos quedaron adentro del
 // segundo..." -- toma la mejor vuelta de clasificación (mínimo
 // `fastest_lap` de resultados_ronda, filas sin DNF/DNS/DQ) de cada piloto
-// en la fecha corrida más reciente, y cuenta cuántos quedaron a un
-// segundo o menos del más rápido.
+// en la fecha más reciente con clasificación cargada, y cuenta cuántos
+// quedaron a un segundo o menos del más rápido.
 // deno-lint-ignore no-explicit-any
-async function detectarAutosEnUnSegundo(sb: any, eventosCorridos: any[], clase: any) {
-  if (!eventosCorridos || eventosCorridos.length === 0) return [];
-  const ultimoEvento = eventosCorridos[0];
+async function detectarAutosEnUnSegundo(sb: any, vigente: any, clase: any) {
+  const ultimoEvento = await eventoMasRecienteConClasificacion(sb, vigente, clase);
+  if (!ultimoEvento) return [];
 
   const { data: rondas, error } = await sb
     .from("resultados_ronda")
