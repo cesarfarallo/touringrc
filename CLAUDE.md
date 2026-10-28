@@ -1509,6 +1509,27 @@ depende de `corrida` para nada. Hay que re-deployar la función
 para que el fix tome efecto, y forzar una regeneración inmediata (`{"forzar": true}`, paso 3 del
 README) en vez de esperar los 3 días si se quiere ver el cambio reflejado ya mismo.
 
+⚠️ **Segunda vuelta del mismo bug, ya con el fix de arriba deployado** — el club volvió a probar
+después del redeploy y la frase seguía nombrando a Pezzotti, aunque esta vez la fecha elegida
+sí era la real (confirmado con una consulta SQL directa: la fecha más reciente con datos de
+clasificación tenía efectivamente a Marcolongo en `clasificacion.posicion = 1`, la tabla que
+alimenta el tab público "Clasificación"). El problema estaba **dentro de la misma fecha**:
+`resultados_ronda` guarda en la misma tabla tanto las rondas de clasificación (numeradas, `Round:
+1`/`2`/`3`...) como los heats de la final — Live Timing titula esa sección `"Round: M"` (de Main,
+ver el comentario con un header real de ejemplo en `livetime_parsers.py`:
+`"Touring Eco 1:10 Stock\nRound: M"`), y `syncRoundResults` (`subir-resultado/index.ts`) guarda
+esa ronda tal cual como `${f.ronda}-heat${f.heat}` — una fila de la final queda con `ronda`
+empezando en `"M-"`. El `fastest_lap` mínimo de la tabla, sin filtrar esto, podía terminar siendo
+la vuelta más rápida que alguien hizo **durante la final** (ritmo de carrera, no de
+clasificación) — exactamente lo que pasaba: la vuelta de 18.11s de Pezzotti era de la final, no
+de la clasificación, pero el detector la contaba igual porque solo miraba el mínimo global de
+`resultados_ronda` sin distinguir de qué ronda venía. Corregido agregando
+`.not("ronda", "ilike", "M-%")` tanto en `eventoMasRecienteConClasificacion()` (para no contar
+una fecha como "con clasificación cargada" si lo único que tiene ahí es la final) como en
+`detectarAutosEnUnSegundo()` (para no mezclar esa vuelta en el cálculo de quién es el más
+rápido). Mismo pendiente de siempre: re-deployar la función y forzar una regeneración
+(`{"forzar": true}`) para ver este segundo fix reflejado.
+
 ## Marca del auto por piloto y por evento (migración 0029)
 
 Pedido del club: mostrar la marca del auto (chasis) con la que corre cada piloto al lado de su

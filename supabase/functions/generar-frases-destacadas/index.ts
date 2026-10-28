@@ -551,13 +551,14 @@ async function detectarRecordEnJuego(sb: any, proximaFecha: any, clase: any) {
 
 // Busca la fecha más reciente del campeonato vigente que tenga datos de
 // clasificación cargados para esta clase (al menos una fila de
-// `resultados_ronda` con `fastest_lap`) -- a propósito NO reusa
-// `eventosCorridos` (filtrado por `eventos.corrida`, que recién se prende
-// al subir FinalResults.xls, ver index.ts de subir-resultado): Live Timing
-// exporta la clasificación (Leaderboard-Event*.xls) como un archivo
-// independiente, que se puede subir antes que FinalResults.xls o incluso
-// sin subir ese -- gatear por `corrida` hacía que esta frase mirara la
-// fecha corrida anterior en vez de la última con clasificación real.
+// `resultados_ronda` con `fastest_lap`, EXCLUYENDO la ronda "M" -- ver nota
+// abajo) -- a propósito NO reusa `eventosCorridos` (filtrado por
+// `eventos.corrida`, que recién se prende al subir FinalResults.xls, ver
+// index.ts de subir-resultado): Live Timing exporta la clasificación
+// (Leaderboard-Event*.xls) como un archivo independiente, que se puede
+// subir antes que FinalResults.xls o incluso sin subir ese -- gatear por
+// `corrida` hacía que esta frase mirara la fecha corrida anterior en vez
+// de la última con clasificación real.
 // deno-lint-ignore no-explicit-any
 async function eventoMasRecienteConClasificacion(sb: any, vigente: any, clase: any) {
   const { data: eventos, error } = await sb
@@ -573,7 +574,8 @@ async function eventoMasRecienteConClasificacion(sb: any, vigente: any, clase: a
       .select("id", { count: "exact", head: true })
       .eq("evento_id", evento.id)
       .eq("clase_id", clase.id)
-      .not("fastest_lap", "is", null);
+      .not("fastest_lap", "is", null)
+      .not("ronda", "ilike", "M-%");
     if (errCount) throw new Error(`resultados_ronda.select (chequeo clasificación, ${clase.nombre}): ${errCount.message}`);
     if ((count ?? 0) > 0) return evento;
   }
@@ -585,6 +587,22 @@ async function eventoMasRecienteConClasificacion(sb: any, vigente: any, clase: a
 // `fastest_lap` de resultados_ronda, filas sin DNF/DNS/DQ) de cada piloto
 // en la fecha más reciente con clasificación cargada, y cuenta cuántos
 // quedaron a un segundo o menos del más rápido.
+//
+// ⚠️ Excluye a propósito las filas cuya `ronda` empieza con "M-" (la final
+// -- ver el comentario de `parse_round_result` en livetime_parsers.py:
+// Live Timing titula esa sección "Round: M", de Main, y syncRoundResults
+// (subir-resultado/index.ts) guarda esa ronda tal cual como
+// `${f.ronda}-heat${f.heat}`, o sea "M-heatN"). `resultados_ronda` junta en
+// la misma tabla las rondas de clasificación (numeradas) Y los heats de la
+// final -- sin este filtro, el `fastest_lap` mínimo podía ser la vuelta más
+// rápida que alguien hizo DURANTE LA FINAL (ritmo de carrera, no de
+// clasificación), nombrando como "más rápido en clasificación" a un piloto
+// que en realidad no hizo la pole. Bug real encontrado en producción: el
+// mínimo global nombraba a Diego Pezzotti con 18.11s, pero
+// `clasificacion.posicion = 1` (la tabla que alimenta el tab público
+// "Clasificación", viene de Leaderboard-Event*.xls) tenía a Mariano
+// Marcolongo en la pole de esa misma fecha -- la vuelta de Pezzotti era de
+// la final, no de clasificación.
 // deno-lint-ignore no-explicit-any
 async function detectarAutosEnUnSegundo(sb: any, vigente: any, clase: any) {
   const ultimoEvento = await eventoMasRecienteConClasificacion(sb, vigente, clase);
@@ -596,7 +614,8 @@ async function detectarAutosEnUnSegundo(sb: any, vigente: any, clase: any) {
     .eq("evento_id", ultimoEvento.id)
     .eq("clase_id", clase.id)
     .is("status", null)
-    .not("fastest_lap", "is", null);
+    .not("fastest_lap", "is", null)
+    .not("ronda", "ilike", "M-%");
   if (error) throw new Error(`resultados_ronda.select (autos apretados, ${clase.nombre}): ${error.message}`);
   if (!rondas || rondas.length === 0) return [];
 

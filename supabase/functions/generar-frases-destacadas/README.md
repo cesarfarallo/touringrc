@@ -116,7 +116,8 @@ empieza con A" identifica al resultado real sin ambigüedad):
 - **Autos apretados en clasificación**: en la fecha **más reciente con clasificación cargada**
   (no necesariamente la última "corrida" -- ver bug corregido abajo), al menos 3 autos quedaron
   a un segundo o menos de la vuelta de clasificación más rápida (mínimo `fastest_lap` por piloto
-  en `resultados_ronda`, excluyendo DNF/DNS/DQ de esa tabla).
+  en `resultados_ronda`, excluyendo DNF/DNS/DQ de esa tabla **y excluyendo la ronda `M` --
+  Main/la final, ver segundo bug abajo**).
 
 ⚠️ **Bug encontrado en producción**: esta frase miraba `eventosCorridos[0]` (la fecha más
 reciente con `eventos.corrida = true`) para decidir de qué fecha sacar la clasificación --
@@ -128,6 +129,24 @@ piloto más rápido de esa, no de la fecha real más reciente. Corregido con
 `eventoMasRecienteConClasificacion()`: recorre las fechas del campeonato vigente, de más
 reciente a más vieja, y se queda con la primera que tenga al menos una fila real en
 `resultados_ronda` para esa categoría -- ya no depende de `corrida` para nada.
+
+⚠️ **Segundo bug, encontrado al verificar el fix anterior en producción con un caso real**: con
+el fix de arriba ya deployado, la frase seguía nombrando al piloto equivocado **dentro de la
+misma fecha real** -- `resultados_ronda` junta en la misma tabla las rondas de clasificación
+(numeradas, `Round: 1`/`2`/`3`...) Y los heats de la final (`Round: M`, de Main -- ver el
+comentario de `parse_round_result` en `livetime_parsers.py`, con un ejemplo real de header:
+`"Touring Eco 1:10 Stock\nRound: M"`). `syncRoundResults` (`subir-resultado/index.ts`) guarda esa
+ronda tal cual como `${f.ronda}-heat${f.heat}`, o sea una fila de la final queda con `ronda`
+empezando en `"M-"`. Sin filtrar eso, el `fastest_lap` mínimo de la tabla podía ser la vuelta más
+rápida que alguien hizo **durante la final** (ritmo de carrera, no de clasificación) -- en el caso
+real reportado, el mínimo global nombraba a Diego Pezzotti con 18.11s, pero
+`clasificacion.posicion = 1` (la tabla que alimenta el tab público "Clasificación", viene de
+`Leaderboard-Event*.xls`, un archivo totalmente distinto) tenía a Mariano Marcolongo en la pole
+de esa misma fecha -- la vuelta de Pezzotti era de la final. Corregido agregando
+`.not("ronda", "ilike", "M-%")` tanto en `eventoMasRecienteConClasificacion()` (para no contar
+una fecha como "con clasificación cargada" si lo único que tiene es la final) como en
+`detectarAutosEnUnSegundo()` (para no mezclar esa vuelta en el cálculo del más rápido). Hay que
+re-deployar la función y forzar una regeneración (`{"forzar": true}`) para ver el fix reflejado.
 
 **Sobre la próxima fecha**:
 - **Récord del circuito en juego**: si la próxima fecha (no la última corrida) tiene un
