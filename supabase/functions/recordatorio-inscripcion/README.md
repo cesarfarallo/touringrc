@@ -42,9 +42,21 @@ curl -X POST "https://<ref-del-proyecto>.supabase.co/functions/v1/recordatorio-i
 ```
 
 Devuelve `{ ok: true, resultados: [...] }` con un resumen por evento abierto (`enviados: N`), o
-`{ enviados: 0, motivo: "todavía no pasaron 2 días desde el último recordatorio", ... }` si ese
-evento puntual ya recibió un recordatorio hace menos de 2 días. Para forzar el envío ignorando
-esa espera (útil para probar) mandá `{"forzar": true}` en el body en vez de `{}`.
+`{ enviados: 0, motivo: "...", ... }` si todavía no le toca a ese evento puntual -- dos motivos
+posibles: **"el primer recordatorio arranca 2 días después de que abrió la inscripción"** (la
+ventana recién abrió, no pasaron los 2 días iniciales todavía -- ver "Cuándo arranca" abajo) o
+**"todavía no pasaron 2 días desde el último recordatorio"** (ya se mandó al menos uno, pero no
+hace tanto). Para forzar el envío ignorando cualquiera de las dos esperas (útil para probar)
+mandá `{"forzar": true}` en el body en vez de `{}`.
+
+### Cuándo arranca y cuándo termina
+
+- **Arranca 2 días después de que abre la ventana de inscripción**, no el mismo día que abre --
+  si `inscripcion_dias_antes` es 7, la ventana abre 7 días antes de la fecha pero el primer
+  recordatorio recién sale al 5to día antes (`fecha - 7 + 2`). Las corridas siguientes respetan
+  el mismo espaciado de 2 días entre una y la otra (`ultimo_recordatorio_inscripcion`).
+- **Termina el día del evento**: el mismo filtro de ventana abierta (`hoy < fecha`) ya excluye
+  la fecha del evento y cualquier día posterior -- no hace falta ningún chequeo extra para esto.
 
 Para probarlo con un caso real en `dev`/staging: elegí una fecha cuya ventana de inscripción
 esté abierta hoy, fijate que algún piloto de prueba tenga `email` + `acepta_notificaciones =

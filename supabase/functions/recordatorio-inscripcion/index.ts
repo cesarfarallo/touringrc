@@ -63,6 +63,12 @@ function restarDias(fechaISO: string, dias: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function sumarDias(fechaISO: string, dias: number): string {
+  const d = new Date(fechaISO + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
 // deno-lint-ignore no-explicit-any
 async function recordarEventosAbiertos(sb: any, forzar: boolean) {
   const hoy = hoyISO();
@@ -82,17 +88,37 @@ async function recordarEventosAbiertos(sb: any, forzar: boolean) {
 
   const resultados = [];
   for (const evento of abiertos) {
-    if (!forzar && evento.ultimo_recordatorio_inscripcion) {
-      const horasPasadas =
-        (Date.now() - new Date(evento.ultimo_recordatorio_inscripcion).getTime()) / (1000 * 60 * 60);
-      if (horasPasadas < DIAS_ENTRE_RECORDATORIOS * 24) {
+    if (!forzar) {
+      // El primer recordatorio no sale el mismo día que abre la ventana --
+      // arranca recién DIAS_ENTRE_RECORDATORIOS días después de esa
+      // apertura (`desde`, no la fecha del evento), para no apurar al
+      // piloto apenas se habilita. `ultimo_recordatorio_inscripcion` sigue
+      // null hasta el primer envío real, así que ese piso hay que
+      // calcularlo aparte -- no alcanza con "esperar 2 días desde el
+      // último", que sin esto nunca aplica la primera vez.
+      const desde = restarDias(evento.fecha, evento.inscripcion_dias_antes);
+      const primerElegible = sumarDias(desde, DIAS_ENTRE_RECORDATORIOS);
+      if (hoy < primerElegible) {
         resultados.push({
           evento: evento.nombre,
           enviados: 0,
-          motivo: `todavía no pasaron ${DIAS_ENTRE_RECORDATORIOS} días desde el último recordatorio`,
-          ultimo_recordatorio: evento.ultimo_recordatorio_inscripcion,
+          motivo: `el primer recordatorio arranca ${DIAS_ENTRE_RECORDATORIOS} días después de que abrió la inscripción (${primerElegible})`,
         });
         continue;
+      }
+
+      if (evento.ultimo_recordatorio_inscripcion) {
+        const horasPasadas =
+          (Date.now() - new Date(evento.ultimo_recordatorio_inscripcion).getTime()) / (1000 * 60 * 60);
+        if (horasPasadas < DIAS_ENTRE_RECORDATORIOS * 24) {
+          resultados.push({
+            evento: evento.nombre,
+            enviados: 0,
+            motivo: `todavía no pasaron ${DIAS_ENTRE_RECORDATORIOS} días desde el último recordatorio`,
+            ultimo_recordatorio: evento.ultimo_recordatorio_inscripcion,
+          });
+          continue;
+        }
       }
     }
     resultados.push(await recordarEvento(sb, evento));

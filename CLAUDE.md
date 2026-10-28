@@ -1995,12 +1995,23 @@ todavía (deja de recibirlo en cuanto se anota).
   `avisar-inscripcion`/`generar-frases-destacadas`, reusa los mismos secrets que ya tenga
   configurados `avisar-inscripcion` en ese proyecto: `CRON_SECRET`, `RESEND_API_KEY`,
   `RESEND_FROM`, `SITE_URL`). Para cada evento con la ventana de inscripción abierta hoy (mismo
-  cálculo que `avisar-inscripcion`, en UTC servidor) y que no haya recibido un recordatorio en
-  los últimos 2 días: busca los pilotos opt-in con email, les resta los que **ya tienen** una
-  fila en `inscripciones` para ese evento (sin importar la clase — alcanza con estar anotado a
-  una, no hace falta estar anotado a todas), y manda el email solo a los que quedan. Se marca el
-  timestamp igual con 0 destinatarios (ningún pendiente en ese ciclo puntual) — mismo criterio
-  que `avisar-inscripcion` marcando el evento avisado aunque nadie sea opt-in todavía.
+  cálculo que `avisar-inscripcion`, en UTC servidor): busca los pilotos opt-in con email, les
+  resta los que **ya tienen** una fila en `inscripciones` para ese evento (sin importar la
+  clase — alcanza con estar anotado a una, no hace falta estar anotado a todas), y manda el
+  email solo a los que quedan. Se marca el timestamp igual con 0 destinatarios (ningún
+  pendiente en ese ciclo puntual) — mismo criterio que `avisar-inscripcion` marcando el evento
+  avisado aunque nadie sea opt-in todavía.
+- **El primer recordatorio no sale el mismo día que abre la ventana**: arranca recién 2 días
+  después de esa apertura (`fecha - inscripcion_dias_antes + 2`), no apenas se habilita — el
+  pedido original era "cada dos días... siempre arranca dos días después que se habilita la
+  inscripción", y el único gate que existía al principio (`ultimo_recordatorio_inscripcion`,
+  `null` hasta el primer envío) no alcanzaba para eso: sin nada más, esa primera corrida
+  mandaba el aviso el mismo día que abría la ventana, porque no había ningún timestamp previo
+  que la bloqueara. `recordarEventosAbiertos()` ahora calcula ese piso aparte (`desde + 2 días`)
+  antes de mirar `ultimo_recordatorio_inscripcion` — ese segundo chequeo sigue intacto y sigue
+  siendo el que espacia la 2da, 3ra, etc. corrida una vez que ya arrancó. **Termina el día del
+  evento** sin necesitar ningún cambio — el mismo filtro de ventana abierta (`hoy < fecha`) ya
+  lo excluye.
 - **Independiente de `avisar-inscripcion`**: las dos funciones conviven sin pisarse — una es el
   aviso único de apertura, la otra el recordatorio repetido para quien sigue sin anotarse. Se
   puede desplegar/programar una sin la otra.
